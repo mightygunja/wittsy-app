@@ -1,0 +1,5 @@
+# Firebase service account key (NEVER COMMIT THIS)
+serviceAccountKey.json
+
+# Node modules if scripts have local dependencies
+node_modules/

@@ -1,0 +1,224 @@
+// User Types
+export interface User {
+  uid: string;
+  username: string;
+  email: string;
+  avatar: Avatar;
+  stats: UserStats;
+  rating: number;
+  rank: string;
+  level: number;
+  xp: number;
+  achievements: string[];
+  settings: UserSettings;
+  friends: string[];
+  createdAt: string;
+  lastActive: string;
+}
+
+// Game Phase Types
+export type GamePhase = 'prompt' | 'submission' | 'waiting' | 'voting' | 'results';
+
+// UserProfile is an alias for User, used in contexts where we explicitly reference the full profile
+export interface UserProfile extends Omit<User, 'createdAt' | 'lastActive'> {
+  createdAt: Date;
+  lastActive: Date;
+}
+
+export interface Avatar {
+  faceShape: string;
+  skinTone: string;
+  hairstyle: string;
+  hairColor: string;
+  eyes: string;
+  mouth: string;
+  accessories: string[];
+  background: string;
+}
+
+export interface UserStats {
+  gamesPlayed: number;
+  gamesWon: number;
+  roundsWon: number;
+  starsEarned: number;
+  totalVotes: number;
+  averageVotes: number;
+  votingAccuracy: number;
+  submissionRate: number;
+  // Advanced Stats
+  currentStreak: number;
+  bestStreak: number;
+  longestPhraseLength: number;
+  shortestWinningPhraseLength: number;
+  comebackWins: number;
+  closeCallWins: number;
+  unanimousVotes: number;
+  perfectGames: number;
+}
+
+export interface UserSettings {
+  theme: 'dark' | 'light' | 'auto';
+  soundEnabled: boolean;
+  musicVolume: number;
+  sfxVolume: number;
+  notificationsEnabled: boolean;
+  showOnlineStatus: boolean;
+  allowFriendRequests: boolean;
+  profileVisibility: 'public' | 'friends' | 'private';
+  colorBlindMode?: boolean;
+  reducedAnimations?: boolean;
+  autoSubmit?: boolean;
+  showVoteCounts?: boolean;
+  hapticFeedback?: boolean;
+}
+
+// Room Types
+export interface Room {
+  roomId: string;
+  name: string;
+  hostId: string;
+  status: 'waiting' | 'active' | 'finished';
+  settings: RoomSettings;
+  players: Player[];
+  spectators: string[];
+  currentRound: number;
+  currentPrompt: Prompt | null;
+  scores: { [userId: string]: PlayerScore };
+  gameState: 'lobby' | 'submission' | 'voting' | 'results';
+  createdAt: string;
+  startedAt?: string;
+}
+
+export interface RoomSettings {
+  maxPlayers: number;
+  submissionTime: number;
+  votingTime: number;
+  winningScore: number;
+  promptPacks: string[];
+  isPrivate: boolean;
+  password?: string;
+  profanityFilter: 'off' | 'medium' | 'strict';
+  spectatorChatEnabled: boolean;
+  allowJoinMidGame: boolean;
+}
+
+export interface Player {
+  userId: string;
+  username: string;
+  avatar: Avatar;
+  isReady: boolean;
+  isConnected: boolean;
+  joinedAt: string;
+}
+
+export interface PlayerScore {
+  roundWins: number;
+  totalVotes: number;
+  stars: number;
+  phrases: Phrase[];
+}
+
+// Game Types
+export interface Prompt {
+  id: string;
+  text: string;
+  category: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  pack: string;
+}
+
+export interface Phrase {
+  id: string;
+  userId: string;
+  text: string;
+  promptId: string;
+  votes: number;
+  voters: string[];
+  isStar: boolean;
+  submittedAt: string;
+}
+
+export interface Vote {
+  voterId: string;
+  phraseId: string;
+  roundNumber: number;
+  votedAt: string;
+}
+
+export interface RoundResult {
+  roundNumber: number;
+  prompt: Prompt;
+  phrases: Phrase[];
+  winner: {
+    userId: string;
+    username: string;
+    phrase: string;
+    votes: number;
+  };
+}
+
+// Navigation Types
+export type RootStackParamList = {
+  Home: undefined;
+  BrowseRooms: undefined;
+  CreateRoom: undefined;
+  GameRoom: { roomId: string };
+  Lobby: { roomId: string };
+  Profile: { userId?: string };
+  Leaderboard: undefined;
+  Settings: undefined;
+  Auth: undefined;
+  Login: undefined;
+  Register: undefined;
+};
+
+// Achievement Types
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: 'starter' | 'skill' | 'social' | 'milestone';
+  requirement: number;
+  progress: number;
+  unlocked: boolean;
+  unlockedAt?: string;
+}
+
+// Leaderboard Types
+export interface LeaderboardEntry {
+  userId: string;
+  username: string;
+  avatar: Avatar;
+  rating: number;
+  rank: string;
+  wins: number;
+  stars: number;
+  winRate: number;
+  position: number;
+}
+
+export type LeaderboardType = 'global' | 'regional' | 'friends' | 'weekly';
+
+// Chat Types
+export interface ChatMessage {
+  id: string;
+  roomId: string;
+  userId: string;
+  username: string;
+  message: string;
+  type: 'text' | 'system' | 'emoji';
+  timestamp: string;
+}
+
+// Notification Types
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'friend_request' | 'game_invite' | 'achievement' | 'game_start';
+  title: string;
+  message: string;
+  data?: any;
+  read: boolean;
+  createdAt: string;
+}
