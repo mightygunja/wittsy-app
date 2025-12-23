@@ -52,3 +52,7 @@ yarn-error.*
 
 # Testing
 coverage/
+
+# Firebase config files with API keys
+google-services.json
+GoogleService-Info.plist
