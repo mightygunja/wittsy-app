@@ -18,10 +18,7 @@ service cloud.firestore {
     match /rooms/{roomId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        resource.data.hostId == request.auth.uid ||
-        request.auth.uid in resource.data.players
-      );
+      allow update: if isSignedIn();
       allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
     }
     
@@ -57,6 +54,148 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Seasons - read-only for users, write for system
+    match /seasons/{seasonId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend can create/update seasons
+    }
+    
+    // Season Stats - users can read their own and others
+    match /seasonStats/{statId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend updates stats
+    }
+    
+    // Rating History - users can read their own
+    match /ratingHistory/{historyId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend updates rating history
+    }
+    
+    // Prompts - read for all, write for admins only
+    match /prompts/{promptId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only admins/backend can create prompts
+    }
+    
+    // Prompt Submissions - users can submit, read their own
+    match /promptSubmissions/{submissionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.submittedBy;
+      allow update: if false; // Only admins can update
+      allow delete: if false;
+    }
+    
+    // Phrase Reports - users can report
+    match /phraseReports/{reportId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.reportedBy;
+      allow update: if false; // Only admins can review
+      allow delete: if false;
+    }
+    
+    // User Prompt Preferences
+    match /userPromptPreferences/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Prompt Packs
+    match /promptPacks/{packId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only admins can create packs
+    }
+    
+    // ==================== SOCIAL FEATURES ====================
+    
+    // Friendships
+    match /friendships/{friendshipId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Friend Requests
+    match /friendRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromUserId;
+      allow update: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+      allow delete: if isSignedIn() && resource.data.fromUserId == request.auth.uid;
+    }
+    
+    // Game Invites
+    match /gameInvites/{inviteId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromUserId;
+      allow update: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+      allow delete: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+    }
+    
+    // Challenges
+    match /challenges/{challengeId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend can create challenges
+    }
+    
+    // Challenge Progress
+    match /challengeProgress/{progressId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+    
+    // Events
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only admins can create events
+      
+      // Event Participants
+      match /participants/{participantId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+    }
+    
+    // Tournaments
+    match /tournaments/{tournamentId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend manages tournaments
+      
+      // Tournament Rounds
+      match /rounds/{roundId} {
+        allow read: if isSignedIn();
+        allow write: if false;
+        
+        // Tournament Matches
+        match /matches/{matchId} {
+          allow read: if isSignedIn();
+          allow write: if false; // Only backend updates matches
+        }
+      }
+      
+      // Tournament Leaderboard
+      match /leaderboard/{entryId} {
+        allow read: if isSignedIn();
+        allow write: if false;
+      }
+    }
+    
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
   }

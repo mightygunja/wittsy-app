@@ -1,5 +1,14 @@
-import { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { getAuth, firestore } from './firebase';
+import { 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail,
+  updateProfile,
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
 
 // Helper to create default avatar
@@ -21,11 +30,10 @@ export const registerUser = async (
   username: string
 ): Promise<User> => {
   try {
-    const auth = getAuth();
-    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
 
-    await firebaseUser.updateProfile({ displayName: username });
+    await updateProfile(firebaseUser, { displayName: username });
 
     const newUser: User = {
       uid: firebaseUser.uid,
@@ -46,9 +54,9 @@ export const registerUser = async (
         longestPhraseLength: 0,
         shortestWinningPhraseLength: 0,
         comebackWins: 0,
-        closeCalls: 0,
-        favoriteCategory: '',
-        totalPlayTime: 0
+        closeCallWins: 0,
+        unanimousVotes: 0,
+        perfectGames: 0
       },
       rating: 1200,
       rank: 'Bronze I',
@@ -75,7 +83,7 @@ export const registerUser = async (
       lastActive: new Date().toISOString(),
     };
 
-    await firestore.collection('users').doc(firebaseUser.uid).set(newUser);
+    await setDoc(doc(firestore, 'users', firebaseUser.uid), newUser);
     return newUser;
   } catch (error: any) {
     console.error('Error registering user:', error);
@@ -84,15 +92,15 @@ export const registerUser = async (
 };
 
 // Sign in
-export const signIn = async (email: string, password: string): Promise<FirebaseAuthTypes.User> => {
+export const signIn = async (email: string, password: string): Promise<FirebaseUser> => {
   try {
-    const auth = getAuth();
-    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
     
-    await firestore
-      .collection('users')
-      .doc(userCredential.user.uid)
-      .set({ lastActive: new Date().toISOString() }, { merge: true });
+    await setDoc(
+      doc(firestore, 'users', userCredential.user.uid),
+      { lastActive: new Date().toISOString() },
+      { merge: true }
+    );
 
     return userCredential.user;
   } catch (error: any) {
@@ -102,15 +110,14 @@ export const signIn = async (email: string, password: string): Promise<FirebaseA
 };
 
 // Sign in with Google
-export const signInWithGoogle = async (): Promise<FirebaseAuthTypes.User> => {
-  throw new Error('Google Sign-In requires @react-native-google-signin/google-signin setup');
+export const signInWithGoogle = async (): Promise<FirebaseUser> => {
+  throw new Error('Google Sign-In requires additional setup');
 };
 
 // Sign out
 export const signOut = async (): Promise<void> => {
   try {
-    const auth = getAuth();
-    await auth.signOut();
+    await firebaseSignOut(auth);
   } catch (error: any) {
     console.error('Error signing out:', error);
     throw new Error(error.message || 'Failed to sign out');
@@ -120,8 +127,7 @@ export const signOut = async (): Promise<void> => {
 // Reset password
 export const resetPassword = async (email: string): Promise<void> => {
   try {
-    const auth = getAuth();
-    await auth.sendPasswordResetEmail(email);
+    await sendPasswordResetEmail(auth, email);
   } catch (error: any) {
     console.error('Error resetting password:', error);
     throw new Error(error.message || 'Failed to reset password');
@@ -131,12 +137,11 @@ export const resetPassword = async (email: string): Promise<void> => {
 // Get current user
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
-    const auth = getAuth();
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
 
-    const userDoc = await firestore.collection('users').doc(firebaseUser.uid).get();
-    if (!userDoc.exists) return null;
+    const userDoc = await getDoc(doc(firestore, 'users', firebaseUser.uid));
+    if (!userDoc.exists()) return null;
 
     return userDoc.data() as User;
   } catch (error) {
@@ -146,7 +151,11 @@ export const getCurrentUser = async (): Promise<User | null> => {
 };
 
 // Auth state observer
-export const onAuthStateChange = (callback: (user: FirebaseAuthTypes.User | null) => void) => {
-  const auth = getAuth();
-  return auth.onAuthStateChanged(callback);
+export const onAuthStateChange = (callback: (user: FirebaseUser | null) => void) => {
+  if (!auth) {
+    console.warn('Auth not initialized, returning empty unsubscribe');
+    callback(null);
+    return () => {}; // Return empty unsubscribe function
+  }
+  return onAuthStateChanged(auth, callback);
 };

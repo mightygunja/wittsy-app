@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
 import { getActiveRooms, joinRoom } from '../services/database';
@@ -84,7 +85,7 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
           onPress={() => handleJoinRoom(item)}
           disabled={isFull}
           variant={isFull ? 'outline' : 'primary'}
-          size="small"
+          size="sm"
           style={styles.joinButton}
         />
       </TouchableOpacity>
@@ -96,7 +97,7 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={rooms}
         keyExtractor={(item) => item.roomId}
@@ -114,13 +115,14 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
             <Button
               title="Create Room"
               onPress={() => navigation.navigate('CreateRoom')}
+              size="md"
               style={styles.createButton}
             />
           </View>
         }
         contentContainerStyle={styles.listContent}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -130,7 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background
   },
   listContent: {
-    padding: 16
+    padding: 12
   },
   roomCard: {
     backgroundColor: '#FFFFFF',
@@ -177,28 +179,33 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    color: COLORS.gray
+    color: COLORS.textSecondary
   },
   joinButton: {
-    marginTop: 8
+    marginTop: 8,
+    height: 40
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60
+    paddingVertical: 80,
+    paddingHorizontal: 24
   },
   emptyText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 8
+    marginBottom: 8,
+    textAlign: 'center'
   },
   emptySubtext: {
-    fontSize: 16,
-    color: COLORS.gray,
-    marginBottom: 24
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 32,
+    textAlign: 'center'
   },
   createButton: {
-    minWidth: 200
+    width: 200,
+    height: 48
   }
 });

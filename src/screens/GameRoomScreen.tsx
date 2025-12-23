@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,14 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
-import { getRoom, leaveRoom, startGame } from '../services/database';
+import { leaveRoom, startGame } from '../services/database';
+import { gameTimerService } from '../services/gameTimer';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { firestore } from '../services/firebase';
 import {
   subscribeToGameState,
   markSubmission,
@@ -24,6 +28,7 @@ import {
   subscribeToTyping,
 } from '../services/realtime';
 import { Room, GamePhase } from '../types';
+import { ChatBox } from '../components/social/ChatBox';
 import { COLORS } from '../utils/constants';
 import { validatePhrase } from '../utils/validation';
 import { Button } from '../components/common/Button';
@@ -66,28 +71,69 @@ const GameRoomScreen: React.FC = () => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [submissionCount, setSubmissionCount] = useState(0);
   const [voteCount, setVoteCount] = useState(0);
+  
+  // Track previous phase to detect actual phase changes
+  const previousPhaseRef = useRef<string | null>(null);
+  
+  // Store unsubscribe functions to clean up before leaving
+  const roomUnsubscribeRef = useRef<(() => void) | null>(null);
+  const gameStateUnsubscribeRef = useRef<(() => void) | null>(null);
 
-  // Load room data
+  // Subscribe to room data updates (Firestore)
   useEffect(() => {
-    loadRoom();
-  }, [roomId]);
+    if (!roomId) return;
 
-  const loadRoom = async () => {
-    try {
-      const roomData = await getRoom(roomId);
-      if (!roomData) {
-        Alert.alert('Error', 'Room not found');
-        navigation.goBack();
-        return;
+    const roomRef = doc(firestore, 'rooms', roomId);
+    const unsubscribe = onSnapshot(roomRef, (snapshot) => {
+      // Check if we're intentionally leaving
+      if (!roomUnsubscribeRef.current) return;
+      if (snapshot.exists()) {
+        const roomData = snapshot.data() as Room;
+        console.log('🔄 Room updated:', {
+          roomId,
+          playerCount: roomData.players?.length || 0,
+          players: roomData.players?.map(p => p.username) || [],
+          currentUserId: user?.uid,
+          isCurrentUserInRoom: roomData.players?.some(p => p.userId === user?.uid)
+        });
+        setRoom(roomData);
+        setLoading(false);
+      } else {
+        Alert.alert('Error', 'Room not found', [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('Home' as never);
+              }
+            }
+          }
+        ]);
       }
-      setRoom(roomData);
-      setLoading(false);
-    } catch (error) {
+    }, (error) => {
       console.error('Error loading room:', error);
-      Alert.alert('Error', 'Failed to load room');
-      navigation.goBack();
-    }
-  };
+      Alert.alert('Error', 'Failed to load room', [
+        {
+          text: 'OK',
+          onPress: () => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Home' as never);
+            }
+          }
+        }
+      ]);
+    });
+
+    roomUnsubscribeRef.current = unsubscribe;
+    return () => {
+      roomUnsubscribeRef.current = null;
+      unsubscribe();
+    };
+  }, [roomId]);
 
   // Subscribe to game state updates
   useEffect(() => {
@@ -95,20 +141,29 @@ const GameRoomScreen: React.FC = () => {
 
     const unsubscribe = subscribeToGameState(roomId, (state) => {
       if (state) {
-        setGameState(state as GameState);
+        const previousPhase = previousPhaseRef.current;
         
-        // Reset phase-specific state when phase changes
-        if (state.phase === 'submission') {
+        // Reset phase-specific state when phase actually changes
+        if (state.phase === 'submission' && previousPhase !== 'submission') {
+          // Only reset when entering submission phase from a different phase
           setHasSubmitted(false);
           setPhrase('');
           setHasVoted(false);
-        } else if (state.phase === 'voting') {
+        } else if (state.phase === 'voting' && previousPhase !== 'voting') {
           setHasVoted(false);
         }
+        
+        // Update the ref and state
+        previousPhaseRef.current = state.phase;
+        setGameState(state as GameState);
       }
     });
 
-    return () => unsubscribe();
+    gameStateUnsubscribeRef.current = unsubscribe;
+    return () => {
+      gameStateUnsubscribeRef.current = null;
+      unsubscribe();
+    };
   }, [roomId]);
 
   // Subscribe to typing indicators
@@ -170,14 +225,10 @@ const GameRoomScreen: React.FC = () => {
     }
 
     try {
-      await markSubmission(roomId, user.uid);
+      await markSubmission(roomId, user.uid, phrase.trim());
       
-      // Note: Actual phrase storage would be handled by the game server/functions
-      // For now, we just mark the submission in realtime DB
-
       setHasSubmitted(true);
       setTyping(roomId, user.uid, false);
-      Alert.alert('Success', 'Phrase submitted!');
     } catch (error) {
       console.error('Error submitting phrase:', error);
       Alert.alert('Error', 'Failed to submit phrase');
@@ -200,7 +251,6 @@ const GameRoomScreen: React.FC = () => {
       // Note: Vote storage is handled by markVote in realtime DB
 
       setHasVoted(true);
-      Alert.alert('Success', 'Vote cast!');
     } catch (error) {
       console.error('Error voting:', error);
       Alert.alert('Error', 'Failed to cast vote');
@@ -211,14 +261,13 @@ const GameRoomScreen: React.FC = () => {
   const handleStartGame = async () => {
     if (!room || room.hostId !== user?.uid) return;
 
-    if (room.players.length < 3) {
-      Alert.alert('Error', 'Need at least 3 players to start');
+    if (room.players.length < 1) {
+      Alert.alert('Error', 'Need at least 1 player to start');
       return;
     }
 
     try {
       await startGame(roomId);
-      Alert.alert('Success', 'Game starting!');
     } catch (error) {
       console.error('Error starting game:', error);
       Alert.alert('Error', 'Failed to start game');
@@ -230,6 +279,18 @@ const GameRoomScreen: React.FC = () => {
     if (!user?.uid) return;
 
     try {
+      // Unsubscribe from listeners first to prevent "Room not found" alert
+      if (roomUnsubscribeRef.current) {
+        roomUnsubscribeRef.current();
+        roomUnsubscribeRef.current = null;
+      }
+      if (gameStateUnsubscribeRef.current) {
+        gameStateUnsubscribeRef.current();
+        gameStateUnsubscribeRef.current = null;
+      }
+      
+      // Stop the timer for this room
+      gameTimerService.stopTimer(roomId);
       await leaveRoom(roomId, user.uid);
       navigation.goBack();
     } catch (error) {
@@ -237,17 +298,33 @@ const GameRoomScreen: React.FC = () => {
       Alert.alert('Error', 'Failed to leave room');
     }
   };
+  
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      gameTimerService.stopTimer(roomId);
+    };
+  }, [roomId]);
 
   // Render phase-specific content
+  // Helper to safely get prompt text (handles both string and object)
+  const getPromptText = (prompt: any): string => {
+    if (typeof prompt === 'string') return prompt;
+    if (prompt && typeof prompt === 'object' && prompt.text) return prompt.text;
+    return 'Loading prompt...';
+  };
+
   const renderPhaseContent = () => {
     if (!gameState) return null;
+    
+    const promptText = getPromptText(gameState.currentPrompt);
 
     switch (gameState.phase) {
       case 'prompt':
         return (
           <View style={styles.promptPhase}>
             <Text style={styles.phaseTitle}>GET READY!</Text>
-            <Text style={styles.promptText}>{gameState.currentPrompt}</Text>
+            <Text style={styles.promptText}>{promptText}</Text>
             <Text style={styles.roundNumber}>Round {gameState.currentRound}</Text>
           </View>
         );
@@ -255,7 +332,7 @@ const GameRoomScreen: React.FC = () => {
       case 'submission':
         return (
           <View style={styles.submissionPhase}>
-            <Text style={styles.promptText}>{gameState.currentPrompt}</Text>
+            <Text style={styles.promptText}>{promptText}</Text>
             
             <View style={styles.submissionInfo}>
               <Text style={styles.infoText}>
@@ -269,10 +346,7 @@ const GameRoomScreen: React.FC = () => {
             </View>
 
             {!hasSubmitted ? (
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.inputContainer}
-              >
+              <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.phraseInput}
                   placeholder="Enter your witty phrase..."
@@ -288,8 +362,10 @@ const GameRoomScreen: React.FC = () => {
                   title="SUBMIT PHRASE"
                   onPress={handleSubmit}
                   disabled={!phrase.trim()}
+                  size="md"
+                  style={styles.submitButton}
                 />
-              </KeyboardAvoidingView>
+              </View>
             ) : (
               <View style={styles.waitingContainer}>
                 <Text style={styles.waitingText}>✓ Phrase submitted!</Text>
@@ -310,7 +386,10 @@ const GameRoomScreen: React.FC = () => {
       case 'voting':
         return (
           <View style={styles.votingPhase}>
-            <Text style={styles.promptText}>{gameState.currentPrompt}</Text>
+            <View style={styles.votingHeader}>
+              <Text style={styles.phaseTitle}>VOTE FOR THE BEST!</Text>
+              <Text style={styles.promptText}>{promptText}</Text>
+            </View>
             
             <View style={styles.voteInfo}>
               <Text style={styles.infoText}>
@@ -321,7 +400,7 @@ const GameRoomScreen: React.FC = () => {
               )}
             </View>
 
-            <ScrollView style={styles.phrasesList}>
+            <ScrollView style={styles.phrasesList} showsVerticalScrollIndicator={false}>
               {Object.entries(gameState.submissions || {}).map(([userId, phraseText], index) => (
                 <PhraseCard
                   key={userId}
@@ -401,7 +480,7 @@ const GameRoomScreen: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -421,6 +500,34 @@ const GameRoomScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* In-game scoreboard - shows during active game */}
+      {room.status === 'active' && room.scores && (
+        <View style={styles.inGameScoreboard}>
+          <Text style={styles.scoreboardTitle}>SCORES</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scoresList}>
+            {Object.entries(room.scores)
+              .sort(([, a], [, b]) => {
+                const scoreA = typeof a === 'object' ? (a.totalVotes || 0) : 0;
+                const scoreB = typeof b === 'object' ? (b.totalVotes || 0) : 0;
+                return scoreB - scoreA;
+              })
+              .slice(0, 5)
+              .map(([userId, score]) => {
+                const player = room.players.find(p => p.userId === userId);
+                const displayScore = typeof score === 'object' ? (score.totalVotes || 0) : 0;
+                return (
+                  <View key={userId} style={styles.scoreItem}>
+                    <Text style={styles.playerName} numberOfLines={1}>
+                      {player?.username || 'Unknown'}
+                    </Text>
+                    <Text style={styles.playerScore}>{displayScore} votes</Text>
+                  </View>
+                );
+              })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Main content area */}
       <View style={styles.mainContent}>
         {/* Waiting lobby (before game starts) */}
@@ -431,13 +538,15 @@ const GameRoomScreen: React.FC = () => {
               {room.players.length}/{room.settings.maxPlayers} players
             </Text>
             
-            <PlayerList players={room.players} />
+            <PlayerList players={room.players} currentUserId={user?.uid} />
             
             {room.hostId === user?.uid && (
               <Button
                 title="START GAME"
                 onPress={handleStartGame}
-                disabled={room.players.length < 3}
+                disabled={room.players.length < 1}
+                size="md"
+                style={styles.startButton}
               />
             )}
             
@@ -448,10 +557,40 @@ const GameRoomScreen: React.FC = () => {
         )}
 
         {/* Active game */}
-        {room.status === 'active' && room.scores && (
-          <ScrollView style={styles.gameContent}>
-            {renderPhaseContent()}
-          </ScrollView>
+        {room.status === 'active' && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={100}
+          >
+            <View style={{ flex: 1 }}>
+              <ScrollView 
+                style={styles.gameContent}
+                contentContainerStyle={styles.gameContentContainer}
+                keyboardShouldPersistTaps="handled"
+              >
+                {gameState ? renderPhaseContent() : (
+                  <View style={styles.waitingPhase}>
+                    <Text style={styles.phaseTitle}>Loading game...</Text>
+                    <Text style={styles.waitingSubtext}>Please wait</Text>
+                  </View>
+                )}
+              </ScrollView>
+              
+              {/* In-game Chat */}
+              {user && (
+                <View style={styles.chatContainer}>
+                  <ChatBox
+                    roomId={roomId}
+                    userId={user.uid}
+                    username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
+                    compact={true}
+                    maxHeight={300}
+                  />
+                </View>
+              )}
+            </View>
+          </KeyboardAvoidingView>
         )}
 
         {/* Game finished */}
@@ -463,31 +602,22 @@ const GameRoomScreen: React.FC = () => {
               scores={Object.fromEntries(
                 Object.entries(room.scores || {}).map(([userId, score]) => [
                   userId,
-                  typeof score === 'object' ? score.roundWins : score
+                  typeof score === 'object' ? score.totalVotes : score
                 ])
               )}
             />
-            <Button title="Back to Lobby" onPress={handleLeaveRoom} />
+            <Button 
+              title="Back to Lobby" 
+              onPress={handleLeaveRoom}
+              size="md"
+              style={styles.backButton}
+            />
           </View>
         )}
       </View>
 
-      {/* Scoreboard sidebar (during active game) */}
-      {room.status === 'active' && (
-        <View style={styles.sidebar}>
-          <ScoreBoard
-            players={room.players}
-            scores={Object.fromEntries(
-              Object.entries(room.scores || {}).map(([userId, score]) => [
-                userId,
-                typeof score === 'object' ? score.roundWins : score
-              ])
-            )}
-            compact
-          />
-        </View>
-      )}
-    </View>
+      {/* Scoreboard sidebar (during active game) - Hidden on mobile */}
+    </SafeAreaView>
   );
 };
 
@@ -500,63 +630,100 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
     borderBottomColor: COLORS.border,
+    minHeight: 60,
   },
   headerLeft: {
     flex: 1,
+    marginRight: 8,
   },
   roomName: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: 'bold',
     color: COLORS.text,
   },
   roomCode: {
-    fontSize: 12,
+    fontSize: 10,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
   leaveButton: {
-    padding: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     backgroundColor: COLORS.error,
-    borderRadius: 8,
+    borderRadius: 6,
+    marginLeft: 8,
   },
   leaveButtonText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontWeight: '600',
+    fontSize: 12,
   },
   mainContent: {
     flex: 1,
   },
   sidebar: {
-    position: 'absolute',
-    right: 0,
-    top: 70,
-    bottom: 0,
-    width: 200,
+    display: 'none', // Hidden on mobile - causes layout issues
+  },
+  inGameScoreboard: {
     backgroundColor: COLORS.surface,
-    borderLeftWidth: 1,
-    borderLeftColor: COLORS.border,
-    padding: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  scoreboardTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: 6,
+    letterSpacing: 1,
+  },
+  scoresList: {
+    flexDirection: 'row',
+  },
+  scoreItem: {
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  playerName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  playerScore: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   lobby: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 16,
   },
   lobbyTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
     marginBottom: 8,
+    textAlign: 'center',
   },
   lobbySubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.textSecondary,
-    marginBottom: 24,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   waitingForHost: {
     fontSize: 14,
@@ -565,33 +732,36 @@ const styles = StyleSheet.create({
   },
   gameContent: {
     flex: 1,
-    padding: 16,
+  },
+  gameContentContainer: {
+    padding: 12,
   },
   promptPhase: {
+    minHeight: 400,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    padding: 20,
   },
   phaseTitle: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.primary,
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
   },
   promptText: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   roundNumber: {
     fontSize: 18,
     color: COLORS.textSecondary,
   },
   submissionPhase: {
-    flex: 1,
+    paddingVertical: 16,
   },
   submissionInfo: {
     marginVertical: 16,
@@ -609,14 +779,15 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginTop: 16,
+    paddingHorizontal: 4,
   },
   phraseInput: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    padding: 12,
+    fontSize: 15,
     color: COLORS.text,
-    minHeight: 100,
+    minHeight: 80,
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -624,71 +795,84 @@ const styles = StyleSheet.create({
   charCount: {
     textAlign: 'right',
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 4,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   waitingContainer: {
     alignItems: 'center',
     marginTop: 32,
   },
   waitingText: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '600',
     color: COLORS.success,
     marginBottom: 8,
+    textAlign: 'center',
   },
   waitingSubtext: {
     fontSize: 14,
     color: COLORS.textSecondary,
   },
   waitingPhase: {
+    minHeight: 400,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    padding: 20,
   },
   votingPhase: {
-    flex: 1,
+    paddingVertical: 8,
+  },
+  votingHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
   },
   voteInfo: {
-    marginVertical: 16,
+    backgroundColor: COLORS.surface,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   votedText: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.success,
-    fontWeight: '600',
-    marginTop: 4,
+    fontWeight: '700',
+    marginTop: 6,
+    letterSpacing: 0.5,
   },
   phrasesList: {
     flex: 1,
+    paddingHorizontal: 4,
   },
   resultsPhase: {
-    flex: 1,
+    paddingVertical: 16,
   },
   winnerCard: {
     backgroundColor: COLORS.gold,
-    borderRadius: 16,
-    padding: 24,
-    marginVertical: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 12,
     alignItems: 'center',
   },
   winningPhrase: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '600',
     color: COLORS.background,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   winnerName: {
-    fontSize: 18,
+    fontSize: 15,
     color: COLORS.background,
     fontWeight: '600',
   },
   voteCountText: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.background,
-    marginTop: 8,
+    marginTop: 6,
   },
   allPhrasesList: {
     flex: 1,
@@ -696,24 +880,31 @@ const styles = StyleSheet.create({
   },
   resultCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  resultPhrase: {
-    fontSize: 16,
-    color: COLORS.text,
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 8,
   },
-  resultAuthor: {
+  resultPhrase: {
     fontSize: 14,
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+  resultAuthor: {
+    fontSize: 12,
     color: COLORS.textSecondary,
     marginBottom: 4,
   },
   resultVotes: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.primary,
     fontWeight: '600',
+  },
+  submitButton: {
+    height: 48,
+  },
+  chatContainer: {
+    padding: 12,
+    paddingBottom: 0,
   },
   finishedContainer: {
     flex: 1,
@@ -722,10 +913,19 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   finishedTitle: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.primary,
-    marginBottom: 24,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  startButton: {
+    height: 48,
+    marginTop: 16,
+  },
+  backButton: {
+    height: 48,
+    marginTop: 16,
   },
   errorText: {
     fontSize: 16,

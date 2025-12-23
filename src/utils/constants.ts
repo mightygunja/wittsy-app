@@ -6,9 +6,11 @@ export const APP_VERSION = '1.0.0';
 // Game Settings
 export const DEFAULT_SUBMISSION_TIME = 25; // seconds
 export const DEFAULT_VOTING_TIME = 10; // seconds
-export const DEFAULT_WINNING_SCORE = 10; // rounds
+export const WINNING_VOTES = 20; // FIXED - total votes needed to win (not adjustable)
+export const JOIN_LOCK_THRESHOLD = 8; // FIXED - votes at which joins are locked
 export const MAX_PLAYERS = 12;
 export const MIN_PLAYERS = 3;
+export const MIN_PLAYERS_ACTIVE = 3; // Minimum players to continue game
 export const STAR_THRESHOLD = 6; // votes needed for star
 export const PHRASE_MAX_LENGTH = 200;
 

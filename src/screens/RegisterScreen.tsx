@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
@@ -44,113 +45,130 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          <Text style={styles.title}>🎮 Wittsy</Text>
-          <Text style={styles.subtitle}>Create your account</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            <Text style={styles.title}>🎮 Wittsy</Text>
+            <Text style={styles.subtitle}>Create your account</Text>
 
-          <Input
-            label="Username"
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Choose a username"
-            autoCapitalize="none"
-            error={errors.username}
-          />
+            <Input
+              label="Username"
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Choose a username"
+              autoCapitalize="none"
+              error={errors.username}
+            />
 
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={errors.email}
-          />
+            <Input
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter your email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              error={errors.email}
+            />
 
-          <Input
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Create a password"
-            secureTextEntry
-            error={errors.password}
-          />
+            <Input
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Create a password (min 6 characters)"
+              secureTextEntry
+              autoComplete="off"
+              textContentType="none"
+              passwordRules="minlength: 6;"
+              error={errors.password}
+            />
 
-          <Input
-            label="Confirm Password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Confirm your password"
-            secureTextEntry
-            error={errors.confirmPassword}
-          />
+            <Input
+              label="Confirm Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Confirm your password"
+              secureTextEntry
+              autoComplete="off"
+              textContentType="none"
+              error={errors.confirmPassword}
+            />
 
-          <Button
-            title="Create Account"
-            onPress={handleRegister}
-            loading={loading}
-            style={styles.button}
-          />
+            <Button
+              title="Create Account"
+              onPress={handleRegister}
+              loading={loading}
+              size="sm"
+              style={styles.button}
+            />
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <Text
-              style={styles.link}
-              onPress={() => navigation.navigate('Login')}
-            >
-              Sign In
-            </Text>
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <Text
+                style={styles.link}
+                onPress={() => navigation.navigate('Login')}
+              >
+                Sign In
+              </Text>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background
   },
   scrollContent: {
-    flexGrow: 1
+    paddingVertical: 20,
+    paddingHorizontal: 20
   },
   content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center'
+    width: '100%'
   },
   title: {
-    fontSize: 48,
+    fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 8
+    marginBottom: 2,
+    color: COLORS.text
   },
   subtitle: {
-    fontSize: 24,
+    fontSize: 14,
     textAlign: 'center',
-    marginBottom: 32,
-    color: COLORS.gray
+    marginBottom: 12,
+    color: COLORS.textSecondary
   },
   button: {
-    marginBottom: 16
+    marginBottom: 8,
+    height: 40
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24
+    marginTop: 8
   },
   footerText: {
-    fontSize: 14,
-    color: COLORS.gray
+    fontSize: 13,
+    color: COLORS.textSecondary
   },
   link: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.primary,
     fontWeight: '600'
   }

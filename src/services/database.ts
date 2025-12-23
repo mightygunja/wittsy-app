@@ -15,9 +15,12 @@ import {
   Timestamp,
   increment
 } from 'firebase/firestore';
-import { firestore } from './firebase';
+import { firestore, realtimeDb } from './firebase';
+import { ref, set, get } from 'firebase/database';
 import { Room, RoomSettings, Player, Prompt } from '../types';
 import { generateRoomCode } from '../utils/helpers';
+import { gameTimerService } from './gameTimer';
+import { WINNING_VOTES, JOIN_LOCK_THRESHOLD } from '../utils/constants';
 
 // ==================== ROOM OPERATIONS ====================
 
@@ -32,9 +35,10 @@ export const createRoom = async (
 ): Promise<string> => {
   const defaultSettings: RoomSettings = {
     maxPlayers: 12,
-    submissionTime: 25,
-    votingTime: 10,
-    winningScore: 10,
+    submissionTime: 20,
+    votingTime: 20,
+    winningVotes: WINNING_VOTES, // FIXED at 20 - not adjustable
+    joinLockVoteThreshold: JOIN_LOCK_THRESHOLD, // FIXED at 8
     promptPacks: ['default'],
     isPrivate: false,
     profanityFilter: 'medium',
@@ -60,7 +64,7 @@ export const createRoom = async (
     spectators: [],
     currentRound: 0,
     currentPrompt: null,
-    scores: { [hostId]: { roundWins: 0, totalVotes: 0, stars: 0, phrases: [] } },
+    scores: { [hostId]: { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] } },
     gameState: 'lobby' as const,
     createdAt: Timestamp.now(),
     startedAt: null
@@ -126,6 +130,8 @@ export const joinRoom = async (
   userId: string,
   username: string
 ): Promise<void> => {
+  console.log('🚪 Joining room:', { roomId, userId, username });
+  
   const roomRef = doc(firestore, 'rooms', roomId);
   const roomDoc = await getDoc(roomRef);
   
@@ -135,12 +141,32 @@ export const joinRoom = async (
   
   const roomData = roomDoc.data();
   const players = roomData.players || [];
+  const scores = roomData.scores || {};
+  
+  // Check if any player has reached the join lock threshold
+  const maxVotes = Math.max(...Object.values(scores).map((s: any) => s.totalVotes || 0));
+  const joinLockThreshold = roomData.settings.joinLockVoteThreshold || JOIN_LOCK_THRESHOLD;
+  
+  console.log('📊 Current room state:', {
+    currentPlayers: players.length,
+    maxPlayers: roomData.settings.maxPlayers,
+    maxVotes,
+    joinLockThreshold,
+    isJoinLocked: maxVotes >= joinLockThreshold,
+    playerUserIds: players.map((p: Player) => p.userId)
+  });
+  
+  // Prevent joining if any player has reached vote threshold
+  if (maxVotes >= joinLockThreshold) {
+    throw new Error(`Game is locked - a player has reached ${joinLockThreshold} votes`);
+  }
   
   if (players.length >= roomData.settings.maxPlayers) {
     throw new Error('Room is full');
   }
   
   if (players.find((p: Player) => p.userId === userId)) {
+    console.warn('⚠️ User already in room, skipping join');
     throw new Error('Already in room');
   }
   
@@ -149,13 +175,23 @@ export const joinRoom = async (
     username,
     isReady: false,
     isConnected: true,
-    joinedAt: new Date().toISOString()
+    joinedAt: new Date().toISOString(),
+    avatar: null, // Will be populated from user profile if needed
   };
   
-  await updateDoc(roomRef, {
-    players: [...players, newPlayer],
-    [`scores.${userId}`]: { roundWins: 0, totalVotes: 0, stars: 0, phrases: [] }
+  const updatedPlayers = [...players, newPlayer];
+  
+  console.log('✅ Adding player to room:', {
+    newPlayerCount: updatedPlayers.length,
+    newPlayer: newPlayer.username
   });
+  
+  await updateDoc(roomRef, {
+    players: updatedPlayers,
+    [`scores.${userId}`]: { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] }
+  });
+  
+  console.log('✅ Player joined successfully');
 };
 
 /**
@@ -201,18 +237,222 @@ export const updateRoomSettings = async (
 };
 
 /**
+ * Helper function to start submission phase timer and continue game loop recursively
+ */
+const startSubmissionPhaseLoop = async (
+  roomId: string, 
+  roomData: Room, 
+  promptText: string, 
+  roundNumber: number
+) => {
+  gameTimerService.startTimer(roomId, roomData.settings.submissionTime, async (submissionTimeLeft) => {
+    console.log('Submission phase timer:', submissionTimeLeft);
+    if (submissionTimeLeft <= 0) {
+      console.log('Transitioning to voting phase...');
+      try {
+        // Transition to voting phase
+        await gameTimerService.transitionPhase(
+          roomId,
+          'voting',
+          roomData.settings.votingTime,
+          {
+            currentPrompt: promptText,
+            currentRound: roundNumber
+          }
+        );
+        console.log('Successfully transitioned to voting phase');
+        
+        // Set up timer for voting phase
+        gameTimerService.startTimer(roomId, roomData.settings.votingTime, async (votingTimeLeft) => {
+          console.log('Voting phase timer:', votingTimeLeft);
+          if (votingTimeLeft <= 0) {
+            console.log('Transitioning to results phase...');
+            try {
+              // Calculate winner from votes
+              const gameStateSnapshot = await get(ref(realtimeDb, `rooms/${roomId}/gameState`));
+              const currentGameState = gameStateSnapshot.val();
+              const votes = currentGameState?.votes || {};
+              const submissions = currentGameState?.submissions || {};
+              
+              // Count votes for each phrase
+              const voteCount: { [userId: string]: number } = {};
+              Object.values(votes).forEach((votedUserId: any) => {
+                voteCount[votedUserId] = (voteCount[votedUserId] || 0) + 1;
+              });
+              
+              // Find winner
+              let winnerId = null;
+              let maxVotes = 0;
+              Object.entries(voteCount).forEach(([userId, count]) => {
+                if (count > maxVotes) {
+                  maxVotes = count;
+                  winnerId = userId;
+                }
+              });
+              
+              const winningPhrase = winnerId ? submissions[winnerId] : null;
+              
+              // Update scores in Firestore
+              if (winnerId) {
+                const roomRef = doc(firestore, 'rooms', roomId);
+                await updateDoc(roomRef, {
+                  [`scores.${winnerId}`]: increment(1)
+                });
+              }
+              
+              // Transition to results phase
+              await gameTimerService.transitionPhase(
+                roomId,
+                'results',
+                8, // 8 seconds for results
+                {
+                  currentPrompt: promptText,
+                  currentRound: roundNumber,
+                  lastWinner: winnerId,
+                  lastWinningPhrase: winningPhrase,
+                  voteCount: maxVotes
+                }
+              );
+              console.log('Successfully transitioned to results phase');
+              
+              // Set up timer for results phase to start next round
+              gameTimerService.startTimer(roomId, 8, async (resultsTimeLeft) => {
+                console.log('Results phase timer:', resultsTimeLeft);
+                if (resultsTimeLeft <= 0) {
+                  console.log('Starting next round...');
+                  try {
+                    // Get a new prompt
+                    const newPrompt = await getRandomPrompt();
+                    if (!newPrompt) {
+                      console.error('No prompts available for next round');
+                      return;
+                    }
+                    const newPromptText = typeof newPrompt === 'string' ? newPrompt : newPrompt.text;
+                    
+                    // Clear previous round data and start new prompt phase
+                    await gameTimerService.transitionPhase(
+                      roomId,
+                      'prompt',
+                      5, // 5 seconds to read prompt
+                      {
+                        currentPrompt: newPromptText,
+                        currentRound: roundNumber + 1,
+                        submissions: {},
+                        votes: {}
+                      }
+                    );
+                    console.log('Started new round with prompt:', newPromptText);
+                    
+                    // Continue the game loop (prompt → submission → voting → results)
+                    gameTimerService.startTimer(roomId, 5, async (promptTimeLeft) => {
+                      if (promptTimeLeft <= 0) {
+                        // Transition to submission phase for next round
+                        await gameTimerService.transitionPhase(
+                          roomId,
+                          'submission',
+                          roomData.settings.submissionTime,
+                          {
+                            currentPrompt: newPromptText,
+                            currentRound: roundNumber + 1
+                          }
+                        );
+                        console.log('Next round submission phase started. Round:', roundNumber + 1);
+                        // Recursively continue the game loop
+                        startSubmissionPhaseLoop(roomId, roomData, newPromptText, roundNumber + 1);
+                      }
+                    });
+                  } catch (error) {
+                    console.error('Error starting next round:', error);
+                  }
+                }
+              });
+            } catch (error) {
+              console.error('Error transitioning to results phase:', error);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error transitioning to voting phase:', error);
+      }
+    }
+  });
+};
+
+/**
  * Start the game
  */
 export const startGame = async (roomId: string): Promise<void> => {
   const roomRef = doc(firestore, 'rooms', roomId);
-  const prompt = await getRandomPrompt();
+  const roomDoc = await getDoc(roomRef);
   
+  if (!roomDoc.exists()) {
+    throw new Error('Room not found');
+  }
+  
+  const roomData = roomDoc.data() as Room;
+  const promptObj = await getRandomPrompt();
+  
+  if (!promptObj) {
+    throw new Error('No prompts available');
+  }
+  
+  const promptText = promptObj.text; // Extract just the text
+  
+  // Initialize scores for all players
+  const scores: { [userId: string]: number } = {};
+  roomData.players.forEach(player => {
+    scores[player.userId] = 0;
+  });
+  
+  // Update Firestore
   await updateDoc(roomRef, {
     status: 'active',
     gameState: 'submission',
     currentRound: 1,
-    currentPrompt: prompt,
-    startedAt: Timestamp.now()
+    currentPrompt: promptText,
+    startedAt: Timestamp.now(),
+    scores: scores
+  });
+  
+  // Initialize Realtime Database game state
+  const gameStateRef = ref(realtimeDb, `rooms/${roomId}/gameState`);
+  await set(gameStateRef, {
+    phase: 'prompt',
+    timeRemaining: 5, // 5 seconds to show the prompt
+    currentPrompt: promptText,
+    currentRound: 1,
+    submissions: {},
+    votes: {},
+    lastWinner: null,
+    lastWinningPhrase: null
+  });
+  
+  // Start timer for prompt phase (5 seconds)
+  gameTimerService.startTimer(roomId, 5, async (timeLeft) => {
+    console.log('Prompt phase timer:', timeLeft);
+    if (timeLeft <= 0) {
+      console.log('Transitioning to submission phase...');
+      try {
+        // Transition to submission phase
+        await gameTimerService.transitionPhase(
+          roomId,
+          'submission',
+          roomData.settings.submissionTime,
+          {
+            currentPrompt: promptText,
+            currentRound: 1,
+            submissions: {},
+            votes: {}
+          }
+        );
+        console.log('Successfully transitioned to submission phase');
+        
+        // Start the game loop using helper function
+        startSubmissionPhaseLoop(roomId, roomData, promptText, 1);
+      } catch (error) {
+        console.error('Error transitioning to submission phase:', error);
+      }
+    }
   });
 };
 
@@ -427,18 +667,28 @@ export const getUserMatches = async (
   userId: string,
   maxResults: number = 20
 ): Promise<any[]> => {
-  const q = query(
-    collection(firestore, 'matches'),
-    where('players', 'array-contains', { userId }),
-    orderBy('createdAt', 'desc'),
-    limit(maxResults)
-  );
-  
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    matchId: doc.id,
-    ...doc.data()
-  }));
+  try {
+    // Simplified query to avoid composite index requirement
+    const q = query(
+      collection(firestore, 'matches'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(maxResults)
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      matchId: doc.id,
+      ...doc.data()
+    }));
+  } catch (error: any) {
+    // Handle permissions or index errors gracefully
+    if (error?.code === 'permission-denied' || error?.code === 'failed-precondition') {
+      console.warn('Match history requires Firestore permissions or index. Returning empty history.');
+      return [];
+    }
+    throw error;
+  }
 };
 
 // Update advanced user stats

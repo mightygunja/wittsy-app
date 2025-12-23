@@ -142,10 +142,14 @@ export const subscribeToGameState = (
   roomId: string,
   callback: (gameState: any) => void
 ): (() => void) => {
-  const gameStateRef = ref(realtimeDb, `rooms/${roomId}/gameState`);
+  const gameStateRef = ref(realtimeDb, `gameStates/${roomId}`);
+  
+  console.log('🎮 Subscribing to game state:', `gameStates/${roomId}`);
   
   const unsubscribe = onValue(gameStateRef, (snapshot) => {
-    callback(snapshot.val());
+    const state = snapshot.val();
+    console.log('⏱️ Game state update:', state);
+    callback(state);
   });
   
   return unsubscribe;
@@ -164,12 +168,17 @@ export const clearRoomState = (roomId: string): void => {
 /**
  * Mark that a player has submitted their phrase
  */
-export const markSubmission = (roomId: string, userId: string): void => {
+export const markSubmission = (roomId: string, userId: string, phraseText: string): void => {
+  // Store in submissions tracking
   const submissionRef = ref(realtimeDb, `rooms/${roomId}/submissions/${userId}`);
   set(submissionRef, {
     submitted: true,
     timestamp: serverTimestamp()
   });
+  
+  // Store the actual phrase in gameState
+  const gameStateSubmissionRef = ref(realtimeDb, `rooms/${roomId}/gameState/submissions/${userId}`);
+  set(gameStateSubmissionRef, phraseText);
 };
 
 /**

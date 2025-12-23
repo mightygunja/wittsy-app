@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, Switch, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Alert, Switch, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { createRoom } from '../services/database';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { validateRoomName } from '../utils/validation';
-import { COLORS, DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, DEFAULT_WINNING_SCORE } from '../utils/constants';
+import { COLORS, DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES } from '../utils/constants';
 
 export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { userProfile } = useAuth();
@@ -13,7 +14,6 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const [maxPlayers, setMaxPlayers] = useState('12');
   const [submissionTime, setSubmissionTime] = useState(DEFAULT_SUBMISSION_TIME.toString());
   const [votingTime, setVotingTime] = useState(DEFAULT_VOTING_TIME.toString());
-  const [winningScore, setWinningScore] = useState(DEFAULT_WINNING_SCORE.toString());
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -73,15 +73,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       return;
     }
 
-    // Validate winning score
-    const winningScoreNum = parseInt(winningScore);
-    if (isNaN(winningScoreNum) || winningScoreNum < 5 || winningScoreNum > 25) {
-      const error = 'Winning score must be between 5 and 25';
-      console.log('Winning score validation failed:', error);
-      setErrors({ winningScore: error });
-      Alert.alert('Validation Error', error);
-      return;
-    }
+    // Winning votes is now fixed at 20 (WINNING_VOTES constant)
 
     // Validate password for private rooms
     if (isPrivate && (!password || password.trim().length === 0)) {
@@ -96,22 +88,27 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     setLoading(true);
 
     try {
+      const settings: any = {
+        maxPlayers: maxPlayersNum,
+        submissionTime: submissionTimeNum,
+        votingTime: votingTimeNum,
+        winningVotes: WINNING_VOTES, // Fixed at 20
+        isPrivate,
+        promptPacks: ['default'],
+        profanityFilter: 'medium',
+        spectatorChatEnabled: true,
+        allowJoinMidGame: false
+      };
+      
+      if (isPrivate) {
+        settings.password = password;
+      }
+      
       const roomId = await createRoom(
         userProfile.uid,
         userProfile.username,
         roomName,
-        {
-          maxPlayers: maxPlayersNum,
-          submissionTime: submissionTimeNum,
-          votingTime: votingTimeNum,
-          winningScore: winningScoreNum,
-          isPrivate,
-          password: isPrivate ? password : undefined,
-          promptPacks: ['default'],
-          profanityFilter: 'medium',
-          spectatorChatEnabled: true,
-          allowJoinMidGame: false
-        }
+        settings
       );
 
       console.log('Room created successfully with ID:', roomId);
@@ -127,17 +124,17 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView 
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
+        <ScrollView 
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <Text style={styles.title}>Create Your Room</Text>
-          
-        {/* Debug info */}
-        <Text style={{ color: 'red', marginBottom: 10, fontSize: 16 }}>
-          Debug: User = {userProfile?.username || 'NOT LOADED'}, Loading = {loading ? 'YES' : 'NO'}
-        </Text>
 
         <Input
           label="Room Name"
@@ -160,14 +157,11 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           />
         </View>
         <View style={styles.halfInput}>
-          <Input
-            label="Winning Score"
-            value={winningScore}
-            onChangeText={setWinningScore}
-            placeholder="10"
-            keyboardType="number-pad"
-            error={errors.winningScore}
-          />
+          <Text style={styles.infoLabel}>Winning Votes</Text>
+          <View style={styles.fixedValueContainer}>
+            <Text style={styles.fixedValue}>20 votes</Text>
+            <Text style={styles.fixedValueSubtext}>Fixed</Text>
+          </View>
         </View>
       </View>
 
@@ -202,7 +196,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         <Switch
           value={isPrivate}
           onValueChange={setIsPrivate}
-          trackColor={{ false: COLORS.lightGray, true: COLORS.primary }}
+          trackColor={{ false: COLORS.border, true: COLORS.primary }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -219,24 +213,25 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       )}
 
       <Button
-          title={loading ? "Creating..." : "Create Room"}
-          onPress={handleCreateRoom}
-          loading={loading}
-          disabled={loading}
-          style={styles.createButton}
-        />
+        title={loading ? "Creating..." : "Create Room"}
+        onPress={handleCreateRoom}
+        loading={loading}
+        disabled={loading}
+        size="md"
+        style={styles.createButton}
+      />
 
-        <Button
-          title="Cancel"
-          onPress={() => {
-            console.log('Cancel button clicked');
-            navigation.goBack();
-          }}
-          variant="outline"
-          disabled={loading}
-        />
-      </ScrollView>
-    </View>
+      <Button
+        title="Cancel"
+        onPress={() => navigation.goBack()}
+        variant="outline"
+        disabled={loading}
+        size="md"
+        style={styles.cancelButton}
+      />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -246,14 +241,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background
   },
   content: {
-    padding: 24,
-    paddingBottom: 40,
-    flexGrow: 1
+    padding: 16,
+    paddingBottom: 24
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 16,
     color: COLORS.text
   },
   row: {
@@ -279,10 +273,40 @@ const styles = StyleSheet.create({
   },
   switchSubtext: {
     fontSize: 14,
-    color: COLORS.gray
+    color: COLORS.textSecondary
   },
   createButton: {
-    marginTop: 24,
-    marginBottom: 12
+    marginTop: 16,
+    marginBottom: 8,
+    height: 48
+  },
+  cancelButton: {
+    height: 48
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: 8
+  },
+  fixedValueContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center'
+  },
+  fixedValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginBottom: 4
+  },
+  fixedValueSubtext: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1
   }
 });

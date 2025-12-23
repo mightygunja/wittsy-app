@@ -6,9 +6,16 @@ import { COLORS } from '../../utils/constants';
 interface PlayerListProps {
   players: Player[];
   onlineStatus?: { [userId: string]: boolean };
+  currentUserId?: string;
 }
 
-const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {} }) => {
+const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, currentUserId }) => {
+  console.log('🎮 PlayerList rendering:', { 
+    playerCount: players.length, 
+    players: players.map(p => ({ id: p.userId, name: p.username })),
+    currentUserId 
+  });
+  
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.title}>Players ({players.length})</Text>
@@ -16,9 +23,13 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {} }) =
       <View style={styles.grid}>
         {players.map((player) => {
           const isOnline = onlineStatus[player.userId] !== false;
+          const isCurrentUser = player.userId === currentUserId;
           
           return (
-            <View key={player.userId} style={styles.playerCard}>
+            <View key={player.userId} style={[
+              styles.playerCard,
+              isCurrentUser && styles.currentUserCard
+            ]}>
               <View style={styles.avatarContainer}>
                 <View style={[
                   styles.avatar,
@@ -93,7 +104,14 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.white,
+    color: '#FFFFFF',
+  },
+  currentUserCard: {
+    backgroundColor: COLORS.primaryLight,
+    padding: 4,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
   },
   statusDot: {
     position: 'absolute',
@@ -125,7 +143,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.surface,
   },
   readyText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
   },

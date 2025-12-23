@@ -7,9 +7,14 @@ export interface User {
   stats: UserStats;
   rating: number;
   rank: string;
+  tier?: string;
   level: number;
   xp: number;
   achievements: string[];
+  selectedTitle?: string;
+  unlockedTitles?: string[];
+  badges?: string[];
+  region?: string;
   settings: UserSettings;
   friends: string[];
   createdAt: string;
@@ -93,13 +98,14 @@ export interface RoomSettings {
   maxPlayers: number;
   submissionTime: number;
   votingTime: number;
-  winningScore: number;
+  winningVotes: number; // Changed from winningScore - total votes needed to win (fixed at 20)
   promptPacks: string[];
   isPrivate: boolean;
   password?: string;
   profanityFilter: 'off' | 'medium' | 'strict';
   spectatorChatEnabled: boolean;
   allowJoinMidGame: boolean;
+  joinLockVoteThreshold: number; // New - lock joins when any player reaches this (8 votes)
 }
 
 export interface Player {
@@ -112,8 +118,8 @@ export interface Player {
 }
 
 export interface PlayerScore {
-  roundWins: number;
-  totalVotes: number;
+  totalVotes: number; // Primary win condition - total votes across all rounds
+  roundWins: number; // Kept for stats but not used for winning
   stars: number;
   phrases: Phrase[];
 }

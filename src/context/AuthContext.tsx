@@ -22,13 +22,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Now using React Native Firebase - works natively!
     const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
       setUser(firebaseUser);
       
       if (firebaseUser) {
         // TODO: Fetch user profile from Firestore
-        // For now, create a basic profile from auth user
         setUserProfile({
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -51,7 +49,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             totalVotes: 0,
             averageVotes: 0,
             submissionRate: 100,
-            votingAccuracy: 0
+            votingAccuracy: 0,
+            currentStreak: 0,
+            bestStreak: 0,
+            longestPhraseLength: 0,
+            shortestWinningPhraseLength: 0,
+            comebackWins: 0,
+            closeCallWins: 0,
+            unanimousVotes: 0,
+            perfectGames: 0
           },
           rating: 1200,
           rank: 'Bronze I',
@@ -80,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return unsubscribe;
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);

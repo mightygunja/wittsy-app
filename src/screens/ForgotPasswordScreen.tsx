@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
@@ -38,71 +39,89 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        <Text style={styles.title}>Reset Password</Text>
-        <Text style={styles.subtitle}>
-          Enter your email address and we'll send you a link to reset your password.
-        </Text>
-
-        <Input
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Enter your email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          error={error}
-        />
-
-        <Button
-          title="Send Reset Link"
-          onPress={handleResetPassword}
-          loading={loading}
-          style={styles.button}
-        />
-
-        <Text
-          style={styles.link}
-          onPress={() => navigation.goBack()}
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          Back to Login
-        </Text>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.content}>
+            <Text style={styles.title}>Reset Password</Text>
+            <Text style={styles.subtitle}>
+              Enter your email address and we'll send you a link to reset your password.
+            </Text>
+
+            <Input
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter your email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              error={error}
+            />
+
+            <Button
+              title="Send Reset Link"
+              onPress={handleResetPassword}
+              loading={loading}
+              size="sm"
+              style={styles.button}
+            />
+
+            <Text
+              style={styles.link}
+              onPress={() => navigation.goBack()}
+            >
+              Back to Login
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background
   },
+  scrollContent: {
+    paddingVertical: 20,
+    paddingHorizontal: 20
+  },
   content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center'
+    width: '100%'
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 8
+    marginBottom: 4,
+    color: COLORS.text
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.gray,
-    marginBottom: 32
-  },
-  button: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
     marginBottom: 16
   },
+  button: {
+    marginBottom: 8,
+    height: 40
+  },
   link: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.primary,
     fontWeight: '600',
-    textAlign: 'center'
+    textAlign: 'center',
+    marginTop: 8
   }
 });

@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, Platform, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { haptics } from '../../services/haptics';
 
 interface ButtonProps {
   title: string;
@@ -75,6 +76,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   const handlePress = () => {
     if (!isDisabled && onPress) {
+      haptics.buttonPress();
       onPress();
     }
   };
@@ -145,7 +147,7 @@ export const Button: React.FC<ButtonProps> = ({
       >
         {needsGradient ? (
           <LinearGradient
-            colors={isDisabled ? [COLORS.textDisabled, COLORS.textMuted] : getGradientColors()}
+            colors={(isDisabled ? [COLORS.textDisabled, COLORS.textMuted] : getGradientColors()) as any}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.gradient}
@@ -185,12 +187,13 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   gradient: {
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
     paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
   },
   content: {
     flexDirection: 'row',
@@ -215,16 +218,16 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonSm: {
-    minHeight: 36,
+    height: 36,
   },
   buttonMd: {
-    minHeight: 48,
+    height: 48,
   },
   buttonLg: {
-    minHeight: 56,
+    height: 56,
   },
   buttonXl: {
-    minHeight: 64,
+    height: 64,
   },
   text: {
     fontWeight: TYPOGRAPHY.fontWeight.bold,

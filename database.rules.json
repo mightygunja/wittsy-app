@@ -19,6 +19,40 @@
           ".write": "auth != null && auth.uid == $userId"
         }
       }
+    },
+    "chat": {
+      "$roomId": {
+        "messages": {
+          ".read": "auth != null",
+          "$messageId": {
+            ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid)"
+          }
+        }
+      }
+    },
+    "presence": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId"
+      }
+    },
+    "gameStates": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "submissions": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "votes": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
     }
   }
 }

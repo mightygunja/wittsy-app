@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, Platform, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, ANIMATION } from '../utils/constants';
+import { COLORS, TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
 import { getActiveRooms, createRoom, joinRoom } from '../services/database';
-import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, DEFAULT_WINNING_SCORE, MAX_PLAYERS } from '../utils/constants';
+import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES, MAX_PLAYERS } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
 
@@ -85,7 +86,10 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const handleQuickMatch = async () => {
-    if (!user?.uid || !userProfile?.username) return;
+    if (!user?.uid || !userProfile?.username) {
+      Alert.alert('Error', 'Please sign in to play');
+      return;
+    }
 
     setQuickMatchLoading(true);
 
@@ -96,7 +100,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       });
 
       const availableRoom = rooms.find(
-        room => room.players.length < room.settings.maxPlayers
+        room => room.players.length < room.settings.maxPlayers &&
+        !room.players.find((p: any) => p.userId === user.uid) // Don't join if already in room
       );
 
       if (availableRoom) {
@@ -111,14 +116,25 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             maxPlayers: MAX_PLAYERS,
             submissionTime: DEFAULT_SUBMISSION_TIME,
             votingTime: DEFAULT_VOTING_TIME,
-            winningScore: DEFAULT_WINNING_SCORE,
+            winningVotes: WINNING_VOTES,
             isPrivate: false,
           }
         );
         navigation.navigate('GameRoom', { roomId });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error with quick match:', error);
+      
+      let errorMessage = 'Failed to start quick match';
+      if (error.message?.includes('Already in room')) {
+        errorMessage = 'You are already in a room. Please leave it first.';
+      } else if (error.message?.includes('permission')) {
+        errorMessage = 'Permission denied. Please check your connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Quick Match Error', errorMessage);
     } finally {
       setQuickMatchLoading(false);
     }
@@ -130,7 +146,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   });
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Animated Background */}
       <LinearGradient
         colors={[COLORS.background, COLORS.backgroundLight, COLORS.backgroundElevated]}
@@ -165,32 +181,20 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <View style={styles.titleContainer}>
             <Text style={styles.gameTitle}>WITTSY</Text>
             <LinearGradient
-              colors={COLORS.gradientPrimary}
+              colors={[COLORS.primary, COLORS.primaryDark] as any}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.titleUnderline}
             />
           </View>
           
-          <Text style={styles.tagline}>BATTLE OF WITS</Text>
-          
-          {/* User Info Card */}
-          <Card variant="glass" style={styles.userCard}>
-            <View style={styles.userInfo}>
-              <View>
-                <Text style={styles.welcomeText}>WELCOME BACK</Text>
-                <Text style={styles.username}>{userProfile?.username || 'Player'}</Text>
-              </View>
-              <View style={styles.statsContainer}>
-                <Badge text={`LVL ${userProfile?.level || 1}`} variant="gold" shine />
-                <Badge 
-                  text={userProfile?.rank || 'Silver III'} 
-                  variant="rank" 
-                  size="sm"
-                />
-              </View>
+          {/* Compact User Info */}
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
+            <View style={styles.userInfoCompact}>
+              <Text style={styles.usernameCompact}>{userProfile?.username || 'Player'}</Text>
+              <Badge text={`LVL ${userProfile?.level || 1}`} variant="gold" size="sm" />
             </View>
-          </Card>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Quick Play - Hero Button */}
@@ -213,16 +217,16 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           />
         </Animated.View>
 
-        {/* Main Actions Grid */}
+        {/* Main Actions - 2 Column Grid */}
         <Animated.View
           style={[
-            styles.actionsGrid,
+            styles.mainActionsGrid,
             {
               opacity: fadeAnim,
             },
           ]}
         >
-          <Card variant="glow" onPress={() => navigation.navigate('BrowseRooms')}>
+          <Card variant="glow" onPress={() => navigation.navigate('BrowseRooms')} style={styles.mainActionCard}>
             <View style={styles.actionCard}>
               <Text style={styles.actionIcon}>🎲</Text>
               <Text style={styles.actionTitle}>BROWSE ROOMS</Text>
@@ -230,7 +234,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             </View>
           </Card>
 
-          <Card variant="elevated" onPress={() => navigation.navigate('CreateRoom')}>
+          <Card variant="elevated" onPress={() => navigation.navigate('CreateRoom')} style={styles.mainActionCard}>
             <View style={styles.actionCard}>
               <Text style={styles.actionIcon}>➕</Text>
               <Text style={styles.actionTitle}>CREATE ROOM</Text>
@@ -239,11 +243,86 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </Card>
         </Animated.View>
 
+        {/* Secondary Features - Horizontal Scroll */}
+        <Animated.View style={[styles.secondarySection, { opacity: fadeAnim }]}>
+          <Text style={styles.sectionTitle}>Explore</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.secondaryScroll}
+          >
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('BattlePass')}
+            >
+              <LinearGradient
+                colors={['#FFD700', '#FFA500']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>⚔️</Text>
+                <Text style={styles.secondaryTitle}>Battle Pass</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('PromptLibrary')}
+            >
+              <LinearGradient
+                colors={['#667EEA', '#764BA2']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>📚</Text>
+                <Text style={styles.secondaryTitle}>Prompts</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('Challenges')}
+            >
+              <LinearGradient
+                colors={['#F093FB', '#F5576C']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🎯</Text>
+                <Text style={styles.secondaryTitle}>Challenges</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('Events')}
+            >
+              <LinearGradient
+                colors={['#4FACFE', '#00F2FE']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🏆</Text>
+                <Text style={styles.secondaryTitle}>Events</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('Friends')}
+            >
+              <LinearGradient
+                colors={['#43E97B', '#38F9D7']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>👥</Text>
+                <Text style={styles.secondaryTitle}>Friends</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+
         {/* Live Rooms Section */}
         {activeRooms.length > 0 && (
           <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>🔥 LIVE ROOMS</Text>
+              <Text style={styles.sectionTitle}>🔥 Live Rooms</Text>
               <Badge text="HOT" variant="error" shine size="sm" />
             </View>
             
@@ -274,30 +353,43 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             ))}
           </Animated.View>
         )}
-
-        {/* Secondary Actions */}
-        <Animated.View style={[styles.secondaryActions, { opacity: fadeAnim }]}>
-          <Button
-            title="👤 Profile"
-            onPress={() => navigation.navigate('Profile')}
-            variant="ghost"
-            size="md"
-          />
-          <Button
-            title="🏆 Leaderboard"
-            onPress={() => navigation.navigate('Leaderboard')}
-            variant="ghost"
-            size="md"
-          />
-          <Button
-            title="⚙️ Settings"
-            onPress={() => navigation.navigate('Settings')}
-            variant="ghost"
-            size="md"
-          />
-        </Animated.View>
       </ScrollView>
-    </View>
+
+      {/* Fixed Bottom Navigation Bar */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => {}}
+        >
+          <Text style={styles.navIcon}>🏠</Text>
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <Text style={styles.navIcon}>👤</Text>
+          <Text style={styles.navLabel}>Profile</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => navigation.navigate('Leaderboard')}
+        >
+          <Text style={styles.navIcon}>🏆</Text>
+          <Text style={styles.navLabel}>Leaderboard</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => navigation.navigate('EnhancedSettings')}
+        >
+          <Text style={styles.navIcon}>⚙️</Text>
+          <Text style={styles.navLabel}>Settings</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -325,31 +417,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING['3xl'],
+    padding: SPACING.sm,
+    paddingBottom: 200,
   },
   header: {
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.sm,
+  },
+  userInfoCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.xs,
+    paddingVertical: SPACING.xs,
+  },
+  usernameCompact: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
   },
   titleContainer: {
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: 4,
   },
   gameTitle: {
-    fontSize: TYPOGRAPHY.fontSize['5xl'],
+    fontSize: TYPOGRAPHY.fontSize['3xl'],
     fontWeight: TYPOGRAPHY.fontWeight.black,
     color: COLORS.text,
-    letterSpacing: 4,
+    letterSpacing: 3,
     textAlign: 'center',
     textShadowColor: COLORS.primaryGlow,
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
+    textShadowRadius: 15,
   },
   titleUnderline: {
-    height: 4,
-    width: 120,
+    height: 3,
+    width: 100,
     borderRadius: RADIUS.full,
-    marginTop: SPACING.xs,
+    marginTop: 4,
   },
   tagline: {
     fontSize: TYPOGRAPHY.fontSize.base,
@@ -379,21 +484,62 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.extrabold,
     color: COLORS.text,
   },
+  viewProfile: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.primary,
+    marginTop: SPACING.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
   statsContainer: {
     alignItems: 'flex-end',
     gap: SPACING.xs,
   },
   quickPlayContainer: {
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
+    height: 60,
   },
-  actionsGrid: {
+  mainActionsGrid: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    marginBottom: SPACING.xl,
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  mainActionCard: {
+    flex: 1,
   },
   actionCard: {
     alignItems: 'center',
-    padding: SPACING.lg,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+  },
+  secondarySection: {
+    marginBottom: SPACING.lg,
+  },
+  secondaryScroll: {
+    paddingRight: SPACING.md,
+    gap: SPACING.sm,
+  },
+  secondaryCard: {
+    width: 100,
+    height: 100,
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+    marginRight: SPACING.sm,
+  },
+  secondaryGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.md,
+  },
+  secondaryIcon: {
+    fontSize: 40,
+    marginBottom: SPACING.xs,
+  },
+  secondaryTitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+    textAlign: 'center',
   },
   actionIcon: {
     fontSize: 48,
@@ -413,19 +559,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   section: {
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.extrabold,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   roomCard: {
     marginBottom: SPACING.sm,
@@ -454,7 +600,31 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     marginTop: SPACING.xxs,
   },
-  secondaryActions: {
-    gap: SPACING.sm,
+  bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingBottom: SPACING.xl,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+  },
+  navButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+  },
+  navIcon: {
+    fontSize: 24,
+    marginBottom: SPACING.xxs,
+  },
+  navLabel: {
+    fontSize: 10,
+    color: COLORS.text,
+    fontWeight: '600',
   },
 });

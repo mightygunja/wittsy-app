@@ -38,19 +38,28 @@ export const ACHIEVEMENT_DEFINITIONS: Omit<Achievement, 'progress' | 'unlocked' 
 
 // Get user achievements from Firestore
 export const getUserAchievements = async (userId: string): Promise<Achievement[]> => {
-  const achievementsRef = collection(firestore, 'achievements');
-  const q = query(achievementsRef, where('userId', '==', userId));
-  const snapshot = await getDocs(q);
-  
-  if (snapshot.empty) {
-    // Initialize achievements for new user
-    return await initializeUserAchievements(userId);
+  try {
+    const achievementsRef = collection(firestore, 'achievements');
+    const q = query(achievementsRef, where('userId', '==', userId));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      // Initialize achievements for new user
+      return await initializeUserAchievements(userId);
+    }
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Achievement));
+  } catch (error: any) {
+    // Handle permissions errors gracefully
+    if (error?.code === 'permission-denied') {
+      console.warn('Achievements feature requires Firestore permissions. Returning empty achievements.');
+      return [];
+    }
+    throw error;
   }
-  
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Achievement));
 };
 
 // Initialize achievements for a new user

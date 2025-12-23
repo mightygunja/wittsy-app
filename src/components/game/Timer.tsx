@@ -18,7 +18,7 @@ const Timer: React.FC<TimerProps> = ({ timeRemaining, phase }) => {
       case 'prompt':
         return COLORS.primary;
       case 'submission':
-        return isUrgent ? COLORS.error : isWarning ? COLORS.warning : COLORS.secondary;
+        return isUrgent ? COLORS.error : isWarning ? COLORS.warning : COLORS.cyan;
       case 'voting':
         return isUrgent ? COLORS.error : isWarning ? COLORS.warning : COLORS.primary;
       case 'waiting':
@@ -97,23 +97,25 @@ const Timer: React.FC<TimerProps> = ({ timeRemaining, phase }) => {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
+    minWidth: 70,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 4,
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   timerContainer: {
     alignItems: 'center',
   },
   progressBar: {
-    width: 80,
-    height: 4,
+    width: 60,
+    height: 3,
     backgroundColor: COLORS.border,
     borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   progressFill: {
     height: '100%',
@@ -122,6 +124,7 @@ const styles = StyleSheet.create({
   time: {
     fontWeight: 'bold',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 20,
   },
 });
 

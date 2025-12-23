@@ -1,5 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { TouchableOpacity, Text, StyleSheet, View, Animated } from 'react-native';
 import { COLORS } from '../../utils/constants';
 
 interface PhraseCardProps {
@@ -19,6 +19,50 @@ const PhraseCard: React.FC<PhraseCardProps> = ({
   isOwnPhrase = false,
   hasVoted = false,
 }) => {
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Entrance animation
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: number * 50, // Stagger effect
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 7,
+        delay: number * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // Vote animation
+  useEffect(() => {
+    if (hasVoted) {
+      Animated.sequence([
+        Animated.spring(scaleAnim, {
+          toValue: 1.05,
+          tension: 100,
+          friction: 3,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 3,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [hasVoted]);
+
   const getCardStyle = () => {
     if (isOwnPhrase) {
       return [styles.card, styles.ownPhraseCard];
@@ -32,34 +76,61 @@ const PhraseCard: React.FC<PhraseCardProps> = ({
     return styles.card;
   };
 
+  const handlePress = () => {
+    // Press animation
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  };
+
   return (
-    <TouchableOpacity
-      style={getCardStyle()}
-      onPress={onPress}
-      disabled={disabled || isOwnPhrase}
-      activeOpacity={0.7}
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [
+          { translateY: slideAnim },
+          { scale: scaleAnim },
+        ],
+      }}
     >
-      <View style={styles.numberBadge}>
-        <Text style={styles.number}>{number}</Text>
-      </View>
-      
-      <Text style={[
-        styles.phrase,
-        (disabled || isOwnPhrase) && styles.disabledText,
-      ]}>
-        "{phrase}"
-      </Text>
-      
-      {isOwnPhrase && (
-        <Text style={styles.ownPhraseLabel}>Your phrase</Text>
-      )}
-      
-      {hasVoted && (
-        <View style={styles.votedBadge}>
-          <Text style={styles.votedText}>✓ Voted</Text>
+      <TouchableOpacity
+        style={getCardStyle()}
+        onPress={handlePress}
+        disabled={disabled || isOwnPhrase}
+        activeOpacity={0.9}
+      >
+        <View style={styles.numberBadge}>
+          <Text style={styles.number}>{number}</Text>
         </View>
-      )}
-    </TouchableOpacity>
+        
+        <Text style={[
+          styles.phrase,
+          (disabled || isOwnPhrase) && styles.disabledText,
+        ]}>
+          "{phrase}"
+        </Text>
+        
+        {isOwnPhrase && (
+          <Text style={styles.ownPhraseLabel}>Your phrase</Text>
+        )}
+        
+        {hasVoted && (
+          <View style={styles.votedBadge}>
+            <Text style={styles.votedText}>✓ Voted</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -76,9 +147,9 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   ownPhraseCard: {
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: COLORS.surface,
     borderColor: COLORS.textSecondary,
-    opacity: 0.5,
+    opacity: 0.6,
   },
   votedCard: {
     borderColor: COLORS.primary,
@@ -97,7 +168,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   number: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -124,7 +195,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   votedText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
