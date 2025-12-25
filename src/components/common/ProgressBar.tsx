@@ -3,9 +3,9 @@
  * Animated progress bar with customizable colors and height
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 
 interface ProgressBarProps {
   progress: number; // 0-100
@@ -18,10 +18,14 @@ interface ProgressBarProps {
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
   height = 6,
-  backgroundColor = COLORS.border,
-  progressColor = COLORS.primary,
+  backgroundColor,
+  progressColor,
   animated = true,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const bgColor = backgroundColor || COLORS.border;
+  const progColor = progressColor || COLORS.primary;
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const animatedWidth = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -43,13 +47,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   });
 
   return (
-    <View style={[styles.container, { height, backgroundColor }]}>
+    <View style={[styles.container, { height, backgroundColor: bgColor }]}>
       <Animated.View
         style={[
           styles.progress,
           {
             width: widthInterpolated,
-            backgroundColor: progressColor,
+            backgroundColor: progColor,
             height,
           },
         ]}
@@ -58,7 +62,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     width: '100%',
     borderRadius: 100,
@@ -68,3 +72,6 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
 });
+
+
+

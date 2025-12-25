@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated, ViewStyle, TextStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../utils/constants';
+import { TYPOGRAPHY, SPACING, RADIUS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface BadgeProps {
   text: string | number;
@@ -22,6 +23,8 @@ export const Badge: React.FC<BadgeProps> = ({
   textStyle,
   icon,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const shineAnim = useRef(new Animated.Value(-1)).current;
 
   useEffect(() => {
@@ -119,7 +122,7 @@ export const Badge: React.FC<BadgeProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   wrapper: {
     position: 'relative',
     alignSelf: 'flex-start',

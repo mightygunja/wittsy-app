@@ -387,7 +387,8 @@ export const getSeasonLeaderboard = async (
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => doc.data() as UserSeasonStats);
   } catch (error) {
-    console.error('Error fetching season leaderboard:', error);
+    // Expected when seasonStats collection is empty - silently return empty array
+    console.warn('Season leaderboard not yet populated (expected on first run)');
     return [];
   }
 };

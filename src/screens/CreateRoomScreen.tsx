@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Alert, Switch, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
@@ -6,9 +6,11 @@ import { createRoom } from '../services/database';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { validateRoomName } from '../utils/validation';
-import { COLORS, DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES } from '../utils/constants';
+import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { userProfile } = useAuth();
   const [roomName, setRoomName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState('12');
@@ -122,6 +124,8 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       Alert.alert('Error', error.message || 'Failed to create room. Please try again.');
     }
   };
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -235,7 +239,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background

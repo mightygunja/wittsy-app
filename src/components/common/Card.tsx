@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Animated, ViewStyle, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { SPACING, RADIUS, SHADOWS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface CardProps {
   children: React.ReactNode;
@@ -18,6 +19,8 @@ export const Card: React.FC<CardProps> = ({
   onPress,
   animated = true,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -120,7 +123,7 @@ export const Card: React.FC<CardProps> = ({
   return cardContent;
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   card: {
     borderRadius: RADIUS.lg,
     overflow: 'hidden',

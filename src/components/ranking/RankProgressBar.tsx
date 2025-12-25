@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getRankProgression, RANK_TIERS } from '../../services/ranking';
-import { COLORS, SPACING, RADIUS } from '../../utils/constants';
+import { SPACING, RADIUS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface RankProgressBarProps {
   rating: number;
@@ -13,6 +14,8 @@ export const RankProgressBar: React.FC<RankProgressBarProps> = ({
   rating,
   animated = true,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const progression = getRankProgression(rating);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -114,7 +117,7 @@ export const RankProgressBar: React.FC<RankProgressBarProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     width: '100%',
   },

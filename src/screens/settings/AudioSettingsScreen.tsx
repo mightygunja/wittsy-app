@@ -3,7 +3,7 @@
  * Volume controls, sound effects, music, vibration
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,11 +17,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 // Slider removed - using +/- buttons instead
 import { useSettings } from '../../contexts/SettingsContext';
+import { useTheme } from '../../hooks/useTheme';
 import { Card } from '../../components/common/Card';
-import { COLORS, SPACING } from '../../utils/constants';
+import { SPACING } from '../../utils/constants';
+import { audioService } from '../../services/audioService';
 
 export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, updateAudio } = useSettings();
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [fadeAnim] = useState(new Animated.Value(0));
 
   React.useEffect(() => {
@@ -31,6 +35,36 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
       useNativeDriver: true,
     }).start();
   }, []);
+
+  const handleToggle = async (key: string, value: boolean) => {
+    updateAudio({ [key]: value });
+    
+    // Update audio service
+    if (key === 'enableMusic') {
+      await audioService.setMusicEnabled(value);
+    } else if (key === 'enableSFX') {
+      await audioService.setSFXEnabled(value);
+    }
+    
+    // Play click sound for feedback
+    audioService.playClick();
+  };
+
+  const handleVolumeChange = async (key: string, delta: number) => {
+    const currentVolume = settings.audio[key] || 50;
+    const newVolume = Math.max(0, Math.min(100, currentVolume + delta));
+    updateAudio({ [key]: newVolume });
+    
+    // Update audio service volumes (convert 0-100 to 0-1)
+    if (key === 'musicVolume') {
+      await audioService.setMusicVolume(newVolume / 100);
+    } else if (key === 'sfxVolume') {
+      await audioService.setSFXVolume(newVolume / 100);
+    }
+    
+    // Play click sound for feedback
+    audioService.playClick();
+  };
 
   const volumeSettings = [
     { key: 'masterVolume', label: 'Master Volume', icon: '🔊' },
@@ -86,11 +120,7 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
                     <View style={styles.volumeControls}>
                       <TouchableOpacity
                         style={styles.volumeButton}
-                        onPress={() => {
-                          const currentValue = settings.audio[setting.key as keyof typeof settings.audio] as number;
-                          const newValue = Math.max(0, currentValue - 10);
-                          updateAudio({ [setting.key]: newValue });
-                        }}
+                        onPress={() => handleVolumeChange(setting.key, -10)}
                         disabled={settings.audio.muteAll}
                       >
                         <Text style={styles.volumeButtonText}>−</Text>
@@ -100,11 +130,7 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
                       </Text>
                       <TouchableOpacity
                         style={styles.volumeButton}
-                        onPress={() => {
-                          const currentValue = settings.audio[setting.key as keyof typeof settings.audio] as number;
-                          const newValue = Math.min(100, currentValue + 10);
-                          updateAudio({ [setting.key]: newValue });
-                        }}
+                        onPress={() => handleVolumeChange(setting.key, 10)}
                         disabled={settings.audio.muteAll}
                       >
                         <Text style={styles.volumeButtonText}>+</Text>
@@ -127,7 +153,7 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
                     </View>
                     <Switch
                       value={settings.audio[setting.key as keyof typeof settings.audio] as boolean}
-                      onValueChange={(value) => updateAudio({ [setting.key]: value })}
+                      onValueChange={(value) => handleToggle(setting.key, value)}
                       trackColor={{ false: COLORS.border, true: COLORS.primary }}
                       thumbColor={COLORS.text}
                       disabled={settings.audio.muteAll}
@@ -143,7 +169,7 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: {

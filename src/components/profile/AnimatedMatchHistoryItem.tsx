@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { SPACING, RADIUS, SHADOWS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface AnimatedMatchHistoryItemProps {
   roomName: string;
@@ -27,6 +28,8 @@ export const AnimatedMatchHistoryItem: React.FC<AnimatedMatchHistoryItemProps> =
   onPress,
   delay = 0,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const isWin = result === 'win';
   const [expanded, setExpanded] = useState(false);
   
@@ -177,7 +180,7 @@ export const AnimatedMatchHistoryItem: React.FC<AnimatedMatchHistoryItemProps> =
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,

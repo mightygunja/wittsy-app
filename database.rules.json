@@ -24,16 +24,8 @@
       "$roomId": {
         "messages": {
           ".read": "auth != null",
-          "$messageId": {
-            ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid)"
-          }
+          ".write": "auth != null"
         }
-      }
-    },
-    "presence": {
-      "$userId": {
-        ".read": "auth != null",
-        ".write": "auth != null && auth.uid == $userId"
       }
     },
     "gameStates": {

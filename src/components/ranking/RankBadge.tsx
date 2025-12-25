@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RANK_TIERS } from '../../services/ranking';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { SPACING, RADIUS, SHADOWS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface RankBadgeProps {
   rank: string;
@@ -21,6 +22,8 @@ export const RankBadge: React.FC<RankBadgeProps> = ({
   showRating = true,
   animated = true,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -112,7 +115,7 @@ export const RankBadge: React.FC<RankBadgeProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     position: 'relative',
     justifyContent: 'center',

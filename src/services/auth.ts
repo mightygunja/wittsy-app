@@ -23,6 +23,73 @@ const getDefaultAvatar = (): Avatar => ({
   background: '#6C63FF'
 });
 
+// Get or create user profile in Firestore
+export const getOrCreateUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
+  try {
+    const userRef = doc(firestore, 'users', firebaseUser.uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      // User document exists, return it
+      return userSnap.data() as User;
+    } else {
+      // User document doesn't exist, create it
+      console.log('Creating new user document for:', firebaseUser.email);
+      const newUser: User = {
+        uid: firebaseUser.uid,
+        username: firebaseUser.displayName || 'Player',
+        email: firebaseUser.email || '',
+        avatar: getDefaultAvatar(),
+        stats: {
+          gamesPlayed: 0,
+          gamesWon: 0,
+          roundsWon: 0,
+          starsEarned: 0,
+          totalVotes: 0,
+          averageVotes: 0,
+          votingAccuracy: 0,
+          submissionRate: 100,
+          currentStreak: 0,
+          bestStreak: 0,
+          longestPhraseLength: 0,
+          shortestWinningPhraseLength: 0,
+          comebackWins: 0,
+          closeCallWins: 0,
+          unanimousVotes: 0,
+          perfectGames: 0,
+        },
+        rating: 1200,
+        rank: 'Bronze I',
+        level: 1,
+        xp: 0,
+        coins: 1000,
+        gems: 0,
+        achievements: [],
+        friends: [],
+        settings: {
+          theme: 'auto',
+          soundEnabled: true,
+          musicVolume: 0.7,
+          sfxVolume: 0.8,
+          notificationsEnabled: true,
+          showOnlineStatus: true,
+          allowFriendRequests: true,
+          profileVisibility: 'public',
+        },
+        createdAt: new Date().toISOString(),
+        lastActive: new Date().toISOString(),
+      };
+      
+      await setDoc(userRef, newUser as any);
+      console.log('✅ User document created successfully');
+      return newUser as any;
+    }
+  } catch (error) {
+    console.error('Error getting/creating user profile:', error);
+    return null;
+  }
+};
+
 // Register new user
 export const registerUser = async (
   email: string,

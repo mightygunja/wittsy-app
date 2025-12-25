@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
+import { useSettings } from '../contexts/SettingsContext';
 import { leaveRoom, startGame } from '../services/database';
 import { gameTimerService } from '../services/gameTimer';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -29,9 +30,26 @@ import {
 } from '../services/realtime';
 import { Room, GamePhase } from '../types';
 import { ChatBox } from '../components/social/ChatBox';
-import { COLORS } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';;
 import { validatePhrase } from '../utils/validation';
 import { Button } from '../components/common/Button';
+
+// Helper function to advance game phase
+const advancePhase = async (roomId: string) => {
+  try {
+    const response = await fetch(
+      `https://us-central1-wittsy-51992.cloudfunctions.net/advanceGamePhase`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { roomId } })
+      }
+    );
+    await response.json();
+  } catch (error) {
+    console.error('Error advancing phase:', error);
+  }
+};
 import { Loading } from '../components/common/Loading';
 import Timer from '../components/game/Timer';
 import PhraseCard from '../components/game/PhraseCard';
@@ -54,13 +72,19 @@ interface GameState {
   votes: { [userId: string]: string };
   lastWinner?: string;
   lastWinningPhrase?: string;
+  phaseStartTime?: number;
+  phaseDuration?: number;
+  timeline?: any; // NEW: Complete game timeline for local calculation
 }
 
 const GameRoomScreen: React.FC = () => {
   const route = useRoute<GameRoomScreenRouteProp>();
   const navigation = useNavigation<GameRoomScreenNavigationProp>();
   const { user } = useAuth();
+  const { settings } = useSettings();
   const { roomId } = route.params;
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -91,6 +115,8 @@ const GameRoomScreen: React.FC = () => {
         const roomData = snapshot.data() as Room;
         console.log('🔄 Room updated:', {
           roomId,
+          status: roomData.status,
+          gameState: roomData.gameState,
           playerCount: roomData.players?.length || 0,
           players: roomData.players?.map(p => p.username) || [],
           currentUserId: user?.uid,
@@ -140,22 +166,52 @@ const GameRoomScreen: React.FC = () => {
     if (!roomId) return;
 
     const unsubscribe = subscribeToGameState(roomId, (state) => {
+      console.log('🎮 Game state update received:', state);
       if (state) {
         const previousPhase = previousPhaseRef.current;
+        console.log(`📍 Phase: ${state.phase}, Prompt: ${state.currentPrompt}, Round: ${state.currentRound}`);
+        
+        // Calculate timeRemaining from phaseStartTime and phaseDuration
+        if (state.phaseStartTime && state.phaseDuration) {
+          const elapsed = (Date.now() - state.phaseStartTime) / 1000;
+          state.timeRemaining = Math.max(0, Math.floor(state.phaseDuration - elapsed));
+        }
         
         // Reset phase-specific state when phase actually changes
         if (state.phase === 'submission' && previousPhase !== 'submission') {
           // Only reset when entering submission phase from a different phase
+          console.log('🔄 Entering submission phase');
           setHasSubmitted(false);
           setPhrase('');
           setHasVoted(false);
         } else if (state.phase === 'voting' && previousPhase !== 'voting') {
+          console.log('🔄 Entering voting phase');
           setHasVoted(false);
+        } else if (state.phase === 'results' && previousPhase !== 'results') {
+          console.log(' Entering results phase - calculating winner');
+          if (!state.lastWinner && state.votes && state.submissions) {
+            const voteCounts: { [userId: string]: number } = {};
+            Object.values(state.votes).forEach((votedUserId: any) => {
+              if (votedUserId) voteCounts[votedUserId] = (voteCounts[votedUserId] || 0) + 1;
+            });
+            let maxVotes = 0;
+            let winnerId = null;
+            Object.entries(voteCounts).forEach(([userId, count]) => {
+              if (count > maxVotes) { maxVotes = count; winnerId = userId; }
+            });
+            if (winnerId && state.submissions[winnerId]) {
+              state.lastWinner = winnerId;
+              state.lastWinningPhrase = state.submissions[winnerId];
+              console.log(' Winner:', winnerId, 'Phrase:', state.lastWinningPhrase, 'Votes:', maxVotes);
+            }
+          }
         }
         
         // Update the ref and state
         previousPhaseRef.current = state.phase;
         setGameState(state as GameState);
+      } else {
+        console.log('⚠️ Game state is null');
       }
     });
 
@@ -165,6 +221,40 @@ const GameRoomScreen: React.FC = () => {
       unsubscribe();
     };
   }, [roomId]);
+  
+  // Client-side timer - calculate from phaseStartTime and phaseDuration
+  useEffect(() => {
+    if (!gameState?.phaseStartTime || !gameState?.phaseDuration) return;
+    
+    let hasAdvanced = false;
+    
+    const interval = setInterval(() => {
+      setGameState(prev => {
+        if (!prev?.phaseStartTime || !prev?.phaseDuration) return prev;
+        const elapsed = (Date.now() - prev.phaseStartTime) / 1000;
+        const remaining = Math.max(0, Math.floor(prev.phaseDuration - elapsed));
+        
+        // Advance phase when timer hits 0
+        if (remaining === 0 && !hasAdvanced) {
+          hasAdvanced = true;
+          advancePhase(roomId);
+        // Auto-submit if enabled and time runs out
+        if (remaining === 0 && !hasAdvanced && gameState.phase === 'submission') {
+          if (settings.gameplay.autoSubmit && phrase.trim() && !hasSubmitted) {
+            console.log('⚡ Auto-submitting phrase due to timeout');
+            markSubmission(roomId, user.uid, phrase.trim());
+            setHasSubmitted(true);
+          }
+        }
+
+        }
+        
+        return { ...prev, timeRemaining: remaining };
+      });
+    }, 100); // Update every 100ms for smooth countdown
+    
+    return () => clearInterval(interval);
+  }, [gameState?.phaseStartTime, gameState?.phaseDuration, roomId]);
 
   // Subscribe to typing indicators
   useEffect(() => {
@@ -206,12 +296,13 @@ const GameRoomScreen: React.FC = () => {
   const handlePhraseChange = (text: string) => {
     setPhrase(text);
     
-    if (text.length > 0 && gameState?.phase === 'submission' && user?.uid) {
+    if (settings.gameplay.showTypingIndicators && text.length > 0 && gameState?.phase === 'submission' && user?.uid) {
       setTyping(roomId, user.uid, true);
     }
   };
 
-  // Handle phrase submission
+  
+  // Handle phrase submission with optional confirmation
   const handleSubmit = async () => {
     if (!user?.uid || !phrase.trim()) {
       Alert.alert('Error', 'Please enter a phrase');
@@ -224,16 +315,33 @@ const GameRoomScreen: React.FC = () => {
       return;
     }
 
-    try {
-      await markSubmission(roomId, user.uid, phrase.trim());
-      
-      setHasSubmitted(true);
-      setTyping(roomId, user.uid, false);
-    } catch (error) {
-      console.error('Error submitting phrase:', error);
-      Alert.alert('Error', 'Failed to submit phrase');
+    const submitPhrase = async () => {
+      try {
+        await markSubmission(roomId, user.uid, phrase.trim());
+        
+        setHasSubmitted(true);
+        setTyping(roomId, user.uid, false);
+      } catch (error) {
+        console.error('Error submitting phrase:', error);
+        Alert.alert('Error', 'Failed to submit phrase');
+      }
+    };
+
+    // Show confirmation dialog if enabled
+    if (settings.gameplay.confirmBeforeSubmit) {
+      Alert.alert(
+        'Confirm Submission',
+        `Submit this phrase?\n\n"${phrase.trim()}"`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Submit', onPress: submitPhrase }
+        ]
+      );
+    } else {
+      await submitPhrase();
     }
   };
+
 
   // Handle vote
   const handleVote = async (phraseId: string) => {
@@ -315,6 +423,17 @@ const GameRoomScreen: React.FC = () => {
   };
 
   const renderPhaseContent = () => {
+    // Show loading state if game is active but no game state yet
+    if (room?.status === 'active' && !gameState) {
+      return (
+        <View style={styles.loadingPhase}>
+          <Text style={styles.loadingEmoji}>🤔</Text>
+          <Text style={styles.loadingText}>Loading game...</Text>
+          <Text style={styles.loadingSubtext}>Preparing your first prompt</Text>
+        </View>
+      );
+    }
+    
     if (!gameState) return null;
     
     const promptText = getPromptText(gameState.currentPrompt);
@@ -338,7 +457,7 @@ const GameRoomScreen: React.FC = () => {
               <Text style={styles.infoText}>
                 {submissionCount}/{room?.players.length || 0} submitted
               </Text>
-              {typingUsers.length > 0 && (
+              {settings.gameplay.showTypingIndicators && typingUsers.length > 0 && (
                 <Text style={styles.typingText}>
                   {typingUsers.length} {typingUsers.length === 1 ? 'player is' : 'players are'} typing...
                 </Text>
@@ -384,6 +503,7 @@ const GameRoomScreen: React.FC = () => {
         );
 
       case 'voting':
+        console.log(' VOTING PHASE - Submissions:', gameState.submissions, 'Count:', Object.keys(gameState.submissions || {}).length);
         return (
           <View style={styles.votingPhase}>
             <View style={styles.votingHeader}>
@@ -417,6 +537,7 @@ const GameRoomScreen: React.FC = () => {
         );
 
       case 'results':
+        console.log(' RESULTS PHASE - Winner:', gameState.lastWinner, 'Phrase:', gameState.lastWinningPhrase);
         return (
           <View style={styles.resultsPhase}>
             <Text style={styles.phaseTitle}>WINNER!</Text>
@@ -488,7 +609,9 @@ const GameRoomScreen: React.FC = () => {
           <Text style={styles.roomCode}>Room ID: {roomId.substring(0, 6).toUpperCase()}</Text>
         </View>
         
-        {gameState && (
+        {gameState && settings.gameplay.showTimer && (
+
+        
           <Timer
             timeRemaining={gameState.timeRemaining}
             phase={gameState.phase}
@@ -531,7 +654,7 @@ const GameRoomScreen: React.FC = () => {
       {/* Main content area */}
       <View style={styles.mainContent}>
         {/* Waiting lobby (before game starts) */}
-        {room.status === 'waiting' && (
+        {!gameState && room.status === 'waiting' && (
           <View style={styles.lobby}>
             <Text style={styles.lobbyTitle}>Waiting for game to start...</Text>
             <Text style={styles.lobbySubtitle}>
@@ -557,7 +680,7 @@ const GameRoomScreen: React.FC = () => {
         )}
 
         {/* Active game */}
-        {room.status === 'active' && (
+        {gameState && (
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1 }}
@@ -594,7 +717,7 @@ const GameRoomScreen: React.FC = () => {
         )}
 
         {/* Game finished */}
-        {room.status === 'finished' && (
+        {room.status === 'finished' && !gameState && (
           <View style={styles.finishedContainer}>
             <Text style={styles.finishedTitle}>Game Over!</Text>
             <ScoreBoard
@@ -621,7 +744,7 @@ const GameRoomScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -735,6 +858,28 @@ const styles = StyleSheet.create({
   },
   gameContentContainer: {
     padding: 12,
+  },
+  loadingPhase: {
+    minHeight: 400,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingEmoji: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  loadingText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
   promptPhase: {
     minHeight: 400,
@@ -922,10 +1067,14 @@ const styles = StyleSheet.create({
   startButton: {
     height: 48,
     marginTop: 16,
+    alignSelf: 'center',
+    width: '80%',
   },
   backButton: {
     height: 48,
     marginTop: 16,
+    alignSelf: 'center',
+    width: '80%',
   },
   errorText: {
     fontSize: 16,
@@ -936,3 +1085,12 @@ const styles = StyleSheet.create({
 });
 
 export default GameRoomScreen;
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,18 +11,21 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { getLeaderboard } from '../services/database';
 import { LeaderboardEntry } from '../types';
-import { COLORS } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';;
 import { formatNumber } from '../utils/helpers';
 
 type SortBy = 'rating' | 'wins' | 'stars';
 
 export const LeaderboardScreen: React.FC = () => {
+  const { colors: COLORS } = useTheme();
   const { user } = useAuth();
   const [sortBy, setSortBy] = useState<SortBy>('rating');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userRank, setUserRank] = useState<number | null>(null);
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     loadLeaderboard();
@@ -275,7 +278,7 @@ export const LeaderboardScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -510,3 +513,4 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 });
+

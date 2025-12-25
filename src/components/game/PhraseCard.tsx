@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, Animated } from 'react-native';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 
 interface PhraseCardProps {
   number: number;
@@ -19,6 +19,9 @@ const PhraseCard: React.FC<PhraseCardProps> = ({
   isOwnPhrase = false,
   hasVoted = false,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -134,7 +137,7 @@ const PhraseCard: React.FC<PhraseCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
@@ -202,3 +205,5 @@ const styles = StyleSheet.create({
 });
 
 export default PhraseCard;
+
+

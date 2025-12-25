@@ -142,14 +142,38 @@ export const subscribeToGameState = (
   roomId: string,
   callback: (gameState: any) => void
 ): (() => void) => {
-  const gameStateRef = ref(realtimeDb, `gameStates/${roomId}`);
+  const gameRef = ref(realtimeDb, `rooms/${roomId}/game`);
   
-  console.log('🎮 Subscribing to game state:', `gameStates/${roomId}`);
+  console.log('🎮 Subscribing to game:', `rooms/${roomId}/game`);
   
-  const unsubscribe = onValue(gameStateRef, (snapshot) => {
+  const unsubscribe = onValue(gameRef, (snapshot) => {
     const state = snapshot.val();
-    console.log('⏱️ Game state update:', state);
-    callback(state);
+    
+    if (state) {
+      // Transform new format to old format for compatibility
+      const phaseDurations = { prompt: 3, submission: 25, voting: 10, results: 8 };
+      const elapsed = (Date.now() - state.phaseStart) / 1000;
+      const duration = phaseDurations[state.phase as keyof typeof phaseDurations] || 0;
+      const remaining = Math.max(0, Math.floor(duration - elapsed));
+      
+      const transformedState = {
+        phase: state.phase,
+        timeRemaining: remaining,
+        currentPrompt: state.prompt,
+        currentRound: state.round,
+        submissions: state.submissions || {},
+        votes: state.votes || {},
+        lastWinner: state.lastWinner,
+        lastWinningPhrase: state.lastWinningPhrase,
+        phaseStartTime: state.phaseStart,
+        phaseDuration: duration
+      };
+      
+      console.log('⏱️ Game state update:', transformedState);
+      callback(transformedState);
+    } else {
+      callback(null);
+    }
   });
   
   return unsubscribe;
@@ -176,20 +200,27 @@ export const markSubmission = (roomId: string, userId: string, phraseText: strin
     timestamp: serverTimestamp()
   });
   
-  // Store the actual phrase in gameState
-  const gameStateSubmissionRef = ref(realtimeDb, `rooms/${roomId}/gameState/submissions/${userId}`);
+  // Store the actual phrase in game state (matching subscription path)
+  const gameStateSubmissionRef = ref(realtimeDb, `rooms/${roomId}/game/submissions/${userId}`);
   set(gameStateSubmissionRef, phraseText);
+  console.log('💾 Saved submission:', phraseText, 'to', `rooms/${roomId}/game/submissions/${userId}`);
 };
 
 /**
  * Mark that a player has voted
  */
 export const markVote = (roomId: string, userId: string, phraseId: string): void => {
+  // Store in votes tracking
   const voteRef = ref(realtimeDb, `rooms/${roomId}/votes/${userId}`);
   set(voteRef, {
     phraseId,
     timestamp: serverTimestamp()
   });
+  
+  // Store the actual vote in game state (matching subscription path)
+  const gameStateVoteRef = ref(realtimeDb, `rooms/${roomId}/game/votes/${userId}`);
+  set(gameStateVoteRef, phraseId);
+  console.log('🗳️ Saved vote for:', phraseId, 'to', `rooms/${roomId}/game/votes/${userId}`);
 };
 
 /**
@@ -199,9 +230,10 @@ export const subscribeToSubmissions = (
   roomId: string,
   callback: (count: number) => void
 ): (() => void) => {
-  const submissionsRef = ref(realtimeDb, `rooms/${roomId}/submissions`);
+  // Count actual submissions in game state, not just tracking flags
+  const gameSubmissionsRef = ref(realtimeDb, `rooms/${roomId}/game/submissions`);
   
-  const unsubscribe = onValue(submissionsRef, (snapshot) => {
+  const unsubscribe = onValue(gameSubmissionsRef, (snapshot) => {
     const submissions = snapshot.val() || {};
     callback(Object.keys(submissions).length);
   });
@@ -216,15 +248,18 @@ export const subscribeToVotes = (
   roomId: string,
   callback: (votes: { [phraseId: string]: number }) => void
 ): (() => void) => {
-  const votesRef = ref(realtimeDb, `rooms/${roomId}/votes`);
+  // Read actual votes from game state
+  const votesRef = ref(realtimeDb, `rooms/${roomId}/game/votes`);
   
   const unsubscribe = onValue(votesRef, (snapshot) => {
     const votesData = snapshot.val() || {};
     const voteCounts: { [phraseId: string]: number } = {};
     
-    Object.values(votesData).forEach((vote: any) => {
-      const phraseId = vote.phraseId;
-      voteCounts[phraseId] = (voteCounts[phraseId] || 0) + 1;
+    // votesData is now { userId: phraseId } format
+    Object.values(votesData).forEach((phraseId: any) => {
+      if (phraseId) {
+        voteCounts[phraseId] = (voteCounts[phraseId] || 0) + 1;
+      }
     });
     
     callback(voteCounts);

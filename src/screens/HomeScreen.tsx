@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, Platform, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
+import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
 import { getActiveRooms, createRoom, joinRoom } from '../services/database';
 import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES, MAX_PLAYERS } from '../utils/constants';
 
@@ -15,8 +16,11 @@ const { width } = Dimensions.get('window');
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, userProfile, signOut } = useAuth();
+  const { colors: COLORS } = useTheme();
   const [quickMatchLoading, setQuickMatchLoading] = useState(false);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
+  
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -315,6 +319,22 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 <Text style={styles.secondaryTitle}>Friends</Text>
               </LinearGradient>
             </TouchableOpacity>
+
+            {/* Admin Card - Only for specific admins */}
+            {(user?.email === 'mightygunja@gmail.com' || user?.email === 'noshir2@gmail.com') && (
+              <TouchableOpacity 
+                style={styles.secondaryCard}
+                onPress={() => navigation.navigate('AdminConsole')}
+              >
+                <LinearGradient
+                  colors={['#FF6B6B', '#C92A2A']}
+                  style={styles.secondaryGradient}
+                >
+                  <Text style={styles.secondaryIcon}>⚙️</Text>
+                  <Text style={styles.secondaryTitle}>Admin</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </Animated.View>
 
@@ -393,7 +413,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

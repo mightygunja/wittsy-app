@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,9 +7,10 @@ import { getActiveRooms, joinRoom } from '../services/database';
 import { Button } from '../components/common/Button';
 import { Loading } from '../components/common/Loading';
 import { Room } from '../types';
-import { COLORS } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';;
 
 export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { userProfile } = useAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,8 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
       setRefreshing(false);
     }
   };
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     loadRooms();
@@ -126,7 +129,7 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background
@@ -209,3 +212,4 @@ const styles = StyleSheet.create({
     height: 48
   }
 });
+

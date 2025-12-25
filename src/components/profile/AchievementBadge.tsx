@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Achievement } from '../../types';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 
 interface AchievementBadgeProps {
   achievement: Achievement;
@@ -12,6 +12,8 @@ export const AchievementBadge: React.FC<AchievementBadgeProps> = ({
   achievement, 
   onPress 
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const isUnlocked = achievement.unlocked;
   const progress = Math.round((achievement.progress / achievement.requirement) * 100);
 
@@ -46,7 +48,7 @@ export const AchievementBadge: React.FC<AchievementBadgeProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     width: '30%',
     margin: '1.5%',
@@ -114,3 +116,5 @@ const styles = StyleSheet.create({
     marginTop: 4
   }
 });
+
+

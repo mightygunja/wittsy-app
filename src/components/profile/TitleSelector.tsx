@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { SPACING, RADIUS, SHADOWS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 import { TITLES } from '../../services/progression';
 
 interface TitleSelectorProps {
@@ -14,6 +15,8 @@ export const TitleSelector: React.FC<TitleSelectorProps> = ({
   selectedTitle,
   onSelectTitle,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [modalVisible, setModalVisible] = useState(false);
 
   const currentTitle = selectedTitle ? TITLES[selectedTitle.toUpperCase() as keyof typeof TITLES] : TITLES.NEWBIE;
@@ -94,7 +97,7 @@ export const TitleSelector: React.FC<TitleSelectorProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     marginVertical: SPACING.md,
   },

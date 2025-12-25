@@ -17,11 +17,16 @@ import { EnhancedSettingsScreen } from '../screens/EnhancedSettingsScreen';
 import { ThemeSettingsScreen } from '../screens/settings/ThemeSettingsScreen';
 import { AudioSettingsScreen } from '../screens/settings/AudioSettingsScreen';
 import { GameplaySettingsScreen } from '../screens/settings/GameplaySettingsScreen';
-import { AvatarCreatorScreen } from '../screens/AvatarCreatorScreen';
+import { LanguageSettingsScreen } from '../screens/settings/LanguageSettingsScreen';
+import { AccessibilitySettingsScreen } from '../screens/settings/AccessibilitySettingsScreen';
+import { PrivacySettingsScreen } from '../screens/settings/PrivacySettingsScreen';
+import { NotificationSettingsScreen } from '../screens/settings/NotificationSettingsScreen';
+import { AvatarCreatorScreenV2 as AvatarCreatorScreen } from '../screens/AvatarCreatorScreenV2';
 import { AvatarShopScreen } from '../screens/AvatarShopScreen';
 import { CoinShopScreen } from '../screens/CoinShopScreen';
 import { AnalyticsDashboardScreen } from '../screens/AnalyticsDashboardScreen';
 import { BattlePassScreen } from '../screens/BattlePassScreen';
+import { AdminEventsScreen } from '../screens/AdminEventsScreen';
 
 const Stack = createStackNavigator();
 
@@ -124,6 +129,26 @@ export const MainNavigator: React.FC = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen 
+        name="LanguageSettings" 
+        component={LanguageSettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="AccessibilitySettings" 
+        component={AccessibilitySettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="PrivacySettings" 
+        component={PrivacySettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="NotificationSettings" 
+        component={NotificationSettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
         name="AvatarCreator" 
         component={AvatarCreatorScreen}
         options={{ headerShown: false }}
@@ -146,6 +171,11 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="BattlePass" 
         component={BattlePassScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="AdminEvents" 
+        component={AdminEventsScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

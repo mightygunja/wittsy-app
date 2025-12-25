@@ -3,7 +3,7 @@
  * Purchase and unlock avatar items - KEY MONETIZATION FEATURE
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
-import { COLORS, SPACING, RADIUS } from '../utils/constants';
+import { SPACING, RADIUS } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 import {
   AvatarItem,
   AvatarRarity,
@@ -91,13 +92,16 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
   navigation,
   route,
 }) => {
+  const { colors: COLORS } = useTheme();
   const { user } = useAuth();
   const [unlockedItems, setUnlockedItems] = useState<string[]>([]);
   const [userCoins, setUserCoins] = useState(0);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadShopData();
@@ -396,7 +400,7 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   loadingContainer: {

@@ -191,6 +191,24 @@ service cloud.firestore {
       }
     }
     
+    // Avatars - users can read/write their own avatar
+    match /avatars/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Battle Pass Seasons - read-only for users
+    match /battlePassSeasons/{seasonId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend can manage seasons
+    }
+    
+    // User Battle Pass Progress
+    match /userBattlePass/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
     // Notifications
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;

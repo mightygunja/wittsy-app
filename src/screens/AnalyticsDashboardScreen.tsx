@@ -3,7 +3,7 @@
  * View app metrics and KPIs - ADMIN ONLY
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { monetization } from '../services/monetization';
 import { Card } from '../components/common/Card';
-import { COLORS, SPACING, RADIUS } from '../utils/constants';
+import { SPACING, RADIUS } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 const { width } = Dimensions.get('window');
 
@@ -31,8 +32,11 @@ interface KPI {
 }
 
 export const AnalyticsDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
   const [kpis, setKpis] = useState<KPI[]>([]);
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     loadAnalytics();
@@ -244,7 +248,7 @@ export const AnalyticsDashboardScreen: React.FC<{ navigation: any }> = ({ naviga
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: {

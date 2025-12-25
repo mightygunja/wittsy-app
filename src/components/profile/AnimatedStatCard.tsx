@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { SPACING, RADIUS, SHADOWS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface AnimatedStatCardProps {
   label: string;
@@ -15,10 +16,13 @@ export const AnimatedStatCard: React.FC<AnimatedStatCardProps> = ({
   label, 
   value, 
   icon, 
-  color = COLORS.primary,
+  color,
   subtitle,
   delay = 0
 }) => {
+  const { colors: COLORS } = useTheme();
+  const cardColor = color || COLORS.primary;
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -72,14 +76,14 @@ export const AnimatedStatCard: React.FC<AnimatedStatCardProps> = ({
           {icon}
         </Animated.Text>
       )}
-      <Text style={[styles.value, { color }]}>{value}</Text>
+      <Text style={[styles.value, { color: cardColor }]}>{value}</Text>
       <Text style={styles.label}>{label}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </Animated.View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     width: '48%',
     backgroundColor: COLORS.surface,
@@ -111,3 +115,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   }
 });
+
+

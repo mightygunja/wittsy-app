@@ -3,7 +3,7 @@
  * Seasonal progression and rewards
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,14 +22,16 @@ import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
-import { COLORS, SPACING, RADIUS } from '../utils/constants';
+import { SPACING, RADIUS } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 import { UserBattlePass, BattlePassStats, BattlePassReward } from '../types/battlePass';
 
 const { width } = Dimensions.get('window');
 const REWARD_CARD_WIDTH = 120;
 
 export const BattlePassScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user, userProfile } = useAuth();
+  const { colors: COLORS } = useTheme();
+  const { user, userProfile, refreshUserProfile } = useAuth();
   const [userBP, setUserBP] = useState<UserBattlePass | null>(null);
   const [stats, setStats] = useState<BattlePassStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,9 @@ export const BattlePassScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const scrollViewRef = useRef<ScrollView>(null);
+  
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     loadBattlePass();
@@ -125,7 +129,8 @@ export const BattlePassScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       
       if (success) {
         haptics.success();
-        loadBattlePass();
+        await loadBattlePass();
+        await refreshUserProfile(); // Refresh coins in header
       } else {
         haptics.warning();
       }
@@ -432,7 +437,7 @@ export const BattlePassScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   loadingContainer: {

@@ -34,33 +34,40 @@ import {
  * Get all active events
  */
 export const getActiveEvents = async (): Promise<Event[]> => {
-  const now = new Date().toISOString();
-  
+  // Simplified query - get all events and filter client-side
   const q = query(
     collection(firestore, 'events'),
-    where('status', 'in', ['upcoming', 'registration', 'active']),
-    orderBy('startDate', 'asc'),
-    limit(20)
+    limit(50)
   );
 
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
+  const allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
+  
+  // Filter active events client-side
+  return allEvents
+    .filter(event => ['upcoming', 'registration', 'active'].includes(event.status))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .slice(0, 20);
 };
 
 /**
  * Get featured events
  */
 export const getFeaturedEvents = async (): Promise<Event[]> => {
+  // Simplified query - get all events and filter client-side
   const q = query(
     collection(firestore, 'events'),
-    where('featured', '==', true),
-    where('status', 'in', ['upcoming', 'registration', 'active']),
-    orderBy('startDate', 'asc'),
-    limit(5)
+    limit(50)
   );
 
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
+  const allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
+  
+  // Filter featured events client-side
+  return allEvents
+    .filter(event => event.featured && ['upcoming', 'registration', 'active'].includes(event.status))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .slice(0, 5);
 };
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { submitPrompt, containsProfanity } from '../services/prompts';
 import { PromptCategory, PromptDifficulty } from '../types/prompts';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
+import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 import { Button } from '../components/common/Button';
 
 const CATEGORIES: { id: PromptCategory; name: string; icon: string }[] = [
@@ -39,6 +40,7 @@ const DIFFICULTIES: { id: PromptDifficulty; name: string; description: string }[
 ];
 
 export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { user } = useAuth();
   const [promptText, setPromptText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<PromptCategory>('general');
@@ -117,6 +119,8 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   const characterCount = promptText.length;
   const isValid = characterCount >= 10 && characterCount <= 200;
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -277,7 +281,7 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

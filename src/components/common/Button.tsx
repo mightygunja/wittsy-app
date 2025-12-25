@@ -1,8 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, Platform, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 import { haptics } from '../../services/haptics';
+import { audioService } from '../../services/audioService';
 
 interface ButtonProps {
   title: string;
@@ -29,6 +31,8 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   fullWidth = false,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0.7)).current;
   
@@ -77,6 +81,7 @@ export const Button: React.FC<ButtonProps> = ({
   const handlePress = () => {
     if (!isDisabled && onPress) {
       haptics.buttonPress();
+      audioService.playClick();
       onPress();
     }
   };
@@ -175,7 +180,7 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   button: {
     position: 'relative',
     borderRadius: RADIUS.lg,

@@ -2,16 +2,19 @@
  * Gameplay Settings Screen
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useTheme } from '../../hooks/useTheme';
 import { Card } from '../../components/common/Card';
-import { COLORS, SPACING } from '../../utils/constants';
+import { SPACING } from '../../utils/constants';
 
 export const GameplaySettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, updateGameplay } = useSettings();
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [fadeAnim] = useState(new Animated.Value(0));
 
   React.useEffect(() => {
@@ -67,7 +70,7 @@ export const GameplaySettingsScreen: React.FC<{ navigation: any }> = ({ navigati
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md },

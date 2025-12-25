@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { validateEmail, validatePassword } from '../utils/validation';
-import { COLORS, SPACING } from '../utils/constants';
+import { SPACING } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';
 
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,6 +47,8 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setLoading(false);
     }
   };
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -120,7 +124,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background

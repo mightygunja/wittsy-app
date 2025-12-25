@@ -12,6 +12,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,9 +27,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        // TODO: Fetch user profile from Firestore
-        setUserProfile({
-          uid: firebaseUser.uid,
+        // Create or fetch user profile from Firestore
+        const userDoc = await authService.getOrCreateUserProfile(firebaseUser);
+        
+        if (userDoc) {
+          setUserProfile(userDoc as any); // Type conversion needed
+        } else {
+          // Fallback to temporary profile
+          setUserProfile({
+            uid: firebaseUser.uid,
           email: firebaseUser.email || '',
           username: firebaseUser.displayName || 'Anonymous',
           avatar: {
@@ -78,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date(),
           lastActive: new Date()
         });
+        }
       } else {
         setUserProfile(null);
       }
@@ -128,6 +136,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await authService.resetPassword(email);
   };
 
+  const refreshUserProfile = async () => {
+    if (user) {
+      const userDoc = await authService.getOrCreateUserProfile(user);
+      if (userDoc) {
+        setUserProfile(userDoc as any);
+      }
+    }
+  };
+
   const value = {
     user,
     userProfile,
@@ -136,7 +153,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signInWithGoogle,
     signOut: handleSignOut,
-    resetPassword
+    resetPassword,
+    refreshUserProfile
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

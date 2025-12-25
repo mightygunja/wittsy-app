@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getCurrentSeason, getAllSeasons } from '../services/seasons';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
+import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const [seasons, setSeasons] = useState<any[]>([]);
   const [currentSeason, setCurrentSeason] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -25,10 +27,30 @@ export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [seasonTheme, setSeasonTheme] = useState('');
   const [seasonDescription, setSeasonDescription] = useState('');
   const [durationDays, setDurationDays] = useState('90');
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     loadSeasons();
   }, []);
+
+  useEffect(() => {
+    // Auto-populate next season number based on all seasons (including current)
+    if (seasons.length > 0) {
+      const maxSeasonNumber = Math.max(...seasons.map(s => s.number || 0));
+      const nextNumber = maxSeasonNumber + 1;
+      setSeasonNumber(nextNumber.toString());
+      console.log(`Auto-setting next season number to ${nextNumber} (current max: ${maxSeasonNumber})`);
+    } else if (currentSeason) {
+      // If we have a current season but no seasons in the list, use current + 1
+      const nextNumber = (currentSeason.number || 0) + 1;
+      setSeasonNumber(nextNumber.toString());
+      console.log(`Auto-setting next season number to ${nextNumber} based on current season`);
+    } else {
+      setSeasonNumber('1');
+      // Silently default to season 1 - this is expected on first run
+    }
+  }, [seasons, currentSeason]);
 
   const loadSeasons = async () => {
     setLoading(true);
@@ -122,7 +144,23 @@ export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>🔧 Admin Console</Text>
-          <Text style={styles.subtitle}>Season Management</Text>
+          <Text style={styles.subtitle}>Manage your app</Text>
+        </View>
+
+        {/* Admin Tools */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>🛠️ Admin Tools</Text>
+          <TouchableOpacity 
+            style={styles.toolCard}
+            onPress={() => navigation.navigate('AdminEvents')}
+          >
+            <Text style={styles.toolIcon}>🏆</Text>
+            <View style={styles.toolInfo}>
+              <Text style={styles.toolTitle}>Manage Events</Text>
+              <Text style={styles.toolDescription}>Create and manage tournaments & events</Text>
+            </View>
+            <Text style={styles.toolArrow}>→</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Current Season Info */}
@@ -156,7 +194,7 @@ export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }
               style={styles.input}
               value={seasonNumber}
               onChangeText={setSeasonNumber}
-              placeholder="e.g., 1"
+              placeholder="e.g., 2"
               keyboardType="number-pad"
               placeholderTextColor={COLORS.textSecondary}
             />
@@ -252,7 +290,7 @@ export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -327,6 +365,10 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.text,
   },
+  inputReadOnly: {
+    backgroundColor: COLORS.surface,
+    opacity: 0.6,
+  },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
@@ -400,5 +442,34 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     paddingVertical: SPACING.lg,
+  },
+  toolCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    backgroundColor: COLORS.backgroundElevated,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  toolIcon: {
+    fontSize: 32,
+    marginRight: SPACING.md,
+  },
+  toolInfo: {
+    flex: 1,
+  },
+  toolTitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  toolDescription: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+  },
+  toolArrow: {
+    fontSize: 20,
+    color: COLORS.textSecondary,
   },
 });

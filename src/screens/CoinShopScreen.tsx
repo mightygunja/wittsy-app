@@ -3,7 +3,7 @@
  * Purchase coins and premium currency - MONETIZATION
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,17 +22,21 @@ import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
-import { COLORS, SPACING, RADIUS } from '../utils/constants';
+import { SPACING, RADIUS } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 const { width } = Dimensions.get('window');
 
 export const CoinShopScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState<'coins' | 'premium'>('coins');
   const [purchasing, setPurchasing] = useState<string | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
     analytics.screenView('CoinShop');
@@ -263,7 +267,7 @@ export const CoinShopScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: {

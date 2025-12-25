@@ -1,14 +1,46 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
+import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Settings</Text>
         
+        {/* Settings Sections */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>⚙️ General Settings</Text>
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => navigation.navigate('EnhancedSettings')}
+          >
+            <Text style={styles.settingButtonText}>🎨 Theme & Appearance</Text>
+            <Text style={styles.settingButtonSubtext}>Customize colors and display</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => navigation.navigate('EnhancedSettings')}
+          >
+            <Text style={styles.settingButtonText}>🔊 Audio & Sound</Text>
+            <Text style={styles.settingButtonSubtext}>Volume and sound effects</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => navigation.navigate('EnhancedSettings')}
+          >
+            <Text style={styles.settingButtonText}>🎮 Gameplay</Text>
+            <Text style={styles.settingButtonSubtext}>Game preferences and options</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Admin Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🔧 Admin</Text>
@@ -20,14 +52,12 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <Text style={styles.adminButtonSubtext}>Create and manage competitive seasons</Text>
           </TouchableOpacity>
         </View>
-
-        <Text style={styles.subtitle}>More settings coming soon...</Text>
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background
@@ -59,6 +89,24 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: 12,
   },
+  settingButton: {
+    backgroundColor: COLORS.surface,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  settingButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  settingButtonSubtext: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
   adminButton: {
     backgroundColor: COLORS.surface,
     padding: 16,
@@ -77,3 +125,4 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 });
+

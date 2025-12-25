@@ -3,7 +3,7 @@
  * Browse and register for events and tournaments
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,15 +28,19 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
-import { COLORS, SPACING } from '../utils/constants';
+import { SPACING } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { user, userProfile } = useAuth();
   const [featuredEvents, setFeaturedEvents] = useState<Event[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -289,7 +293,16 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Events & Tournaments</Text>
-          <View style={styles.headerRight} />
+          {(user?.email === 'mightygunja@gmail.com' || user?.email === 'noshir2@gmail.com') ? (
+            <TouchableOpacity 
+              style={styles.adminButton}
+              onPress={() => navigation.navigate('AdminEvents')}
+            >
+              <Text style={styles.adminButtonText}>⚙️</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerRight} />
+          )}
         </View>
 
         {/* Content */}
@@ -331,7 +344,7 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -364,6 +377,15 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40,
+  },
+  adminButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminButtonText: {
+    fontSize: 20,
   },
   content: {
     flex: 1,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { getUserMatches } from '../services/database';
@@ -7,9 +7,10 @@ import { StatCard } from '../components/profile/StatCard';
 import { AchievementBadge } from '../components/profile/AchievementBadge';
 import { MatchHistoryItem } from '../components/profile/MatchHistoryItem';
 import { Achievement } from '../types';
-import { COLORS } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';;
 
 export const ProfileScreen: React.FC = () => {
+  const { colors: COLORS } = useTheme();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'history'>('stats');
   const [matches, setMatches] = useState<any[]>([]);
@@ -17,6 +18,8 @@ export const ProfileScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     if (userProfile) {
@@ -325,7 +328,7 @@ export const ProfileScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background
@@ -459,3 +462,4 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   }
 });
+

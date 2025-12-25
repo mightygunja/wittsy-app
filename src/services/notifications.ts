@@ -14,6 +14,7 @@ import {
   NotificationType,
   NOTIFICATION_TEMPLATES,
 } from '../types/platform';
+import { shouldSendNotification } from '../utils/settingsIntegration';
 
 // Configure notification handler
 Notifications.setNotificationHandler({

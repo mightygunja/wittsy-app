@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Player } from '../../types';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 
 interface PlayerListProps {
   players: Player[];
@@ -10,6 +10,9 @@ interface PlayerListProps {
 }
 
 const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, currentUserId }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  
   console.log('🎮 PlayerList rendering:', { 
     playerCount: players.length, 
     players: players.map(p => ({ id: p.userId, name: p.username })),
@@ -63,7 +66,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, cur
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     width: '100%',
     maxHeight: 400,
@@ -150,3 +153,5 @@ const styles = StyleSheet.create({
 });
 
 export default PlayerList;
+
+

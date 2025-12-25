@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { getPromptsByCategory, getPromptPacks, getUserPromptPreferences } from '../services/prompts';
 import { Prompt, PromptPack, PromptCategory } from '../types/prompts';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
+import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';
 import { Loading } from '../components/common/Loading';
 
 const CATEGORIES: { id: PromptCategory; name: string; icon: string; color: string }[] = [
-  { id: 'general', name: 'General', icon: '💬', color: COLORS.primary },
+  { id: 'general', name: 'General', icon: '💬', color: '#A855F7' },
   { id: 'pop-culture', name: 'Pop Culture', icon: '🎬', color: '#FF6B9D' },
   { id: 'food', name: 'Food', icon: '🍕', color: '#FFB84D' },
   { id: 'technology', name: 'Tech', icon: '💻', color: '#4ECDC4' },
@@ -33,6 +34,7 @@ const CATEGORIES: { id: PromptCategory; name: string; icon: string; color: strin
 ];
 
 export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<PromptCategory>('general');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -41,6 +43,8 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [fadeAnim] = useState(new Animated.Value(0));
+  
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
   useEffect(() => {
     loadData();
@@ -276,7 +280,7 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

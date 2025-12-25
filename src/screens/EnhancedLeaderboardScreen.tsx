@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,12 +22,14 @@ import {
 } from '../services/leaderboards';
 import { getCurrentSeason, getSeasonLeaderboard, getDaysRemainingInSeason } from '../services/seasons';
 import { RANK_TIERS } from '../services/ranking';
-import { COLORS, SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
 
 type TabType = 'global' | 'friends' | 'specialized' | 'season';
 
 export const EnhancedLeaderboardScreen: React.FC = () => {
   const { userProfile } = useAuth();
+  const { colors: COLORS } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('global');
   const [specializedType, setSpecializedType] = useState<LeaderboardType>('hall_of_fame');
   const [leaderboard, setLeaderboard] = useState<(LeaderboardEntry | SpecializedLeaderboardEntry)[]>([]);
@@ -39,6 +41,8 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
   useEffect(() => {
     Animated.parallel([
@@ -344,7 +348,7 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { GamePhase } from '../../types';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 import { formatTime } from '../../utils/helpers';
 
 interface TimerProps {
@@ -10,6 +10,8 @@ interface TimerProps {
 }
 
 const Timer: React.FC<TimerProps> = ({ timeRemaining, phase }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const isUrgent = timeRemaining <= 5;
   const isWarning = timeRemaining <= 10;
 
@@ -94,7 +96,7 @@ const Timer: React.FC<TimerProps> = ({ timeRemaining, phase }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     alignItems: 'center',
     minWidth: 70,
@@ -129,3 +131,4 @@ const styles = StyleSheet.create({
 });
 
 export default Timer;
+

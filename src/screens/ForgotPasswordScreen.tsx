@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { validateEmail } from '../utils/validation';
-import { COLORS } from '../utils/constants';
+import { useTheme } from '../hooks/useTheme';;
 
 export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,8 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
       setLoading(false);
     }
   };
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -86,7 +89,7 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background
@@ -125,3 +128,4 @@ const styles = StyleSheet.create({
     marginTop: 8
   }
 });
+

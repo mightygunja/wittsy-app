@@ -69,10 +69,13 @@ export const awardXP = async (
   amount: number,
   reason: string
 ): Promise<{ newXP: number; newLevel: number; leveledUp: boolean }> => {
+  console.log(`⭐ awardXP called: userId=${userId}, amount=${amount}, reason=${reason}`);
+  
   const userRef = doc(firestore, 'users', userId);
   const userDoc = await getDoc(userRef);
   
   if (!userDoc.exists()) {
+    console.error(`❌ User ${userId} not found!`);
     throw new Error('User not found');
   }
   
@@ -82,14 +85,19 @@ export const awardXP = async (
   const newLevel = getLevelFromXP(newXP);
   const leveledUp = newLevel > currentLevel;
   
-  await updateDoc(userRef, {
-    xp: newXP,
-    level: newLevel,
-    lastActive: new Date().toISOString(),
-  });
+  console.log(`📊 XP Update: ${currentXP} → ${newXP}, Level: ${currentLevel} → ${newLevel}, Leveled up: ${leveledUp}`);
   
-  // Log XP gain (optional, for analytics)
-  console.log(`User ${userId} gained ${amount} XP for ${reason}. Total: ${newXP}, Level: ${newLevel}`);
+  try {
+    await updateDoc(userRef, {
+      xp: newXP,
+      level: newLevel,
+      lastActive: new Date().toISOString(),
+    });
+    console.log(`✅ Successfully updated user ${userId} XP and level`);
+  } catch (error) {
+    console.error(`❌ Failed to update user ${userId}:`, error);
+    throw error;
+  }
   
   return { newXP, newLevel, leveledUp };
 };

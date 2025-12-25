@@ -3,7 +3,7 @@
  * Display daily and weekly challenges with progress tracking
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,17 +24,21 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 // ProgressBar component inline
-import { COLORS, SPACING } from '../utils/constants';
+import { SPACING } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 type TabType = 'daily' | 'weekly' | 'seasonal' | 'skill' | 'social';
 
 export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('daily');
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     console.log('🎯 ChallengesScreen mounted, user:', user?.uid || 'NO USER');
@@ -324,7 +328,7 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

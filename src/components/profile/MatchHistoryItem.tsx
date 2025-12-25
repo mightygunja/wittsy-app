@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 
 interface MatchHistoryItemProps {
   roomName: string;
@@ -21,6 +21,8 @@ export const MatchHistoryItem: React.FC<MatchHistoryItemProps> = ({
   playedAt,
   onPress
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const isWin = result === 'win';
 
   return (
@@ -60,7 +62,7 @@ export const MatchHistoryItem: React.FC<MatchHistoryItemProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
@@ -130,3 +132,5 @@ const styles = StyleSheet.create({
     textAlign: 'right'
   }
 });
+
+

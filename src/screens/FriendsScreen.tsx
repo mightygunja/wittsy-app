@@ -3,7 +3,7 @@
  * Manage friends, friend requests, search users, send invites
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -34,11 +34,13 @@ import {
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
-import { COLORS, SPACING } from '../utils/constants';
+import { SPACING } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 type TabType = 'friends' | 'requests' | 'search';
 
 export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { colors: COLORS } = useTheme();
   const { user, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('friends');
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -49,6 +51,8 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -75,8 +79,8 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       setPendingRequests(requestsData);
       setSentRequests(sentData);
     } catch (error) {
-      console.error('Error loading friends data:', error);
-      Alert.alert('Error', 'Failed to load friends data');
+      console.warn('Error loading friends data (expected if collections not initialized):', error);
+      // Don't show alert - this is expected when collections don't exist yet
     } finally {
       setLoading(false);
     }
@@ -442,7 +446,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

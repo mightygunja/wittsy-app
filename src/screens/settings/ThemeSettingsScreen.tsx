@@ -3,7 +3,7 @@
  * Dark/Light mode, color customization
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,12 +16,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useTheme } from '../../hooks/useTheme';
 import { Card } from '../../components/common/Card';
-import { COLORS, SPACING } from '../../utils/constants';
+import { SPACING } from '../../utils/constants';
 import { ThemeMode } from '../../types/settings';
 
 export const ThemeSettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, updateTheme } = useSettings();
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [fadeAnim] = useState(new Animated.Value(0));
 
   React.useEffect(() => {
@@ -189,7 +192,7 @@ export const ThemeSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

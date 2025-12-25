@@ -3,7 +3,7 @@
  * Main settings hub with navigation to all setting categories
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,10 +19,12 @@ import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
-import { COLORS, SPACING } from '../utils/constants';
+import { SPACING } from '../utils/constants'
+import { useTheme } from '../hooks/useTheme';;
 
 export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user, userProfile } = useAuth();
+  const { colors: COLORS } = useTheme();
+  const { user, userProfile, signOut } = useAuth();
   const { settings, resetSettings } = useSettings();
   const [fadeAnim] = useState(new Animated.Value(0));
 
@@ -46,6 +48,28 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
           onPress: async () => {
             await resetSettings();
             Alert.alert('Success', 'Settings have been reset to default');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+              // Navigation will be handled automatically by auth state change
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to sign out');
+            }
           },
         },
       ]
@@ -131,6 +155,8 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
       </View>
     </Card>
   );
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
@@ -196,6 +222,12 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
               >
                 <Text style={styles.dangerButtonText}>Reset All Settings</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dangerButton, styles.signOutButton]}
+                onPress={handleSignOut}
+              >
+                <Text style={styles.dangerButtonText}>🚪 Sign Out</Text>
+              </TouchableOpacity>
             </View>
 
             {/* App Info */}
@@ -212,7 +244,7 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -359,6 +391,9 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  signOutButton: {
+    marginTop: SPACING.sm,
   },
   dangerButtonText: {
     fontSize: 16,

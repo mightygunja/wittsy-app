@@ -178,65 +178,80 @@ export const cancelFriendRequest = async (
  * Get user's friends list
  */
 export const getFriends = async (userId: string): Promise<Friend[]> => {
-  const q = query(
-    collection(firestore, 'friendships'),
-    where('userId', '==', userId),
-    orderBy('addedAt', 'desc')
-  );
+  try {
+    const q = query(
+      collection(firestore, 'friendships'),
+      where('userId', '==', userId),
+      orderBy('addedAt', 'desc')
+    );
 
-  const snapshot = await getDocs(q);
-  const friends: Friend[] = [];
+    const snapshot = await getDocs(q);
+    const friends: Friend[] = [];
 
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    const friendData = await getUserData(data.friendId);
-    const presence = await getUserPresence(data.friendId);
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const friendData = await getUserData(data.friendId);
+      const presence = await getUserPresence(data.friendId);
 
-    friends.push({
-      userId: data.friendId,
-      username: friendData.username,
-      avatar: friendData.avatar,
-      rating: friendData.rating,
-      rank: friendData.rank,
-      isOnline: presence.isOnline,
-      lastActive: presence.lastActive,
-      addedAt: data.addedAt,
-      gamesPlayedTogether: data.gamesPlayedTogether || 0,
-      favorited: data.favorited || false,
-    });
+      friends.push({
+        userId: data.friendId,
+        username: friendData.username,
+        avatar: friendData.avatar,
+        rating: friendData.rating,
+        rank: friendData.rank,
+        isOnline: presence.isOnline,
+        lastActive: presence.lastActive,
+        addedAt: data.addedAt,
+        gamesPlayedTogether: data.gamesPlayedTogether || 0,
+        favorited: data.favorited || false,
+      });
+    }
+
+    return friends;
+  } catch (error) {
+    console.warn('Friends collection not initialized yet, returning empty array');
+    return [];
   }
-
-  return friends;
 };
 
 /**
  * Get pending friend requests (received)
  */
 export const getPendingRequests = async (userId: string): Promise<FriendRequest[]> => {
-  const q = query(
-    collection(firestore, 'friendRequests'),
-    where('toUserId', '==', userId),
-    where('status', '==', 'pending'),
-    orderBy('createdAt', 'desc')
-  );
+  try {
+    const q = query(
+      collection(firestore, 'friendRequests'),
+      where('toUserId', '==', userId),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
 
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FriendRequest));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FriendRequest));
+  } catch (error) {
+    console.warn('Friend requests collection not initialized yet, returning empty array');
+    return [];
+  }
 };
 
 /**
  * Get sent friend requests
  */
 export const getSentRequests = async (userId: string): Promise<FriendRequest[]> => {
-  const q = query(
-    collection(firestore, 'friendRequests'),
-    where('fromUserId', '==', userId),
-    where('status', '==', 'pending'),
-    orderBy('createdAt', 'desc')
-  );
+  try {
+    const q = query(
+      collection(firestore, 'friendRequests'),
+      where('fromUserId', '==', userId),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
 
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FriendRequest));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FriendRequest));
+  } catch (error) {
+    console.warn('Friend requests collection not initialized yet, returning empty array');
+    return [];
+  }
 };
 
 /**

@@ -48,11 +48,14 @@ export interface GameplaySettings {
 export interface PrivacySettings {
   profileVisibility: 'public' | 'friends' | 'private';
   showOnlineStatus: boolean;
+  showActivity: boolean;
   allowFriendRequests: boolean;
   allowGameInvites: boolean;
   showMatchHistory: boolean;
   showStats: boolean;
   allowSpectators: boolean;
+  analytics: boolean;
+  personalizedAds: boolean;
   blockList: string[];
 }
 
@@ -150,11 +153,14 @@ export const DEFAULT_GAMEPLAY_SETTINGS: GameplaySettings = {
 export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
   profileVisibility: 'public',
   showOnlineStatus: true,
+  showActivity: true,
   allowFriendRequests: true,
   allowGameInvites: true,
   showMatchHistory: true,
   showStats: true,
   allowSpectators: true,
+  analytics: true,
+  personalizedAds: false,
   blockList: [],
 };
 

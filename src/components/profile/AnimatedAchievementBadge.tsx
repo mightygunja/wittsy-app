@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Achievement } from '../../types';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../utils/constants';
+import { SPACING, RADIUS, SHADOWS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface AnimatedAchievementBadgeProps {
   achievement: Achievement;
@@ -14,6 +15,8 @@ export const AnimatedAchievementBadge: React.FC<AnimatedAchievementBadgeProps> =
   onPress,
   delay = 0
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const isUnlocked = achievement.unlocked;
   const progress = Math.round((achievement.progress / achievement.requirement) * 100);
   
@@ -147,7 +150,7 @@ export const AnimatedAchievementBadge: React.FC<AnimatedAchievementBadgeProps> =
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   wrapper: {
     width: '31%',
     margin: '1.16%',

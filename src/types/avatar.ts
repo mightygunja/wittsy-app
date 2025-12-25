@@ -61,6 +61,14 @@ export interface AvatarItem {
 
 // ==================== AVATAR CONFIGURATION ====================
 
+export interface FeaturePosition {
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  canvasSize?: number; // Canvas size when position was saved, for scaling
+}
+
 export interface AvatarConfig {
   skin: string;
   eyes: string;
@@ -71,6 +79,13 @@ export interface AvatarConfig {
   clothing: string;
   background: string;
   effects: string[];
+  // Feature positions for drag-and-drop customization
+  positions?: {
+    eyes?: FeaturePosition;
+    mouth?: FeaturePosition;
+    hair?: FeaturePosition;
+    accessories?: { [key: string]: FeaturePosition };
+  };
 }
 
 export interface UserAvatar {

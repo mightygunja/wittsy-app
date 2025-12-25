@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 
 interface StatCardProps {
   label: string;
@@ -14,20 +14,23 @@ export const StatCard: React.FC<StatCardProps> = ({
   label, 
   value, 
   icon, 
-  color = COLORS.primary,
+  color,
   subtitle 
 }) => {
+  const { colors: COLORS } = useTheme();
+  const cardColor = color || COLORS.primary;
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   return (
     <View style={styles.container}>
       {icon && <Text style={styles.icon}>{icon}</Text>}
-      <Text style={[styles.value, { color }]}>{value}</Text>
+      <Text style={[styles.value, { color: cardColor }]}>{value}</Text>
       <Text style={styles.label}>{label}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     width: '48%',
     backgroundColor: COLORS.surface,
@@ -62,3 +65,7 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   }
 });
+
+
+
+

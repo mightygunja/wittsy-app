@@ -45,9 +45,11 @@ export const sendChatMessage = async (
     reactions: {},
   };
 
+  console.log('💬 Sending chat message:', { roomId, username, content });
   const messagesRef = ref(realtimeDb, `chat/${roomId}/messages`);
   const newMessageRef = push(messagesRef);
   await set(newMessageRef, messageData);
+  console.log('✅ Chat message sent successfully:', newMessageRef.key);
 
   return newMessageRef.key!;
 };
@@ -84,18 +86,23 @@ export const sendEmote = async (
   username: string,
   emoteId: string
 ): Promise<string> => {
+  console.log('😊 Sending emote:', { roomId, userId, username, emoteId });
   const emote = EMOTES.find(e => e.id === emoteId);
   if (!emote) {
+    console.error('❌ Emote not found:', emoteId);
     throw new Error('Emote not found');
   }
 
-  return sendChatMessage(
+  console.log('✅ Found emote:', emote);
+  const messageId = await sendChatMessage(
     roomId,
     userId,
     username,
     emote.emoji,
     'emote'
   );
+  console.log('✅ Emote message sent with ID:', messageId);
+  return messageId;
 };
 
 /**
@@ -165,6 +172,7 @@ export const subscribeToChatMessages = (
   callback: (messages: ChatMessage[]) => void,
   messageLimit: number = 50
 ): (() => void) => {
+  console.log('💬 Subscribing to chat messages for room:', roomId);
   const messagesRef = ref(realtimeDb, `chat/${roomId}/messages`);
   const messagesQuery = rtQuery(messagesRef, orderByChild('timestamp'), limitToLast(messageLimit));
 
@@ -177,6 +185,7 @@ export const subscribeToChatMessages = (
         timestamp: new Date(childSnapshot.val().timestamp).toISOString(),
       });
     });
+    console.log('📨 Received chat messages:', messages.length);
     callback(messages);
   });
 

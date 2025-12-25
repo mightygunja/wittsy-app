@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Player } from '../../types';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../hooks/useTheme';;
 
 interface ScoreBoardProps {
   players: Player[];
@@ -10,6 +10,9 @@ interface ScoreBoardProps {
 }
 
 const ScoreBoard: React.FC<ScoreBoardProps> = ({ players, scores, compact = false }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  
   // Sort players by score (highest first)
   const sortedPlayers = [...players].sort((a, b) => {
     const scoreA = scores[a.userId] || 0;
@@ -119,7 +122,7 @@ const ScoreBoard: React.FC<ScoreBoardProps> = ({ players, scores, compact = fals
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
@@ -238,3 +241,5 @@ const styles = StyleSheet.create({
 });
 
 export default ScoreBoard;
+
+

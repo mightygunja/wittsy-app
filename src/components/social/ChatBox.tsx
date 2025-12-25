@@ -3,7 +3,7 @@
  * In-game chat with messages, quick chat, emotes, and reactions
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,8 @@ import {
   EMOTES,
   REACTIONS,
 } from '../../services/chat';
-import { COLORS, SPACING } from '../../utils/constants';
+import { SPACING } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface ChatBoxProps {
   roomId: string;
@@ -45,16 +46,20 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   compact = false,
   maxHeight = 400,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [showQuickChat, setShowQuickChat] = useState(false);
   const [showEmotes, setShowEmotes] = useState(false);
+  useEffect(() => { console.log(' showEmotes changed to:', showEmotes); }, [showEmotes]);
   const [isExpanded, setIsExpanded] = useState(!compact);
   const scrollViewRef = useRef<ScrollView>(null);
   const slideAnim = useRef(new Animated.Value(compact ? 0 : 1)).current;
 
   useEffect(() => {
     const unsubscribe = subscribeToChatMessages(roomId, (newMessages) => {
+      console.log(' ChatBox received messages:', newMessages.length, newMessages);
       setMessages(newMessages);
       setTimeout(() => scrollToBottom(), 100);
     });
@@ -96,6 +101,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   };
 
   const handleEmote = async (emoteId: string) => {
+    console.log(' User clicked emote:', emoteId);
     try {
       await sendEmote(roomId, userId, username, emoteId);
       setShowEmotes(false);
@@ -207,7 +213,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
         style={styles.header}
         onPress={() => compact && setIsExpanded(!isExpanded)}
       >
-        <Text style={styles.headerTitle}>💬 Chat</Text>
+        <Text style={styles.headerTitle}>💬 Chat {compact && !isExpanded && '(Tap to expand)'}</Text>
         <View style={styles.headerActions}>
           <Text style={styles.messageCount}>{messages.length}</Text>
           {compact && (
@@ -243,7 +249,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={() => setShowEmotes(true)}
+                onPress={() => { console.log(' Emote button clicked!'); setShowEmotes(true); }}
               >
                 <Text style={styles.iconButtonText}>😊</Text>
               </TouchableOpacity>
@@ -291,7 +297,11 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.quickChatList}>
+            <ScrollView 
+              style={styles.quickChatList}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+            >
               {['greeting', 'reaction', 'strategy', 'emotion'].map(category => (
                 <View key={category} style={styles.quickChatCategory}>
                   <Text style={styles.quickChatCategoryTitle}>
@@ -326,7 +336,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
           activeOpacity={1}
           onPress={() => setShowEmotes(false)}
         >
-          <View style={styles.modalContent}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Emotes</Text>
               <TouchableOpacity onPress={() => setShowEmotes(false)}>
@@ -334,7 +344,12 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.emotesList}>
+            <ScrollView 
+              style={styles.emotesList}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+            >
+              {console.log(' Rendering emotes, count:', EMOTES.length, EMOTES)}
               <View style={styles.emotesGrid}>
                 {EMOTES.filter(e => !e.premium && !e.unlockCondition).map(emote => (
                   <TouchableOpacity
@@ -386,7 +401,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
@@ -458,6 +473,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
     maxWidth: '100%',
+    overflow: 'visible',
   },
   ownMessageBubble: {
     backgroundColor: COLORS.primary,
@@ -468,8 +484,13 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   emoteBubble: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
+    minWidth: 50,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   messageText: {
     fontSize: 14,
@@ -482,7 +503,9 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   emoteText: {
-    fontSize: 24,
+    fontSize: 28,
+    lineHeight: 32,
+    textAlign: 'center',
   },
   systemMessage: {
     alignSelf: 'center',
@@ -595,6 +618,12 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: COLORS.surface,
+    minHeight: 400,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '70%',
@@ -619,6 +648,8 @@ const styles = StyleSheet.create({
   },
   quickChatList: {
     flex: 1,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.md,
   },
   quickChatCategory: {
     padding: SPACING.md,
@@ -649,6 +680,8 @@ const styles = StyleSheet.create({
   emotesList: {
     flex: 1,
     padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surface,
   },
   emotesGrid: {
     flexDirection: 'row',
@@ -657,7 +690,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   emoteButton: {
-    width: '30%',
+    width: 80,
     aspectRatio: 1,
     backgroundColor: COLORS.background,
     borderRadius: 12,
@@ -695,3 +728,34 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, RADIUS } from '../../utils/constants';
+import { SPACING, RADIUS } from '../../utils/constants'
+import { useTheme } from '../../hooks/useTheme';;
 
 interface XPProgressBarProps {
   currentXP: number;
@@ -16,6 +17,8 @@ export const XPProgressBar: React.FC<XPProgressBarProps> = ({
   level,
   animated = true,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const progress = Math.min((currentXP / requiredXP) * 100, 100);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -106,7 +109,7 @@ export const XPProgressBar: React.FC<XPProgressBarProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     width: '100%',
   },

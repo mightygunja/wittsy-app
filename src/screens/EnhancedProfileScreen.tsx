@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   RefreshControl,
-  Animated 
+  Animated,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,22 +21,35 @@ import { AnimatedAchievementBadge } from '../components/profile/AnimatedAchievem
 import { AnimatedMatchHistoryItem } from '../components/profile/AnimatedMatchHistoryItem';
 import { XPProgressBar } from '../components/profile/XPProgressBar';
 import { TitleSelector } from '../components/profile/TitleSelector';
+import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
 import { Achievement } from '../types';
-import { COLORS, SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
+import { AvatarConfig } from '../types/avatar';
+import { avatarService } from '../services/avatarService';
+import { firestore } from '../services/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
 
-export const EnhancedProfileScreen: React.FC = () => {
+export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { userProfile } = useAuth();
+  const { colors: COLORS } = useTheme();
   const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'history'>('stats');
   const [matches, setMatches] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   useEffect(() => {
+    // Load user avatar
+    loadAvatar();
+    
     // Initial animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -62,6 +76,35 @@ export const EnhancedProfileScreen: React.FC = () => {
       loadMatchHistory();
     }
   }, [activeTab, userProfile]);
+
+  // Reload avatar when screen comes into focus (e.g., after saving in Avatar Creator)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadAvatar();
+    });
+    return unsubscribe;
+  }, [navigation, userProfile]);
+
+  const loadAvatar = async () => {
+    if (!userProfile?.uid) {
+      console.log('❌ No user profile, cannot load avatar');
+      return;
+    }
+    
+    console.log('🔄 Loading avatar for user:', userProfile.uid);
+    try {
+      const userAvatar = await avatarService.getUserAvatar(userProfile.uid);
+      console.log('📦 Avatar data received:', userAvatar);
+      if (userAvatar && userAvatar.config) {
+        console.log('✅ Setting avatar config:', userAvatar.config);
+        setAvatarConfig(userAvatar.config);
+      } else {
+        console.log('⚠️ No avatar config found, using default');
+      }
+    } catch (error) {
+      console.error('❌ Error loading avatar:', error);
+    }
+  };
 
   const loadAchievements = async () => {
     if (!userProfile?.uid) return;
@@ -137,6 +180,17 @@ export const EnhancedProfileScreen: React.FC = () => {
     ? TITLES[userProfile.selectedTitle.toUpperCase() as keyof typeof TITLES]
     : TITLES.NEWBIE;
 
+  console.log('🔥 ENHANCED PROFILE RENDERING - NEW VERSION WITH STATS ROW');
+  console.log('📊 Stats:', { wins: userProfile.stats.gamesWon, winRate, rating: userProfile.rating });
+  console.log('👤 Avatar config:', avatarConfig ? 'LOADED' : 'NOT LOADED');
+  console.log('⭐ XP Debug:', { 
+    totalXP: userProfile.xp, 
+    level: userProfile.level, 
+    current: xpProgress.current, 
+    required: xpProgress.required,
+    percentage: xpProgress.percentage 
+  });
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView 
@@ -146,7 +200,7 @@ export const EnhancedProfileScreen: React.FC = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header with Gradient Background */}
+        {/* Modern Profile Header */}
         <Animated.View 
           style={[
             styles.headerContainer,
@@ -156,44 +210,109 @@ export const EnhancedProfileScreen: React.FC = () => {
             }
           ]}
         >
+          {/* Background Gradient */}
           <LinearGradient
             colors={[COLORS.primary, COLORS.primaryDark] as any}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
-          >
-            {/* Avatar */}
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>👤</Text>
-              </View>
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelBadgeText}>{userProfile.level}</Text>
+          />
+          
+          {/* Content */}
+          <View style={styles.headerContent}>
+            {/* Avatar Section - REBUILT */}
+            <View style={styles.avatarSection}>
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('AvatarCreator')}
+                activeOpacity={0.9}
+              >
+                <View style={styles.avatarWrapper}>
+                  {/* Avatar Circle */}
+                  <View style={styles.avatarCircle}>
+                    {avatarConfig ? (
+                      <>
+                        <AvatarDisplay config={avatarConfig} size={140} />
+                        {!avatarConfig.positions && (
+                          <View style={styles.warningBadge}>
+                            <Text style={styles.warningText}>!</Text>
+                          </View>
+                        )}
+                      </>
+                    ) : (
+                      <Text style={styles.avatarEmoji}>👤</Text>
+                    )}
+                  </View>
+                  
+                  {/* Level Badge */}
+                  <View style={styles.levelBadge}>
+                    <Text style={styles.levelBadgeText}>{userProfile.level}</Text>
+                  </View>
+                  
+                  {/* Edit Badge */}
+                  <View style={styles.editBadge}>
+                    <Text style={styles.editIcon}>✏️</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* User Info */}
+            <View style={styles.userInfo}>
+              <Text style={styles.username}>{userProfile.username}</Text>
+              <View style={styles.titleBadge}>
+                <Text style={styles.titleIcon}>{currentTitle.icon}</Text>
+                <Text style={styles.titleText}>{currentTitle.name}</Text>
               </View>
             </View>
 
-            {/* Username and Title */}
-            <Text style={styles.username}>{userProfile.username}</Text>
-            <View style={styles.titleBadge}>
-              <Text style={styles.titleIcon}>{currentTitle.icon}</Text>
-              <Text style={styles.titleText}>{currentTitle.name}</Text>
-            </View>
-            
-            {/* Rank */}
-            <View style={styles.rankBadge}>
-              <Text style={styles.rankText}>{userProfile.rank}</Text>
-              <Text style={styles.ratingText}>⚡ {userProfile.rating}</Text>
+            {/* Stats Row */}
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{userProfile.stats.gamesWon}</Text>
+                <Text style={styles.statLabel}>WINS</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{userProfile.stats.gamesPlayed}</Text>
+                <Text style={styles.statLabel}>PLAYED</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{userProfile.rating}</Text>
+                <Text style={styles.statLabel}>RATING</Text>
+              </View>
             </View>
 
-            {/* XP Progress */}
+            {/* XP Progress - Redesigned */}
             <View style={styles.xpSection}>
-              <XPProgressBar
-                currentXP={xpProgress.current}
-                requiredXP={xpProgress.required}
-                level={userProfile.level}
-              />
+              <View style={styles.xpRow}>
+                <Text style={styles.xpLabel}>Experience Points</Text>
+                <Text style={styles.xpNumbers}>{userProfile.xp} XP</Text>
+              </View>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBarFill, { width: `${Math.min(100, xpProgress.percentage)}%` }]} />
+              </View>
+              <Text style={styles.xpSubtext}>
+                Level {userProfile.level} • {xpProgress.percentage}% to next level
+              </Text>
+              <TouchableOpacity 
+                style={styles.fixLevelButton}
+                onPress={async () => {
+                  const { getLevelFromXP } = await import('../services/progression');
+                  const correctLevel = getLevelFromXP(userProfile.xp);
+                  console.log(`🔧 Fixing level: Current=${userProfile.level}, Should be=${correctLevel}`);
+                  if (correctLevel !== userProfile.level) {
+                    await updateDoc(doc(firestore, 'users', userProfile.uid), { level: correctLevel });
+                    Alert.alert('Level Fixed!', `Your level has been corrected to ${correctLevel}`);
+                  } else {
+                    Alert.alert('Level OK', 'Your level is already correct');
+                  }
+                }}
+              >
+                <Text style={styles.fixLevelText}>Fix My Level</Text>
+              </TouchableOpacity>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* Title Selector */}
@@ -205,7 +324,7 @@ export const EnhancedProfileScreen: React.FC = () => {
           />
         </View>
 
-        {/* Tab Navigation */}
+        {/* Modern Tab Navigation */}
         <View style={styles.tabContainer}>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
@@ -449,7 +568,7 @@ export const EnhancedProfileScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -463,55 +582,116 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerContainer: {
-    marginBottom: SPACING.lg,
+    position: 'relative',
+    marginBottom: SPACING.sm,
   },
   headerGradient: {
-    padding: SPACING.xl,
-    paddingTop: SPACING.lg,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderBottomLeftRadius: RADIUS.xl,
+    borderBottomRightRadius: RADIUS.xl,
+  },
+  headerContent: {
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
     alignItems: 'center',
   },
-  avatarContainer: {
-    position: 'relative',
+  avatarSection: {
     marginBottom: SPACING.md,
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.surface,
+  avatarWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: COLORS.text,
-    ...SHADOWS.lg,
+    borderWidth: 5,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+    ...SHADOWS.xl,
   },
-  avatarText: {
-    fontSize: 48,
+  avatarEmoji: {
+    fontSize: 56,
+  },
+  debugText: {
+    position: 'absolute',
+    bottom: 5,
+    fontSize: 8,
+    color: 'red',
+    fontWeight: 'bold',
+  },
+  warningBadge: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'orange',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  warningText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   levelBadge: {
     position: 'absolute',
-    bottom: -5,
-    right: -5,
+    bottom: 0,
+    right: 0,
     backgroundColor: COLORS.gold,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    ...SHADOWS.lg,
+  },
+  levelBadgeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    backgroundColor: COLORS.primary,
     width: 36,
     height: 36,
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: COLORS.background,
-    ...SHADOWS.md,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    ...SHADOWS.lg,
   },
-  levelBadgeText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.background,
+  editIcon: {
+    fontSize: 14,
+  },
+  userInfo: {
+    alignItems: 'center',
+    marginBottom: SPACING.md,
   },
   username: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.black,
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
@@ -519,11 +699,10 @@ const styles = StyleSheet.create({
   titleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.full,
-    marginBottom: SPACING.sm,
   },
   titleIcon: {
     fontSize: 16,
@@ -531,8 +710,45 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  statItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 26,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: '#FFFFFF',
+    marginBottom: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   rankBadge: {
     flexDirection: 'row',
@@ -556,36 +772,95 @@ const styles = StyleSheet.create({
   },
   xpSection: {
     width: '100%',
-    marginTop: SPACING.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+  },
+  xpRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  xpLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  xpNumbers: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: SPACING.xs,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: COLORS.gold,
+    borderRadius: 4,
+  },
+  xpSubtext: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  fixLevelButton: {
+    backgroundColor: COLORS.gold,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    alignSelf: 'center',
+  },
+  fixLevelText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   content: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
     marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
     borderRadius: RADIUS.lg,
     padding: SPACING.xs,
     ...SHADOWS.sm,
   },
   tab: {
     flex: 1,
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: RADIUS.md,
     position: 'relative',
+    minHeight: 44,
   },
   activeTab: {
     backgroundColor: COLORS.primary,
+    ...SHADOWS.sm,
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
   activeTabText: {
-    color: COLORS.text,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   tabBadge: {
     position: 'absolute',
