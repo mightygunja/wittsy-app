@@ -1,24 +1,34 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, Platform, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, Dimensions, Platform, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../hooks/useNotifications';
+import { rewards } from '../services/rewardsService';
 import { useTheme } from '../hooks/useTheme';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
+import { CurrencyDisplay } from '../components/common/CurrencyDisplay';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
 import { getActiveRooms, createRoom, joinRoom } from '../services/database';
+import { getBrowsableRankedRooms } from '../services/matchmaking';
 import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES, MAX_PLAYERS } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, userProfile, signOut } = useAuth();
+  const { unreadCount } = useNotifications();
   const { colors: COLORS } = useTheme();
   const [quickMatchLoading, setQuickMatchLoading] = useState(false);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
+  const [selectedRoomType, setSelectedRoomType] = useState<'ranked' | 'casual' | null>(null);
+  const [rankedRooms, setRankedRooms] = useState<any[]>([]);
+  const [casualRooms, setCasualRooms] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(false);
   
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   
@@ -71,13 +81,35 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
     // Load active rooms on mount
     loadActiveRooms();
-  }, []);
+    
+    // Check daily login reward
+    const checkDailyReward = async () => {
+      if (user?.uid) {
+        const granted = await rewards.grantDailyLoginReward(user.uid);
+        if (granted) {
+          Alert.alert(
+            '🎁 Daily Reward!',
+            'You received 25 coins for logging in today!',
+            [{ text: 'Awesome!' }]
+          );
+        }
+      }
+    };
+    
+    checkDailyReward();
+  }, [user]);
 
   // Reload rooms when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadActiveRooms();
-    }, [])
+      // Reload the selected room type if one is active
+      if (selectedRoomType === 'ranked') {
+        loadRankedRooms();
+      } else if (selectedRoomType === 'casual') {
+        loadCasualRooms();
+      }
+    }, [selectedRoomType])
   );
 
   const loadActiveRooms = async () => {
@@ -86,6 +118,55 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setActiveRooms(rooms.slice(0, 5));
     } catch (error) {
       console.error('Error loading rooms:', error);
+    }
+  };
+
+  const loadRankedRooms = async () => {
+    setLoadingRooms(true);
+    try {
+      const userElo = 1000;
+      const rooms = await getBrowsableRankedRooms(userElo);
+      setRankedRooms(rooms);
+    } catch (error) {
+      console.error('Error loading ranked rooms:', error);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
+  const loadCasualRooms = async () => {
+    setLoadingRooms(true);
+    try {
+      const rooms = await getActiveRooms({ isPrivate: false, maxResults: 50 });
+      setCasualRooms(rooms);
+    } catch (error) {
+      console.error('Error loading casual rooms:', error);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
+  const handleRoomTypeSelect = (type: 'ranked' | 'casual') => {
+    setSelectedRoomType(type);
+    if (type === 'ranked') {
+      loadRankedRooms();
+    } else {
+      loadCasualRooms();
+    }
+  };
+
+  const handleJoinRoom = async (roomId: string) => {
+    if (!userProfile) return;
+    try {
+      await joinRoom(roomId, userProfile.uid, userProfile.username);
+      navigation.navigate('GameRoom', { roomId });
+    } catch (error: any) {
+      // If user is already in room, just navigate to it
+      if (error.message === 'Already in room') {
+        navigation.navigate('GameRoom', { roomId });
+      } else {
+        Alert.alert('Error', error.message || 'Failed to join room');
+      }
     }
   };
 
@@ -171,6 +252,22 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              if (selectedRoomType === 'ranked') {
+                await loadRankedRooms();
+              } else if (selectedRoomType === 'casual') {
+                await loadCasualRooms();
+              }
+              setRefreshing(false);
+            }}
+            tintColor="#FFFFFF"
+            colors={['#A855F7']}
+          />
+        }
       >
         {/* Header Section */}
         <Animated.View
@@ -183,7 +280,10 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           ]}
         >
           <View style={styles.titleContainer}>
-            <Text style={styles.gameTitle}>WITTSY</Text>
+            <Animated.View style={{ transform: [{ rotate: '-25deg' }], position: 'absolute', top: 8, left: '10%' }}>
+              <Text style={styles.battleOfTextInner}>Battle of</Text>
+            </Animated.View>
+            <Text style={styles.gameTitle}>Wittz</Text>
             <LinearGradient
               colors={[COLORS.primary, COLORS.primaryDark] as any}
               start={{ x: 0, y: 0 }}
@@ -193,13 +293,30 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </View>
           
           {/* Compact User Info */}
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
-            <View style={styles.userInfoCompact}>
-              <Text style={styles.usernameCompact}>{userProfile?.username || 'Player'}</Text>
-              <Badge text={`LVL ${userProfile?.level || 1}`} variant="gold" size="sm" />
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
+              <View style={styles.userInfoCompact}>
+                <Text style={styles.usernameCompact}>{userProfile?.username || 'Player'}</Text>
+                <Badge text={`LVL ${userProfile?.level || 1}`} variant="gold" size="sm" />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.headerRight}>
+              <TouchableOpacity 
+                style={styles.notificationBell}
+                onPress={() => navigation.navigate('Notifications')}
+              >
+                <Text style={styles.bellIcon}>🔔</Text>
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <CurrencyDisplay variant="compact" showPremium={false} />
             </View>
-          </TouchableOpacity>
+          </View>
         </Animated.View>
+
 
         {/* Quick Play - Hero Button */}
         <Animated.View
@@ -213,7 +330,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         >
           <Button
             title={quickMatchLoading ? "FINDING MATCH..." : "⚡ QUICK PLAY"}
-            onPress={handleQuickMatch}
+            onPress={() => navigation.navigate('QuickPlay')}
             variant="gold"
             size="xl"
             fullWidth
@@ -221,7 +338,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           />
         </Animated.View>
 
-        {/* Main Actions - 2 Column Grid */}
+        {/* Main Actions - 3 Button Grid */}
         <Animated.View
           style={[
             styles.mainActionsGrid,
@@ -230,19 +347,39 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             },
           ]}
         >
-          <Card variant="glow" onPress={() => navigation.navigate('BrowseRooms')} style={styles.mainActionCard}>
+          <Card 
+            variant={selectedRoomType === 'ranked' ? 'glow' : 'elevated'} 
+            onPress={() => handleRoomTypeSelect('ranked')} 
+            style={styles.mainActionCard}
+          >
             <View style={styles.actionCard}>
-              <Text style={styles.actionIcon}>🎲</Text>
-              <Text style={styles.actionTitle}>BROWSE ROOMS</Text>
-              <Text style={styles.actionSubtitle}>{activeRooms.length} Active</Text>
+              <Text style={styles.actionIcon}>🏆</Text>
+              <Text style={styles.actionTitle}>RANKED GAMES</Text>
+              <Text style={styles.actionSubtitle}>Competitive</Text>
             </View>
           </Card>
 
-          <Card variant="elevated" onPress={() => navigation.navigate('CreateRoom')} style={styles.mainActionCard}>
+          <Card 
+            variant={selectedRoomType === 'casual' ? 'glow' : 'elevated'} 
+            onPress={() => handleRoomTypeSelect('casual')} 
+            style={styles.mainActionCard}
+          >
+            <View style={styles.actionCard}>
+              <Text style={styles.actionIcon}>🎲</Text>
+              <Text style={styles.actionTitle}>CASUAL GAMES</Text>
+              <Text style={styles.actionSubtitle}>Relaxed Play</Text>
+            </View>
+          </Card>
+
+          <Card 
+            variant="elevated" 
+            onPress={() => navigation.navigate('CreateRoom')} 
+            style={styles.mainActionCard}
+          >
             <View style={styles.actionCard}>
               <Text style={styles.actionIcon}>➕</Text>
-              <Text style={styles.actionTitle}>CREATE ROOM</Text>
-              <Text style={styles.actionSubtitle}>Host Your Game</Text>
+              <Text style={styles.actionTitle}>CREATE PRIVATE</Text>
+              <Text style={styles.actionSubtitle}>Host Game</Text>
             </View>
           </Card>
         </Animated.View>
@@ -320,6 +457,32 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
 
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('CoinShop')}
+            >
+              <LinearGradient
+                colors={['#FFD700', '#FF8C00']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>💰</Text>
+                <Text style={styles.secondaryTitle}>Coin Shop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('AvatarShop')}
+            >
+              <LinearGradient
+                colors={['#9D50BB', '#6E48AA']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🎨</Text>
+                <Text style={styles.secondaryTitle}>Avatar Shop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
             {/* Admin Card - Only for specific admins */}
             {(user?.email === 'mightygunja@gmail.com' || user?.email === 'noshir2@gmail.com') && (
               <TouchableOpacity 
@@ -338,41 +501,72 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </ScrollView>
         </Animated.View>
 
-        {/* Live Rooms Section */}
-        {activeRooms.length > 0 && (
-          <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>🔥 Live Rooms</Text>
-              <Badge text="HOT" variant="error" shine size="sm" />
-            </View>
-            
-            {activeRooms.map((room, index) => (
-              <Card 
-                key={room.roomId} 
-                variant="glass" 
-                style={styles.roomCard}
-                onPress={() => navigation.navigate('GameRoom', { roomId: room.roomId })}
-              >
-                <View style={styles.roomInfo}>
-                  <View>
-                    <Text style={styles.roomName}>{room.name}</Text>
-                    <Text style={styles.roomHost}>Host: {room.hostUsername}</Text>
-                  </View>
-                  <View style={styles.roomMeta}>
-                    <Badge 
-                      text={`${room.players.length}/${room.settings.maxPlayers}`}
-                      variant="info"
-                      size="sm"
-                    />
-                    <Text style={styles.roomStatus}>
-                      {room.status === 'waiting' ? '⏳ Waiting' : '🎮 Playing'}
+        {/* Current Room Games Section - appears below Explore when button clicked */}
+        {selectedRoomType && (
+          <Animated.View style={[styles.roomListSection, { opacity: fadeAnim }]}>
+            <Text style={styles.sectionTitle}>
+              {selectedRoomType === 'ranked' ? 'Current Ranked Games' : 'Current Casual Games'}
+            </Text>
+            {loadingRooms ? (
+              <Text style={styles.loadingText}>Loading rooms...</Text>
+            ) : (
+              <View style={styles.roomList}>
+                {(selectedRoomType === 'ranked' ? rankedRooms : casualRooms).length === 0 ? (
+                  <View style={styles.emptyRooms}>
+                    <Text style={styles.emptyRoomsText}>
+                      No {selectedRoomType} games available
                     </Text>
+                    {selectedRoomType === 'ranked' && (
+                      <Button
+                        title="Quick Play"
+                        onPress={() => navigation.navigate('QuickPlay')}
+                        size="sm"
+                        fullWidth
+                        style={styles.emptyButton}
+                      />
+                    )}
                   </View>
-                </View>
-              </Card>
-            ))}
+                ) : (
+                  (selectedRoomType === 'ranked' ? rankedRooms : casualRooms).map((room: any) => {
+                    const isUserInRoom = room.players?.some((p: any) => p.userId === user?.uid);
+                    const roomStatus = room.status === 'waiting' ? 'Waiting for players' : 'Started';
+                    
+                    return (
+                      <TouchableOpacity
+                        key={room.roomId}
+                        style={styles.roomCard}
+                        onPress={() => handleJoinRoom(room.roomId)}
+                      >
+                        <View style={styles.roomCardHeader}>
+                          <View style={styles.roomCardTitleRow}>
+                            <Text style={styles.roomCardName}>{room.name}</Text>
+                            {isUserInRoom && (
+                              <Badge text="YOU'RE IN" variant="success" size="sm" />
+                            )}
+                          </View>
+                          <Text style={styles.roomCardPlayers}>
+                            👥 {room.players?.length || 0}/{room.settings.maxPlayers}
+                          </Text>
+                        </View>
+                        <View style={styles.roomCardFooter}>
+                          <Text style={styles.roomCardStatus}>
+                            {room.status === 'waiting' ? '⏳' : '🎮'} {roomStatus}
+                          </Text>
+                          {room.countdownStartedAt && room.countdownDuration && (
+                            <Text style={styles.roomCardCountdown}>
+                              ⏱️ Starting soon
+                            </Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+            )}
           </Animated.View>
         )}
+
       </ScrollView>
 
       {/* Fixed Bottom Navigation Bar */}
@@ -441,7 +635,43 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingBottom: 200,
   },
   header: {
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
+    marginTop: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notificationBell: {
+    position: 'relative',
+  },
+  bellIcon: {
+    fontSize: 20,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   userInfoCompact: {
     flexDirection: 'row',
@@ -452,16 +682,35 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   usernameCompact: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
   },
   titleContainer: {
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: SPACING.sm,
+    position: 'relative',
+    paddingVertical: SPACING.sm,
+  },
+  battleOfText: {
+    fontSize: 28,
+    fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
+    fontStyle: 'italic',
+    color: COLORS.text,
+    opacity: 0.85,
+    position: 'absolute',
+    top: 8,
+    left: '10%',
+  },
+  battleOfTextInner: {
+    fontSize: 28,
+    fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
+    fontStyle: 'italic',
+    color: COLORS.text,
+    opacity: 0.85,
   },
   gameTitle: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
+    fontSize: 42,
     fontWeight: TYPOGRAPHY.fontWeight.black,
     color: COLORS.text,
     letterSpacing: 3,
@@ -518,13 +767,89 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginBottom: SPACING.lg,
     height: 60,
   },
-  mainActionsGrid: {
+  createRoomContainer: {
+    marginBottom: SPACING.md,
+  },
+    mainActionsGrid: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+    justifyContent: 'space-between',
   },
   mainActionCard: {
     flex: 1,
+    minWidth: 110,
+  },
+  roomListSection: {
+    marginBottom: SPACING.lg,
+  },
+  roomList: {
+    gap: SPACING.sm,
+  },
+  roomCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.xs,
+  },
+  roomCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  roomCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    flex: 1,
+  },
+  roomCardName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  roomCardPlayers: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  roomCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  roomCardStatus: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
+  },
+  roomCardCountdown: {
+    fontSize: 12,
+    color: '#FFD700',
+    fontWeight: '600',
+  },
+  emptyRooms: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.lg,
+  },
+  emptyRoomsText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: SPACING.md,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    minWidth: 120,
+    alignSelf: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    padding: SPACING.lg,
   },
   actionCard: {
     alignItems: 'center',
@@ -561,6 +886,21 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     textAlign: 'center',
   },
+  section: {
+    marginBottom: SPACING.lg,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+    letterSpacing: 0.5,
+  },
   actionIcon: {
     fontSize: 48,
     marginBottom: SPACING.sm,
@@ -577,29 +917,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.textTertiary,
     textAlign: 'center',
-  },
-  section: {
-    marginBottom: SPACING.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
-  },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text,
-    letterSpacing: 0.5,
-  },
-  roomCard: {
-    marginBottom: SPACING.sm,
-  },
-  roomInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   roomName: {
     fontSize: TYPOGRAPHY.fontSize.md,

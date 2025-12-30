@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
 import { getActiveRooms, joinRoom } from '../services/database';
+import { getBrowsableRankedRooms } from '../services/matchmaking';
 import { Button } from '../components/common/Button';
 import { Loading } from '../components/common/Loading';
 import { Room } from '../types';
@@ -15,12 +16,21 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [roomType, setRoomType] = useState<'ranked' | 'casual'>('ranked');
 
   const loadRooms = async () => {
     try {
-      const activeRooms = await getActiveRooms({ isPrivate: false, maxResults: 50 });
+      let activeRooms: Room[];
+      if (roomType === 'ranked') {
+        // TODO: Get user's ELO from profile
+        const userElo = 1000;
+        activeRooms = await getBrowsableRankedRooms(userElo);
+      } else {
+        activeRooms = await getActiveRooms({ isPrivate: false, maxResults: 50 });
+      }
       setRooms(activeRooms);
     } catch (error: any) {
+      console.error('Error loading rooms:', error);
       Alert.alert('Error', 'Failed to load rooms');
     } finally {
       setLoading(false);
@@ -36,7 +46,7 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
     // Refresh every 5 seconds
     const interval = setInterval(loadRooms, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [roomType]);
 
   // Reload rooms when screen comes into focus
   useFocusEffect(
@@ -60,13 +70,15 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
   const renderRoom = ({ item }: { item: Room }) => {
     const playerCount = item.players?.length || 0;
     const maxPlayers = item.settings.maxPlayers;
+    const countdown = getCountdownRemaining(item);
     const isFull = playerCount >= maxPlayers;
+    const countdownFinished = countdown !== null && countdown === 0;
 
     return (
       <TouchableOpacity
         style={styles.roomCard}
-        onPress={() => !isFull && handleJoinRoom(item)}
-        disabled={isFull}
+        onPress={() => !isFull && !countdownFinished && handleJoinRoom(item)}
+        disabled={isFull || countdownFinished}
       >
         <View style={styles.roomHeader}>
           <Text style={styles.roomName}>{item.name}</Text>
@@ -80,14 +92,16 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
         <View style={styles.roomInfo}>
           <Text style={styles.infoText}>👥 {playerCount}/{maxPlayers} players</Text>
           <Text style={styles.infoText}>⏱️ {item.settings.submissionTime}s rounds</Text>
-          <Text style={styles.infoText}>🎯 First to {item.settings.winningScore}</Text>
+          {countdown !== null && countdown > 0 && (
+            <Text style={styles.countdownText}>🕐 Starts in {countdown}s</Text>
+          )}
         </View>
 
         <Button
-          title={isFull ? 'Room Full' : 'Join Room'}
+          title={countdownFinished ? 'Game Started' : isFull ? 'Room Full' : 'Join Room'}
           onPress={() => handleJoinRoom(item)}
-          disabled={isFull}
-          variant={isFull ? 'outline' : 'primary'}
+          disabled={isFull || countdownFinished}
+          variant={isFull || countdownFinished ? 'outline' : 'primary'}
           size="sm"
           style={styles.joinButton}
         />
@@ -99,8 +113,50 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
     return <Loading />;
   }
 
+  const getCountdownRemaining = (room: Room): number | null => {
+    if (!room.countdownStartedAt || !room.countdownDuration) return null;
+    
+    const startTime = new Date(room.countdownStartedAt).getTime();
+    const elapsed = (Date.now() - startTime) / 1000;
+    const remaining = room.countdownDuration - elapsed;
+    
+    return remaining > 0 ? Math.ceil(remaining) : 0;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with tabs */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Live Rooms</Text>
+        <View style={styles.headerRight} />
+      </View>
+
+      {/* Tab selector */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, roomType === 'ranked' && styles.activeTab]}
+          onPress={() => setRoomType('ranked')}
+        >
+          <Text style={[styles.tabText, roomType === 'ranked' && styles.activeTabText]}>
+            🏆 Ranked Rooms
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, roomType === 'casual' && styles.activeTab]}
+          onPress={() => setRoomType('casual')}
+        >
+          <Text style={[styles.tabText, roomType === 'casual' && styles.activeTabText]}>
+            🎲 Casual Rooms
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={rooms}
         keyExtractor={(item) => item.roomId}
@@ -113,14 +169,31 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No active rooms found</Text>
-            <Text style={styles.emptySubtext}>Create your own room to get started!</Text>
-            <Button
-              title="Create Room"
-              onPress={() => navigation.navigate('CreateRoom')}
-              size="md"
-              style={styles.createButton}
-            />
+            <Text style={styles.emptyIcon}>{roomType === 'ranked' ? '🏆' : '🎲'}</Text>
+            <Text style={styles.emptyText}>
+              No {roomType === 'ranked' ? 'ranked' : 'casual'} rooms available
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {roomType === 'ranked' 
+                ? 'Try Quick Play to create a new ranked game!' 
+                : 'Create your own casual room to get started!'}
+            </Text>
+            {roomType === 'casual' && (
+              <Button
+                title="Create Casual Room"
+                onPress={() => navigation.navigate('CreateRoom')}
+                size="md"
+                style={styles.createButton}
+              />
+            )}
+            {roomType === 'ranked' && (
+              <Button
+                title="Quick Play"
+                onPress={() => navigation.navigate('QuickPlay')}
+                size="md"
+                style={styles.createButton}
+              />
+            )}
           </View>
         }
         contentContainerStyle={styles.listContent}
@@ -133,6 +206,60 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: COLORS.primary || '#6C63FF',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    fontSize: 28,
+    color: '#FFFFFF',
+    fontWeight: '300',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  headerRight: { width: 40 },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface || '#F5F5F5',
+    padding: 4,
+    margin: 12,
+    borderRadius: 12,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textSecondary || '#666',
+  },
+  activeTabText: {
+    color: COLORS.primary || '#6C63FF',
   },
   listContent: {
     padding: 12
@@ -184,6 +311,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary
   },
+  countdownText: {
+    fontSize: 14,
+    color: '#FFD700',
+    fontWeight: 'bold',
+  },
   joinButton: {
     marginTop: 8,
     height: 40
@@ -193,6 +325,10 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 80,
     paddingHorizontal: 24
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
   },
   emptyText: {
     fontSize: 18,

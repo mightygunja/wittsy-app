@@ -19,6 +19,7 @@ import { firestore } from './firebase';
 import { Room, RoomSettings, Player, Prompt } from '../types';
 import { generateRoomCode } from '../utils/helpers';
 import { WINNING_VOTES, JOIN_LOCK_THRESHOLD } from '../utils/constants';
+import { avatarService } from './avatarService';
 
 // ==================== ROOM OPERATIONS ====================
 
@@ -33,6 +34,7 @@ export const createRoom = async (
 ): Promise<string> => {
   const defaultSettings: RoomSettings = {
     maxPlayers: 12,
+    minPlayers: 3,
     submissionTime: 20,
     votingTime: 20,
     winningVotes: WINNING_VOTES, // FIXED at 20 - not adjustable
@@ -42,8 +44,14 @@ export const createRoom = async (
     profanityFilter: 'medium',
     spectatorChatEnabled: true,
     allowJoinMidGame: false,
+    autoStart: false,
+    countdownTriggerPlayers: 0,
     ...settings
   };
+
+  // Load host's avatar config
+  const hostAvatar = await avatarService.getUserAvatar(hostId);
+  console.log('🏠 Creating room - loading host avatar:', { hostId, hostUsername, hasAvatar: !!hostAvatar, config: hostAvatar?.config });
 
   const roomCode = generateRoomCode();
   const roomData = {
@@ -57,7 +65,9 @@ export const createRoom = async (
       username: hostUsername,
       isReady: false,
       isConnected: true,
-      joinedAt: new Date().toISOString()
+      joinedAt: new Date().toISOString(),
+      avatar: null,
+      avatarConfig: hostAvatar?.config || undefined, // Include host's avatar configuration
     }],
     spectators: [],
     currentRound: 0,
@@ -65,8 +75,11 @@ export const createRoom = async (
     scores: { [hostId]: { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] } },
     gameState: 'lobby' as const,
     createdAt: Timestamp.now(),
-    startedAt: null
+    startedAt: null,
+    isRanked: false
   };
+
+  console.log('✨ Room created with host avatar:', { roomName, hasHostAvatarConfig: !!roomData.players[0].avatarConfig });
 
   const docRef = await addDoc(collection(firestore, 'rooms'), roomData);
   return docRef.id;
@@ -104,6 +117,9 @@ export const getActiveRooms = async (filters: {
   if (filters.isPrivate !== undefined) {
     constraints.push(where('settings.isPrivate', '==', filters.isPrivate));
   }
+  
+  // Filter out ranked rooms (only show casual rooms)
+  constraints.push(where('isRanked', '==', false));
   
   constraints.push(orderBy('createdAt', 'desc'));
   
@@ -168,14 +184,21 @@ export const joinRoom = async (
     throw new Error('Already in room');
   }
   
+  // Load user's avatar config
+  const userAvatar = await avatarService.getUserAvatar(userId);
+  console.log('👤 Loading avatar for user:', { userId, username, hasAvatar: !!userAvatar, config: userAvatar?.config });
+  
   const newPlayer = {
     userId,
     username,
     isReady: false,
     isConnected: true,
     joinedAt: new Date().toISOString(),
-    avatar: null, // Will be populated from user profile if needed
+    avatar: null,
+    avatarConfig: userAvatar?.config || undefined, // Include custom avatar configuration
   };
+  
+  console.log('✨ New player with avatar:', { username, hasAvatarConfig: !!newPlayer.avatarConfig });
   
   const updatedPlayers = [...players, newPlayer];
   
@@ -184,10 +207,23 @@ export const joinRoom = async (
     newPlayer: newPlayer.username
   });
   
-  await updateDoc(roomRef, {
+  const updateData: any = {
     players: updatedPlayers,
     [`scores.${userId}`]: { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] }
-  });
+  };
+  
+  // Check if countdown should start (ranked rooms only)
+  if (roomData.isRanked && roomData.settings.autoStart) {
+    const countdownTrigger = roomData.settings.countdownTriggerPlayers || 6;
+    if (updatedPlayers.length >= countdownTrigger && !roomData.countdownStartedAt) {
+      // Start 30-second countdown
+      updateData.countdownStartedAt = new Date().toISOString();
+      updateData.countdownDuration = 30;
+      console.log('⏱️ Starting 30-second countdown - 6 players reached');
+    }
+  }
+  
+  await updateDoc(roomRef, updateData);
   
   console.log('✅ Player joined successfully');
 };

@@ -52,17 +52,31 @@ class AvatarService {
    */
   async updateAvatarConfig(userId: string, config: AvatarConfig): Promise<void> {
     try {
+      console.log('🔥 avatarService.updateAvatarConfig called with:', {
+        userId,
+        skin: config.skin,
+        eyes: config.eyes,
+        mouth: config.mouth,
+        hair: config.hair,
+        accessories: config.accessories,
+        clothing: config.clothing,
+        background: config.background,
+        hasPositions: !!config.positions,
+      });
+      
       const avatarRef = doc(firestore, 'avatars', userId);
       await updateDoc(avatarRef, {
         config,
         updatedAt: new Date(),
       });
 
+      console.log('✅ Avatar config saved to Firestore successfully');
+
       analytics.logEvent('update_avatar', {
         user_id: userId,
       });
     } catch (error) {
-      console.error('Failed to update avatar config:', error);
+      console.error('❌ Failed to update avatar config:', error);
       throw error;
     }
   }

@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Player } from '../../types';
-import { useTheme } from '../../hooks/useTheme';;
+import { useTheme } from '../../hooks/useTheme';
+import { AvatarDisplay } from '../avatar/AvatarDisplay';
 
 interface PlayerListProps {
   players: Player[];
@@ -15,7 +16,11 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, cur
   
   console.log('🎮 PlayerList rendering:', { 
     playerCount: players.length, 
-    players: players.map(p => ({ id: p.userId, name: p.username })),
+    players: players.map(p => ({ 
+      id: p.userId, 
+      name: p.username,
+      hasAvatarConfig: !!p.avatarConfig 
+    })),
     currentUserId 
   });
   
@@ -34,14 +39,20 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, cur
               isCurrentUser && styles.currentUserCard
             ]}>
               <View style={styles.avatarContainer}>
-                <View style={[
-                  styles.avatar,
-                  { backgroundColor: player.avatar?.background || COLORS.primary }
-                ]}>
-                  <Text style={styles.avatarText}>
-                    {player.username.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+                {player.avatarConfig ? (
+                  <View style={styles.avatar}>
+                    <AvatarDisplay config={player.avatarConfig} size={60} />
+                  </View>
+                ) : (
+                  <View style={[
+                    styles.avatar,
+                    { backgroundColor: player.avatar?.background || COLORS.primary }
+                  ]}>
+                    <Text style={styles.avatarText}>
+                      {player.username.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
                 
                 <View style={[
                   styles.statusDot,

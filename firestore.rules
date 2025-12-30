@@ -209,6 +209,12 @@ service cloud.firestore {
       allow write: if isSignedIn() && isOwner(userId);
     }
     
+    // Battle Passes (alternative collection name)
+    match /battlePasses/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
     // Notifications
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;

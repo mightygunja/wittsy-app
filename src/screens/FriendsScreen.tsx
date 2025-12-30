@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
+import { ScreenHeader } from '../components/common/ScreenHeader';
 import { Friend, FriendRequest } from '../types/social';
 import {
   getFriends,
@@ -303,16 +304,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     >
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Friends</Text>
-          <View style={styles.headerRight} />
-        </View>
+        <ScreenHeader title="Friends" />
 
         {/* Tabs */}
         <View style={styles.tabs}>

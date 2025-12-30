@@ -123,7 +123,7 @@ const EXPERIMENTS: Experiment[] = [
 
 class ABTestingService {
   private userExperiments: Map<string, UserExperiment> = new Map();
-  private storageKey = '@wittsy_experiments';
+  private storageKey = '@wittz_experiments';
 
   /**
    * Initialize A/B testing

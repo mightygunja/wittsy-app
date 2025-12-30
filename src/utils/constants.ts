@@ -1,6 +1,6 @@
 // App Constants
 
-export const APP_NAME = 'Wittsy';
+export const APP_NAME = 'Wittz';
 export const APP_VERSION = '1.0.0';
 
 // Game Settings

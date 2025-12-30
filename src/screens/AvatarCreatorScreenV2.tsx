@@ -108,6 +108,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
           mouth: DEFAULT_MOUTHS[0].id,
           hair: DEFAULT_HAIR_STYLES[0].id,
           accessories: [],
+          clothing: 'clothing_default',
           background: DEFAULT_BACKGROUNDS[0].id,
           effects: [],
         };
@@ -130,6 +131,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         mouth: DEFAULT_MOUTHS[0].id,
         hair: DEFAULT_HAIR_STYLES[0].id,
         accessories: [],
+        clothing: 'clothing_default',
         background: DEFAULT_BACKGROUNDS[0].id,
         effects: [],
       };
@@ -208,16 +210,20 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
     // Accessories
     avatarConfig.accessories.forEach((accId, index) => {
       const accItem = DEFAULT_ACCESSORIES.find(a => a.id === accId);
-      if (accItem) {
+      if (accItem && accId !== 'acc_none') {
+        // Extract style from accessory ID (e.g., 'acc_glasses' -> 'glasses')
+        const style = accId.replace('acc_', '');
+        const defaultPos = { x: AVATAR_SIZE / 2 - 30 + (index * 20), y: AVATAR_SIZE / 2 - 10, scale: 1.1, rotation: 0 };
+        const pos = savedPositions.accessories?.[`accessory_${accId}`] || defaultPos;
         features.push({
           id: `accessory_${accId}`,
           type: 'accessory',
-          style: 'glasses', // default style
+          style: style,
           emoji: accItem.emoji,
-          x: AVATAR_SIZE / 2 - 30 + (index * 20),
-          y: AVATAR_SIZE / 2 - 10,
-          scale: 1.1,
-          rotation: 0,
+          x: pos.x,
+          y: pos.y,
+          scale: pos.scale,
+          rotation: pos.rotation,
         });
       }
     });
@@ -262,7 +268,16 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         positions,
       };
 
-      console.log('💾 Saving avatar with positions:', configWithPositions);
+      console.log('💾 Saving avatar config:', {
+        skin: config.skin,
+        eyes: config.eyes,
+        mouth: config.mouth,
+        hair: config.hair,
+        accessories: config.accessories,
+        background: config.background,
+        hasPositions: !!positions,
+      });
+      
       await avatarService.updateAvatarConfig(user.uid, configWithPositions);
       haptics.success();
       Alert.alert('Success', 'Avatar saved!', [

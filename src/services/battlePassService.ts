@@ -122,12 +122,15 @@ class BattlePassService {
    */
   async purchasePremium(userId: string): Promise<boolean> {
     try {
-      // In production, this would use real IAP
-      // For now, simulate successful purchase in development
-      if (__DEV__) {
-        console.log('Battle Pass: Simulating premium purchase in dev mode');
+      // ✅ Use real RevenueCat IAP
+      const result = await monetization.subscribe('com.wittz.battlepass.premium');
+      
+      if (!result.success) {
+        console.error('Battle Pass purchase failed:', result.error);
+        return false;
       }
       
+      // Update Firestore after successful purchase
       const bpRef = doc(firestore, 'battlePasses', userId);
       await updateDoc(bpRef, {
         isPremium: true,
@@ -140,6 +143,7 @@ class BattlePassService {
         price: this.currentSeason.price,
       });
 
+      console.log('✅ Battle Pass premium purchased successfully');
       return true;
     } catch (error) {
       console.error('Failed to purchase premium:', error);
@@ -245,14 +249,14 @@ class BattlePassService {
     switch (reward.type) {
       case 'coins':
         await updateDoc(userRef, {
-          'currency.coins': increment(reward.amount),
+          'stats.coins': increment(reward.amount),
         });
         console.log(`Granted ${reward.amount} coins to user ${userId}`);
         break;
 
       case 'premium':
         await updateDoc(userRef, {
-          'currency.gems': increment(reward.amount),
+          'stats.premium': increment(reward.amount),
         });
         console.log(`Granted ${reward.amount} gems to user ${userId}`);
         break;
@@ -307,12 +311,16 @@ class BattlePassService {
           break;
       }
 
-      // Process purchase (in production, use real IAP)
-      // For now, simulate successful purchase in development
-      if (__DEV__) {
-        console.log(`Battle Pass: Simulating level skip purchase (${levels} levels) in dev mode`);
+      // ✅ Use real RevenueCat IAP for level skips
+      const productId = `com.wittz.battlepass.skip.${levels}`;
+      const result = await monetization.purchaseCoins(productId); // Using coins purchase for now
+      
+      if (!result.success) {
+        console.error('Level skip purchase failed:', result.error);
+        return false;
       }
       
+      // Update battle pass level after successful purchase
       const bpRef = doc(firestore, 'battlePasses', userId);
       await updateDoc(bpRef, {
         currentLevel: battlePass.currentLevel + levels,
@@ -326,6 +334,7 @@ class BattlePassService {
         new_level: battlePass.currentLevel + levels,
       });
 
+      console.log(`✅ Level skip purchased: ${levels} levels`);
       return true;
     } catch (error) {
       console.error('Failed to purchase level skip:', error);

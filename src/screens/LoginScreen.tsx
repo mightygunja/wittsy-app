@@ -62,7 +62,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
-            <Text style={styles.title}>🎮 Wittsy</Text>
+            <Text style={styles.title}>🎮 Wittz</Text>
             <Text style={styles.subtitle}>Welcome back!</Text>
 
             <Input

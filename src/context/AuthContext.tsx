@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
 import * as authService from '../services/auth';
 import { UserProfile } from '../types';
+import { monetization } from '../services/monetization';
 
 interface AuthContextType {
   user: User | null;
@@ -27,6 +28,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(firebaseUser);
       
       if (firebaseUser) {
+        // Initialize RevenueCat with user ID
+        await monetization.initialize(firebaseUser.uid);
+        
         // Create or fetch user profile from Firestore
         const userDoc = await authService.getOrCreateUserProfile(firebaseUser);
         

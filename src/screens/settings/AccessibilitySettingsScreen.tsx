@@ -40,7 +40,7 @@ export const AccessibilitySettingsScreen: React.FC = () => {
   const handleContrastChange = async (mode: 'normal' | 'high' | 'dark') => {
     await updateAccessibility({ highContrast: mode === 'high' });
   };
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
 
 
   return (
@@ -207,7 +207,7 @@ export const AccessibilitySettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

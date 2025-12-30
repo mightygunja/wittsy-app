@@ -261,9 +261,9 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationType, (data: any) => Pus
 // ==================== DEEP LINK SCHEMES ====================
 
 export const DEEP_LINK_SCHEMES = {
-  production: 'wittsy://',
-  development: 'wittsy-dev://',
-  universal: 'https://wittsy.app',
+  production: 'wittz://',
+  development: 'wittz-dev://',
+  universal: 'https://wittz.app',
 };
 
 export const DEEP_LINK_PATHS = {

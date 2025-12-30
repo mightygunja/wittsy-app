@@ -412,7 +412,7 @@ export const checkAndRotateSeason = async (): Promise<void> => {
   
   if (!currentSeason) {
     // No active season, create first one
-    await createSeason(1, 'Season 1: The Beginning', 'launch', 'The inaugural season of WITTSY!');
+    await createSeason(1, 'Season 1: The Beginning', 'launch', 'The inaugural season of WITTZ!');
     return;
   }
   
@@ -428,7 +428,7 @@ export const checkAndRotateSeason = async (): Promise<void> => {
       newSeasonNumber,
       `Season ${newSeasonNumber}`,
       undefined,
-      `Season ${newSeasonNumber} of competitive WITTSY!`
+      `Season ${newSeasonNumber} of competitive WITTZ!`
     );
   }
 };

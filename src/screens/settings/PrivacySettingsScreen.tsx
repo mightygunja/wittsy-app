@@ -87,7 +87,7 @@ export const PrivacySettingsScreen: React.FC = () => {
       }
     });
   };
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
 
 
   return (
@@ -269,7 +269,7 @@ export const PrivacySettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

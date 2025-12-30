@@ -47,6 +47,16 @@
       "collectionGroup": "rooms",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "isRanked", "order": "ASCENDING" },
+        { "fieldPath": "settings.isPrivate", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "createdAt", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]

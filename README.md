@@ -1,4 +1,4 @@
-# Wittsy - Real-Time Witty Phrase Battle Game
+# Wittz - Real-Time Witty Phrase Battle Game
 
 A modern, cross-platform mobile and web game built with React Native and Firebase.
 
@@ -7,7 +7,7 @@ A modern, cross-platform mobile and web game built with React Native and Firebas
 ### 1. Install Dependencies
 
 ```bash
-cd wittsy-app
+cd Wittz-app
 npm install
 ```
 
@@ -41,7 +41,7 @@ npm run web
 ## 📁 Project Structure
 
 ```
-wittsy-app/
+Wittz-app/
 ├── src/
 │   ├── components/     # Reusable UI components
 │   ├── screens/        # Main app screens
@@ -86,7 +86,7 @@ wittsy-app/
 
 See [SETUP_GUIDE.md](../SETUP_GUIDE.md) for detailed setup instructions.
 
-See [WITTSY_FEATURE_SPEC.md](../WITTSY_FEATURE_SPEC.md) for complete feature specifications.
+See [Wittz_FEATURE_SPEC.md](../Wittz_FEATURE_SPEC.md) for complete feature specifications.
 
 ## 🧪 Testing
 

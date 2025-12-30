@@ -25,7 +25,7 @@ import { audioService } from '../../services/audioService';
 export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, updateAudio } = useSettings();
   const { colors: COLORS } = useTheme();
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
   const [fadeAnim] = useState(new Animated.Value(0));
 
   React.useEffect(() => {
@@ -169,7 +169,7 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: {

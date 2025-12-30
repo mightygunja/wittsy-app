@@ -152,6 +152,17 @@ export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }
           <Text style={styles.cardTitle}>🛠️ Admin Tools</Text>
           <TouchableOpacity 
             style={styles.toolCard}
+            onPress={() => navigation.navigate('PromptApproval')}
+          >
+            <Text style={styles.toolIcon}>✅</Text>
+            <View style={styles.toolInfo}>
+              <Text style={styles.toolTitle}>Approve Prompts</Text>
+              <Text style={styles.toolDescription}>Review and approve community-submitted prompts</Text>
+            </View>
+            <Text style={styles.toolArrow}>→</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.toolCard}
             onPress={() => navigation.navigate('AdminEvents')}
           >
             <Text style={styles.toolIcon}>🏆</Text>

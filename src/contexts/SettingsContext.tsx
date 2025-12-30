@@ -18,7 +18,7 @@ import {
   DEFAULT_USER_SETTINGS,
 } from '../types/settings';
 
-const SETTINGS_STORAGE_KEY = '@wittsy_settings';
+const SETTINGS_STORAGE_KEY = '@wittz_settings';
 
 interface SettingsContextType {
   settings: UserSettings;

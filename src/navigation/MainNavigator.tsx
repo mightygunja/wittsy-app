@@ -10,7 +10,11 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { AdminConsoleScreen } from '../screens/AdminConsoleScreen';
 import { PromptLibraryScreen } from '../screens/PromptLibraryScreen';
 import { SubmitPromptScreen } from '../screens/SubmitPromptScreen';
+import { PromptApprovalScreen } from '../screens/PromptApprovalScreen';
+import { QuickPlayScreen } from '../screens/QuickPlayScreen';
+import { BrowseRankedRoomsScreen } from '../screens/BrowseRankedRoomsScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ChallengesScreen } from '../screens/ChallengesScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { EnhancedSettingsScreen } from '../screens/EnhancedSettingsScreen';
@@ -94,8 +98,24 @@ export const MainNavigator: React.FC = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen 
+        name="PromptApproval" 
+        component={PromptApprovalScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="QuickPlay" 
+        component={QuickPlayScreen}
+        options={{ headerShown: false }}
+      />
+
+      <Stack.Screen 
         name="Friends" 
         component={FriendsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 

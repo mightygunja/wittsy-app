@@ -92,6 +92,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     try {
       const settings: any = {
         maxPlayers: maxPlayersNum,
+        minPlayers: 2,
         submissionTime: submissionTimeNum,
         votingTime: votingTimeNum,
         winningVotes: WINNING_VOTES, // Fixed at 20
@@ -99,7 +100,9 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         promptPacks: ['default'],
         profanityFilter: 'medium',
         spectatorChatEnabled: true,
-        allowJoinMidGame: false
+        allowJoinMidGame: true,
+        autoStart: false,
+        countdownTriggerPlayers: 0
       };
       
       if (isPrivate) {

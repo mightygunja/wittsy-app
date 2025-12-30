@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -33,6 +34,8 @@ import { ChatBox } from '../components/social/ChatBox';
 import { useTheme } from '../hooks/useTheme';;
 import { validatePhrase } from '../utils/validation';
 import { Button } from '../components/common/Button';
+import { rewards } from '../services/rewardsService';
+import { SPACING } from '../utils/constants';
 
 // Helper function to advance game phase
 const advancePhase = async (roomId: string) => {
@@ -84,11 +87,12 @@ const GameRoomScreen: React.FC = () => {
   const { settings } = useSettings();
   const { roomId } = route.params;
   const { colors: COLORS } = useTheme();
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [phrase, setPhrase] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
@@ -203,6 +207,11 @@ const GameRoomScreen: React.FC = () => {
               state.lastWinner = winnerId;
               state.lastWinningPhrase = state.submissions[winnerId];
               console.log(' Winner:', winnerId, 'Phrase:', state.lastWinningPhrase, 'Votes:', maxVotes);
+              
+              // Grant rewards to winner
+              rewards.grantRoundWinRewards(winnerId, maxVotes).catch(err => 
+                console.error('Failed to grant rewards:', err)
+              );
             }
           }
         }
@@ -413,6 +422,16 @@ const GameRoomScreen: React.FC = () => {
       gameTimerService.stopTimer(roomId);
     };
   }, [roomId]);
+
+  // Handle hardware back button - leave room before going back
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleLeaveRoom();
+      return true; // Prevent default back behavior
+    });
+
+    return () => backHandler.remove();
+  }, [roomId, user?.uid]);
 
   // Render phase-specific content
   // Helper to safely get prompt text (handles both string and object)
@@ -656,14 +675,29 @@ const GameRoomScreen: React.FC = () => {
         {/* Waiting lobby (before game starts) */}
         {!gameState && room.status === 'waiting' && (
           <View style={styles.lobby}>
-            <Text style={styles.lobbyTitle}>Waiting for game to start...</Text>
-            <Text style={styles.lobbySubtitle}>
-              {room.players.length}/{room.settings.maxPlayers} players
-            </Text>
+            {countdownRemaining !== null && countdownRemaining > 0 ? (
+              <View style={styles.countdownContainer}>
+                <Text style={styles.countdownTitle}>Game Starting In</Text>
+                <Text style={styles.countdownNumber}>{countdownRemaining}</Text>
+                <Text style={styles.countdownSubtitle}>Get ready!</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.lobbyTitle}>Waiting for game to start...</Text>
+                <Text style={styles.lobbySubtitle}>
+                  {room.players.length}/{room.settings.maxPlayers} players
+                </Text>
+                {room.isRanked && room.settings.autoStart && (
+                  <Text style={styles.rankedInfo}>
+                    🏆 Ranked Game - Auto-starts at {room.settings.countdownTriggerPlayers} players
+                  </Text>
+                )}
+              </>
+            )}
             
             <PlayerList players={room.players} currentUserId={user?.uid} />
             
-            {room.hostId === user?.uid && (
+            {!room.isRanked && room.hostId === user?.uid && (
               <Button
                 title="START GAME"
                 onPress={handleStartGame}
@@ -673,7 +707,7 @@ const GameRoomScreen: React.FC = () => {
               />
             )}
             
-            {room.hostId !== user?.uid && (
+            {!room.isRanked && room.hostId !== user?.uid && (
               <Text style={styles.waitingForHost}>Waiting for host to start...</Text>
             )}
           </View>
@@ -744,7 +778,7 @@ const GameRoomScreen: React.FC = () => {
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -834,6 +868,32 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
+  },
+    countdownContainer: {
+    alignItems: 'center',
+    marginVertical: SPACING.xl,
+  },
+  countdownTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+  },
+  countdownNumber: {
+    fontSize: 72,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginVertical: SPACING.md,
+  },
+  countdownSubtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  rankedInfo: {
+    fontSize: 14,
+    color: COLORS.gold || '#FFD700',
+    marginTop: SPACING.sm,
+    textAlign: 'center',
   },
   lobbyTitle: {
     fontSize: 20,

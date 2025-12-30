@@ -6,7 +6,7 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { AvatarConfig, DEFAULT_SKIN_TONES } from '../../types/avatar';
-import { SkinBase, Eyes, Mouths, Hair, HAIR_COLORS } from './AvatarFeatures';
+import { SkinBase, Eyes, Mouths, Hair, Accessories, HAIR_COLORS } from './AvatarFeatures';
 import { useTheme } from '../../hooks/useTheme';
 
 interface AvatarDisplayProps {
@@ -29,8 +29,9 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
   const eyeStyle = getStyleFromId(config.eyes);
   const mouthStyle = getStyleFromId(config.mouth);
   const hairStyle = config.hair ? getStyleFromId(config.hair) : null;
+  const accessoryStyles = config.accessories?.map(accId => getStyleFromId(accId)).filter(style => style !== 'none') || [];
   
-  console.log('🎨 Avatar features:', { skinColor, eyeStyle, mouthStyle, hairStyle });
+  console.log('🎨 Avatar features:', { skinColor, eyeStyle, mouthStyle, hairStyle, accessories: accessoryStyles });
 
   // Get saved positions or use defaults
   const positions = config.positions || {};
@@ -101,6 +102,25 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
           {Hair[hairStyle as keyof typeof Hair]?.(size * 0.178, HAIR_COLORS.brown) || null}
         </View>
       )}
+
+      {/* Accessories */}
+      {accessoryStyles.map((accStyle, index) => {
+        const accId = config.accessories[index];
+        const accPos = positions.accessories?.[`accessory_${accId}`];
+        const scaleFactor = savedCanvasSize ? size / savedCanvasSize : 1;
+        const position = accPos ? {
+          left: accPos.x * scaleFactor,
+          top: accPos.y * scaleFactor
+        } : { left: size * 0.25, top: size * 0.30 };
+        
+        console.log(`👓 Rendering accessory ${index}:`, { accStyle, accId, position });
+        
+        return (
+          <View key={`acc_${index}`} style={[styles.featureLayer, position]}>
+            {Accessories[accStyle as keyof typeof Accessories]?.(size * 0.178) || null}
+          </View>
+        );
+      })}
     </View>
   );
 };

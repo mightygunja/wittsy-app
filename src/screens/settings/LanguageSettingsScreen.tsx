@@ -49,7 +49,7 @@ export const LanguageSettingsScreen: React.FC = () => {
   const handleTimeFormatChange = async (format: '12h' | '24h') => {
     await updateLanguage({ timeFormat: format });
   };
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
 
 
   return (
@@ -150,7 +150,7 @@ export const LanguageSettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

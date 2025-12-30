@@ -24,7 +24,7 @@ import { ThemeMode } from '../../types/settings';
 export const ThemeSettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, updateTheme } = useSettings();
   const { colors: COLORS } = useTheme();
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
   const [fadeAnim] = useState(new Animated.Value(0));
 
   React.useEffect(() => {
@@ -192,7 +192,7 @@ export const ThemeSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

@@ -92,10 +92,14 @@ export interface Room {
   gameState: 'lobby' | 'submission' | 'voting' | 'results';
   createdAt: string;
   startedAt?: string;
+  isRanked: boolean;
+  countdownStartedAt?: string;
+  countdownDuration?: number;
 }
 
 export interface RoomSettings {
-  maxPlayers: number;
+  maxPlayers: number; // Max 12 for ranked
+  minPlayers: number; // Min 3 for ranked
   submissionTime: number;
   votingTime: number;
   winningVotes: number; // Changed from winningScore - total votes needed to win (fixed at 20)
@@ -106,12 +110,15 @@ export interface RoomSettings {
   spectatorChatEnabled: boolean;
   allowJoinMidGame: boolean;
   joinLockVoteThreshold: number; // New - lock joins when any player reaches this (8 votes)
+  autoStart: boolean; // Auto-start for ranked, manual for casual
+  countdownTriggerPlayers: number; // Start countdown when this many players join (6 for ranked)
 }
 
 export interface Player {
   userId: string;
   username: string;
   avatar: Avatar;
+  avatarConfig?: import('./avatar').AvatarConfig; // User's custom avatar configuration
   isReady: boolean;
   isConnected: boolean;
   joinedAt: string;

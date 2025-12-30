@@ -14,8 +14,8 @@ import { SPACING } from '../../utils/constants';
 export const GameplaySettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, updateGameplay } = useSettings();
   const { colors: COLORS } = useTheme();
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
@@ -70,7 +70,7 @@ export const GameplaySettingsScreen: React.FC<{ navigation: any }> = ({ navigati
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md },

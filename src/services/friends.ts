@@ -56,25 +56,32 @@ export const sendFriendRequest = async (
     return reverseRequest.id;
   }
 
-  const requestData: Omit<FriendRequest, 'id'> = {
+  const requestData: any = {
     fromUserId,
     fromUsername,
     toUserId,
     toUsername,
     status: 'pending',
-    message,
     createdAt: new Date().toISOString(),
   };
+
+  if (message) {
+    requestData.message = message;
+  }
 
   const docRef = await addDoc(collection(firestore, 'friendRequests'), requestData);
   
   // Create notification
-  await createNotification(toUserId, 'friend_request', {
-    title: 'New Friend Request',
-    message: `${fromUsername} sent you a friend request`,
-    fromUserId,
-    requestId: docRef.id,
-  });
+  try {
+    await createNotification(toUserId, 'friend_request', {
+      title: 'New Friend Request',
+      message: `${fromUsername} sent you a friend request`,
+      fromUserId,
+      requestId: docRef.id,
+    });
+  } catch (error) {
+    console.warn('Failed to create notification:', error);
+  }
 
   return docRef.id;
 };
@@ -572,16 +579,22 @@ const createNotification = async (
  * Search users by username
  */
 export const searchUsers = async (searchTerm: string, currentUserId: string): Promise<any[]> => {
-  const usersRef = collection(firestore, 'users');
-  const q = query(usersRef, orderBy('username'), limit(20));
-  
-  const snapshot = await getDocs(q);
-  const users = snapshot.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(user => 
-      user.id !== currentUserId &&
-      user.username.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  try {
+    const usersRef = collection(firestore, 'users');
+    const q = query(usersRef, limit(100));
+    
+    const snapshot = await getDocs(q);
+    const users = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(user => 
+        user.id !== currentUserId &&
+        user.username?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .slice(0, 20);
 
-  return users;
+    return users;
+  } catch (error) {
+    console.error('Search error:', error);
+    throw new Error('Failed to search users');
+  }
 };
