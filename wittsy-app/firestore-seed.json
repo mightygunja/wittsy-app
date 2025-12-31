@@ -1,0 +1,124 @@
+{
+  "seasons": {
+    "season_1": {
+      "id": "season_1",
+      "number": 1,
+      "name": "Season 1: The Beginning",
+      "startDate": "2025-12-23T00:00:00.000Z",
+      "endDate": "2026-03-23T00:00:00.000Z",
+      "status": "active",
+      "theme": "launch",
+      "description": "The inaugural season of WITTSY!",
+      "rewards": [
+        { "rank": "Legend", "tier": "Legend", "minRating": 4000, "rewards": { "title": "Legendary Champion", "badge": "legendary_season", "xp": 5000 } },
+        { "rank": "Grandmaster", "tier": "Grandmaster", "minRating": 3500, "rewards": { "title": "Season Grandmaster", "badge": "grandmaster_season", "xp": 3000 } },
+        { "rank": "Master", "tier": "Master", "minRating": 3000, "rewards": { "title": "Season Master", "badge": "master_season", "xp": 2000 } },
+        { "rank": "Diamond I", "tier": "Diamond", "minRating": 2500, "rewards": { "badge": "diamond_season", "xp": 1500 } },
+        { "rank": "Platinum I", "tier": "Platinum", "minRating": 2000, "rewards": { "badge": "platinum_season", "xp": 1000 } },
+        { "rank": "Gold I", "tier": "Gold", "minRating": 1500, "rewards": { "badge": "gold_season", "xp": 500 } }
+      ]
+    }
+  },
+  "friendships": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, friendId, addedAt, gamesPlayedTogether, favorited"
+    }
+  },
+  "friendRequests": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "fromUserId, toUserId, status, createdAt"
+    }
+  },
+  "achievements": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, achievementId, unlockedAt, progress"
+    }
+  },
+  "seasonStats": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, seasonId, peakRating, gamesPlayed, wins, losses"
+    }
+  },
+  "ratingHistory": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, rating, change, reason, timestamp"
+    }
+  },
+  "promptSubmissions": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "text, category, submittedBy, status, submittedAt"
+    }
+  },
+  "phraseReports": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "phraseText, reportedBy, reason, roomId, status, reportedAt"
+    }
+  },
+  "userPromptPreferences": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, enabledCategories, difficulty, customPacks"
+    }
+  },
+  "promptPacks": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "name, description, category, promptIds, isPremium, createdAt"
+    }
+  },
+  "gameInvites": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "fromUserId, toUserId, roomId, status, createdAt, expiresAt"
+    }
+  },
+  "challengeProgress": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, challengeId, progress, completed, completedAt"
+    }
+  },
+  "events": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "name, description, startDate, endDate, type, rewards"
+    }
+  },
+  "tournaments": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "name, status, startDate, endDate, maxParticipants, prizePool"
+    }
+  },
+  "notifications": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, type, title, message, read, createdAt"
+    }
+  },
+  "leaderboards": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "userId, username, rating, rank, wins, stars, position, updatedAt"
+    }
+  },
+  "matches": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "roomId, players, winner, scores, startedAt, endedAt"
+    }
+  },
+  "chatMessages": {
+    "_placeholder": {
+      "_placeholder": true,
+      "structure": "roomId, userId, username, message, timestamp"
+    }
+  }
+}
