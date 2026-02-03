@@ -5,21 +5,26 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
-import { rewards } from '../services/rewardsService';
 import { useTheme } from '../hooks/useTheme';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { CurrencyDisplay } from '../components/common/CurrencyDisplay';
+import { GameplayTutorial } from '../components/tutorial/GameplayTutorial';
+import { DailyRewardModal } from '../components/DailyRewardModal';
+import { dailyRewardsService } from '../services/dailyRewardsService';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
 import { getActiveRooms, createRoom, joinRoom } from '../services/database';
+import { doc, updateDoc } from 'firebase/firestore';
+import { firestore } from '../services/firebase';
+import { isUserAdmin } from '../utils/adminCheck';
 import { getBrowsableRankedRooms } from '../services/matchmaking';
 import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES, MAX_PLAYERS } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user, userProfile, signOut } = useAuth();
+  const { user, userProfile, refreshUserProfile } = useAuth();
   const { unreadCount } = useNotifications();
   const { colors: COLORS } = useTheme();
   const [quickMatchLoading, setQuickMatchLoading] = useState(false);
@@ -29,6 +34,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [casualRooms, setCasualRooms] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showDailyReward, setShowDailyReward] = useState(false);
+  const [dailyRewardClaimedThisSession, setDailyRewardClaimedThisSession] = useState(false);
   
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   
@@ -85,27 +93,23 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     // Load ranked rooms by default
     loadRankedRooms();
     
-    // Check daily login reward
-    const checkDailyReward = async () => {
-      if (user?.uid) {
-        const granted = await rewards.grantDailyLoginReward(user.uid);
-        if (granted) {
-          Alert.alert(
-            '🎁 Daily Reward!',
-            'You received 25 coins for logging in today!',
-            [{ text: 'Awesome!' }]
-          );
-        }
+    // Check daily login reward will be handled by useFocusEffect
+    
+    // Check if user needs to see tutorial
+    const checkTutorial = () => {
+      if (userProfile && !userProfile.gameplayTutorialCompleted) {
+        setTimeout(() => setShowTutorial(true), 1500);
       }
     };
     
-    checkDailyReward();
-  }, [user]);
+    checkTutorial();
+  }, [user, userProfile]);
 
   // Reload rooms when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadActiveRooms();
+      checkDailyReward();
       // Reload the selected room type if one is active
       if (selectedRoomType === 'ranked') {
         loadRankedRooms();
@@ -114,6 +118,43 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       }
     }, [selectedRoomType])
   );
+
+  const checkDailyReward = async () => {
+    if (!user) return;
+    
+    // Don't check again if already claimed this session
+    if (dailyRewardClaimedThisSession) {
+      console.log('Daily reward already claimed this session, skipping check');
+      return;
+    }
+    
+    try {
+      const status = await dailyRewardsService.canClaimToday(user.uid);
+      if (status.canClaim && !status.alreadyClaimed) {
+        // Show modal after a short delay for better UX
+        setTimeout(() => {
+          setShowDailyReward(true);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Failed to check daily reward:', error);
+    }
+  };
+
+  const handleDailyRewardClaimed = async (coins: number, streak: number) => {
+    // Mark as claimed this session to prevent re-appearing
+    setDailyRewardClaimedThisSession(true);
+    
+    // Close modal immediately
+    setShowDailyReward(false);
+    
+    // Refresh user profile to update coin balance in real-time
+    if (refreshUserProfile) {
+      await refreshUserProfile();
+    }
+    
+    console.log(`Daily reward claimed: ${coins} coins, ${streak} day streak`);
+  };
 
   const loadActiveRooms = async () => {
     try {
@@ -146,6 +187,35 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       console.error('Error loading casual rooms:', error);
     } finally {
       setLoadingRooms(false);
+    }
+  };
+
+  const handleTutorialComplete = async () => {
+    setShowTutorial(false);
+    if (user?.uid) {
+      try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+          gameplayTutorialCompleted: true,
+          gameplayTutorialCompletedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error('Failed to mark tutorial as completed:', error);
+      }
+    }
+  };
+
+  const handleTutorialSkip = async () => {
+    setShowTutorial(false);
+    if (user?.uid) {
+      try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+          gameplayTutorialCompleted: true,
+          gameplayTutorialSkipped: true,
+          gameplayTutorialCompletedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error('Failed to mark tutorial as skipped:', error);
+      }
     }
   };
 
@@ -235,6 +305,21 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <GameplayTutorial
+        visible={showTutorial}
+        onComplete={handleTutorialComplete}
+        onSkip={handleTutorialSkip}
+      />
+      
+      {user && (
+        <DailyRewardModal
+          visible={showDailyReward}
+          userId={user.uid}
+          onClose={() => setShowDailyReward(false)}
+          onClaimed={handleDailyRewardClaimed}
+        />
+      )}
+      
       {/* Animated Background */}
       <LinearGradient
         colors={[COLORS.background, COLORS.backgroundLight, COLORS.backgroundElevated]}
@@ -499,8 +584,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Admin Card - Only for specific admins */}
-            {(user?.email === 'mightygunja@gmail.com' || user?.email === 'noshir2@gmail.com') && (
+            {/* Admin Card - Only for admins */}
+            {isUserAdmin(user) && (
               <TouchableOpacity 
                 style={styles.secondaryCard}
                 onPress={() => navigation.navigate('AdminConsole')}

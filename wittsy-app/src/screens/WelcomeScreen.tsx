@@ -3,19 +3,21 @@
  * First screen users see - offers instant guest access or account creation
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '../components/common/Button';
-import { SPACING, RADIUS, SHADOWS } from '../utils/constants';
+import { SPACING, RADIUS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth';
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -24,6 +26,8 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGuestStart }) => {
   const { colors: COLORS } = useTheme();
+  const { signInWithGoogle } = useAuth();
+  const [loading, setLoading] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -97,12 +101,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
         {/* Features */}
         <View style={styles.featuresContainer}>
           <View style={styles.feature}>
-            <Text style={styles.featureIcon}>⚡</Text>
-            <Text style={[styles.featureText, { color: COLORS.text }]}>
-              Quick 5-minute games
-            </Text>
-          </View>
-          <View style={styles.feature}>
             <Text style={styles.featureIcon}>🎯</Text>
             <Text style={[styles.featureText, { color: COLORS.text }]}>
               Compete with friends
@@ -112,6 +110,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             <Text style={styles.featureIcon}>🏆</Text>
             <Text style={[styles.featureText, { color: COLORS.text }]}>
               Climb the leaderboard
+            </Text>
+          </View>
+          <View style={styles.feature}>
+            <Text style={styles.featureIcon}>💬</Text>
+            <Text style={[styles.featureText, { color: COLORS.text }]}>
+              Battle with creative phrases
             </Text>
           </View>
         </View>
@@ -144,6 +148,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             onPress={() => navigation.navigate('Register')}
             variant="outline"
             style={styles.createButton}
+          />
+
+          {/* Google Sign-In */}
+          <Button
+            title="🔐 Sign In with Google"
+            onPress={async () => {
+              setLoading(true);
+              try {
+                await signInWithGoogle();
+              } catch (error: any) {
+                Alert.alert('Sign In Failed', error.message || 'An error occurred');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            variant="outline"
+            disabled={loading}
+            style={styles.googleButton}
           />
 
           {/* Tertiary: Sign In */}
@@ -226,38 +248,52 @@ const styles = StyleSheet.create({
   playButton: {
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    ...SHADOWS.lg,
+    elevation: 8,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
   },
   playGradient: {
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.xl * 1.5,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   playIcon: {
-    fontSize: 32,
-    marginBottom: SPACING.xs,
+    fontSize: 36,
+    marginBottom: SPACING.sm,
   },
   playText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   playSubtext: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.95)',
     fontWeight: '600',
+    textAlign: 'center',
   },
   createButton: {
     height: 56,
   },
+  googleButton: {
+    height: 56,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
   signInButton: {
     padding: SPACING.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   signInText: {
     fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
   },
   signInLink: {
     fontWeight: 'bold',
