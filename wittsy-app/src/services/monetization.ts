@@ -10,6 +10,7 @@ import { firestore } from './firebase';
 import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 import { analytics } from './analytics';
 import { errorTracking } from './errorTracking';
+import { isIAPAvailable } from '../utils/platform';
 
 // Product IDs
 export const COIN_PRODUCTS = {
@@ -166,15 +167,20 @@ class MonetizationService {
    * Initialize IAP connection
    */
   async initialize(userId?: string): Promise<void> {
+    if (this.initialized) {
+      console.log('💰 Monetization already initialized');
+      return;
+    }
+
+    // Skip IAP initialization on Expo Go
+    if (!isIAPAvailable()) {
+      console.log('⏭️ Skipping IAP initialization (Expo Go)');
+      this.initialized = true;
+      return;
+    }
+
     try {
-      if (this.initialized) {
-        console.log('✅ IAP already initialized');
-        return;
-      }
-
-      console.log('🔵 Initializing IAP...');
-
-      // Initialize connection to App Store/Play Store
+      console.log('🔵 Initializing IAP connection...');
       await RNIap.initConnection();
       console.log('✅ IAP connection established');
 

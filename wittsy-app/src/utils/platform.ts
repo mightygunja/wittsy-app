@@ -29,6 +29,22 @@ export const isGoogleSignInAvailable = (): boolean => {
 };
 
 /**
+ * Check if In-App Purchases are available
+ * Only available in standalone builds, not in Expo Go
+ */
+export const isIAPAvailable = (): boolean => {
+  return !isExpoGo();
+};
+
+/**
+ * Check if Store Review is available
+ * Only available in standalone builds, not in Expo Go
+ */
+export const isStoreReviewAvailable = (): boolean => {
+  return !isExpoGo();
+};
+
+/**
  * Get app environment name for debugging
  */
 export const getAppEnvironment = (): string => {

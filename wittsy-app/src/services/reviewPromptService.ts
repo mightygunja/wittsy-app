@@ -7,6 +7,7 @@ import * as StoreReview from 'expo-store-review';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { analytics } from './analytics';
 import { monetization } from './monetization';
+import { isStoreReviewAvailable } from '../utils/platform';
 
 const STORAGE_KEYS = {
   GAMES_PLAYED: '@review_games_played',
@@ -37,6 +38,11 @@ class ReviewPromptService {
    */
   async isAvailable(): Promise<boolean> {
     try {
+      // Skip on Expo Go
+      if (!isStoreReviewAvailable()) {
+        console.log('⏭️ Store review not available (Expo Go)');
+        return false;
+      }
       return await StoreReview.isAvailableAsync();
     } catch (error) {
       console.error('Failed to check review availability:', error);
