@@ -122,6 +122,25 @@ export const TYPOGRAPHY = {
     normal: 1.5,
     relaxed: 1.75,
   },
+  letterSpacing: {
+    tighter: -0.5,
+    tight: -0.25,
+    normal: 0,
+    wide: 0.25,
+    wider: 0.5,
+    widest: 1,
+  },
+};
+
+// Icon Sizes - Standardized
+export const ICON_SIZES = {
+  xs: 12,
+  sm: 16,
+  md: 20,
+  lg: 24,
+  xl: 32,
+  '2xl': 40,
+  '3xl': 48,
 };
 
 // Spacing System (4px base for tighter control)

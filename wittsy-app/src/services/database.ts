@@ -242,32 +242,42 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
   const players = roomData.players || [];
   const updatedPlayers = players.filter((p: Player) => p.userId !== userId);
   
-  const MIN_PLAYERS_ACTIVE = 3;
+  const MIN_PLAYERS_TO_PLAY = 3;
+  const MIN_PLAYERS_TO_KEEP_ROOM = 2;
   
-  // If room falls below minimum players, terminate the game
-  if (updatedPlayers.length < MIN_PLAYERS_ACTIVE) {
-    // End the game and mark room as finished
+  // Handle different scenarios based on remaining players
+  if (updatedPlayers.length === 0) {
+    // Delete room if completely empty
+    await deleteDoc(roomRef);
+    console.log(`🗑️ Room ${roomId} deleted - no players remaining`);
+  } else if (updatedPlayers.length === 1) {
+    // Only 1 player left - end the game
     if (roomData.status === 'active') {
       await updateDoc(roomRef, {
         status: 'finished',
         endedAt: new Date().toISOString(),
         players: updatedPlayers
       });
-      console.log(`🏁 Room ${roomId} ended - fell below ${MIN_PLAYERS_ACTIVE} players`);
-    } else if (updatedPlayers.length === 0) {
-      // Delete room if completely empty
-      await deleteDoc(roomRef);
-      console.log(`🗑️ Room ${roomId} deleted - no players remaining`);
+      console.log(`🏁 Room ${roomId} ended - only 1 player remaining`);
     } else {
-      // Update players but keep room in waiting state
+      // Keep room in waiting state with 1 player
       await updateDoc(roomRef, {
         players: updatedPlayers,
-        hostId: updatedPlayers.length > 0 ? updatedPlayers[0].userId : roomData.hostId
+        hostId: updatedPlayers[0].userId
       });
+      console.log(`⏸️ Room ${roomId} waiting - only 1 player remaining`);
     }
+  } else if (updatedPlayers.length >= MIN_PLAYERS_TO_KEEP_ROOM && updatedPlayers.length < MIN_PLAYERS_TO_PLAY && roomData.status === 'active') {
+    // 2 players remaining in active game - return to waiting state (need 3 to play)
+    const newHostId = roomData.hostId === userId ? updatedPlayers[0].userId : roomData.hostId;
+    await updateDoc(roomRef, {
+      status: 'waiting',
+      players: updatedPlayers,
+      hostId: newHostId
+    });
+    console.log(`⏸️ Room ${roomId} returned to waiting - need ${MIN_PLAYERS_TO_PLAY} players to continue (${updatedPlayers.length} remaining)`);
   } else {
-    // Room has enough players - continue game
-    // If host leaves and there are other players, assign new host
+    // Room has enough players to continue - update players and reassign host if needed
     if (roomData.hostId === userId && updatedPlayers.length > 0) {
       await updateDoc(roomRef, {
         players: updatedPlayers,
@@ -279,7 +289,7 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
         players: updatedPlayers
       });
     }
-    console.log(`✅ Player left room ${roomId}. ${updatedPlayers.length} players remaining - game continues`);
+    console.log(`✅ Player left room ${roomId}. ${updatedPlayers.length} players remaining - ${roomData.status === 'active' ? 'game continues' : 'room continues'}`);
   }
 };
 

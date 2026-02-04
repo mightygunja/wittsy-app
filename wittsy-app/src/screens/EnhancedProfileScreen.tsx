@@ -20,7 +20,6 @@ import { getUserSeasonHistory, SeasonStats } from '../services/seasonHistory';
 import { AnimatedStatCard } from '../components/profile/AnimatedStatCard';
 import { AnimatedAchievementBadge } from '../components/profile/AnimatedAchievementBadge';
 import { AnimatedMatchHistoryItem } from '../components/profile/AnimatedMatchHistoryItem';
-import { XPProgressBar } from '../components/profile/XPProgressBar';
 import { TitleSelector } from '../components/profile/TitleSelector';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
 import { Achievement } from '../types';
@@ -297,17 +296,12 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
             {/* User Info */}
             <View style={styles.userInfo}>
               <Text style={styles.username}>{userProfile.username}</Text>
-              <View style={styles.badgesRow}>
+              {currentTitle && (
                 <View style={styles.titleBadge}>
                   <Text style={styles.titleIcon}>{currentTitle.icon}</Text>
                   <Text style={styles.titleText}>{currentTitle.name}</Text>
                 </View>
-                <View style={[styles.tierBadge, { backgroundColor: getRatingColor(userProfile.rating) + '20', borderColor: getRatingColor(userProfile.rating) }]}>
-                  <Text style={[styles.tierText, { color: getRatingColor(userProfile.rating) }]}>
-                    {getRatingTier(userProfile.rating)}
-                  </Text>
-                </View>
-              </View>
+              )}
             </View>
 
             {/* Stats Row */}
@@ -319,43 +313,43 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{userProfile.stats.gamesPlayed}</Text>
-                <Text style={styles.statLabel}>PLAYED</Text>
+                <Text style={styles.statLabel}>GAMES</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: getRatingColor(userProfile.rating) }]}>{userProfile.rating}</Text>
+                <View style={styles.ratingBadgeContainer}>
+                  <Text style={[styles.statValue, { color: getRatingColor(userProfile.rating) }]}>{userProfile.rating}</Text>
+                  <View style={[styles.tierBadgeCompact, { backgroundColor: getRatingColor(userProfile.rating) }]}>
+                    <Text style={styles.tierTextCompact}>{getRatingTier(userProfile.rating)}</Text>
+                  </View>
+                </View>
                 <Text style={styles.statLabel}>RATING</Text>
               </View>
             </View>
 
-            {/* XP Progress - Redesigned */}
+            {/* XP Progress - Professional */}
             <View style={styles.xpSection}>
-              <View style={styles.xpRow}>
-                <Text style={styles.xpLabel}>Experience Points</Text>
-                <Text style={styles.xpNumbers}>{userProfile.xp} XP</Text>
+              <View style={styles.xpHeader}>
+                <View style={styles.xpLabelContainer}>
+                  <Text style={styles.xpLabel}>Level {userProfile.level}</Text>
+                  <Text style={styles.xpPercentage}>{xpProgress.percentage}%</Text>
+                </View>
+                <Text style={styles.xpNumbers}>{userProfile.xp.toLocaleString()} XP</Text>
               </View>
               <View style={styles.progressBarContainer}>
-                <View style={[styles.progressBarFill, { width: `${Math.min(100, xpProgress.percentage)}%` }]} />
+                <Animated.View 
+                  style={[
+                    styles.progressBarFill, 
+                    { width: `${Math.min(100, xpProgress.percentage)}%` }
+                  ]} 
+                />
               </View>
               <Text style={styles.xpSubtext}>
-                Level {userProfile.level} • {xpProgress.percentage}% to next level
+                {xpProgress.required && !isNaN(xpProgress.required - xpProgress.current) 
+                  ? `${(xpProgress.required - xpProgress.current).toLocaleString()} XP to Level ${userProfile.level + 1}`
+                  : `Level ${userProfile.level} - Max Level Reached`
+                }
               </Text>
-              <TouchableOpacity 
-                style={styles.fixLevelButton}
-                onPress={async () => {
-                  const { getLevelFromXP } = await import('../services/progression');
-                  const correctLevel = getLevelFromXP(userProfile.xp);
-                  console.log(`🔧 Fixing level: Current=${userProfile.level}, Should be=${correctLevel}`);
-                  if (correctLevel !== userProfile.level) {
-                    await updateDoc(doc(firestore, 'users', userProfile.uid), { level: correctLevel });
-                    Alert.alert('Level Fixed!', `Your level has been corrected to ${correctLevel}`);
-                  } else {
-                    Alert.alert('Level OK', 'Your level is already correct');
-                  }
-                }}
-              >
-                <Text style={styles.fixLevelText}>Fix My Level</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </Animated.View>
@@ -390,43 +384,72 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Modern Tab Navigation */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
-            onPress={() => setActiveTab('stats')}
+        {/* Professional Tab Navigation */}
+        <View style={styles.tabNavigationWrapper}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabScrollContent}
           >
-            <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>
-              📊 Stats
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'achievements' && styles.activeTab]}
-            onPress={() => setActiveTab('achievements')}
-          >
-            <Text style={[styles.tabText, activeTab === 'achievements' && styles.activeTabText]}>
-              🏆 Achievements
-            </Text>
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{unlockedAchievements}/{achievements.length}</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'seasons' && styles.activeTab]}
-            onPress={() => setActiveTab('seasons')}
-          >
-            <Text style={[styles.tabText, activeTab === 'seasons' && styles.activeTabText]}>
-              📅 Seasons
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'history' && styles.activeTab]}
-            onPress={() => setActiveTab('history')}
-          >
-            <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
-              📜 History
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.modernTab, activeTab === 'stats' && styles.modernTabActive]}
+              onPress={() => setActiveTab('stats')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.tabIconContainer}>
+                <Text style={styles.tabIcon}>📊</Text>
+              </View>
+              <Text style={[styles.modernTabText, activeTab === 'stats' && styles.modernTabTextActive]}>
+                Stats
+              </Text>
+              {activeTab === 'stats' && <View style={styles.tabIndicator} />}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.modernTab, activeTab === 'achievements' && styles.modernTabActive]}
+              onPress={() => setActiveTab('achievements')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.tabIconContainer}>
+                <Text style={styles.tabIcon}>🏆</Text>
+                <View style={styles.modernTabBadge}>
+                  <Text style={styles.modernTabBadgeText}>{unlockedAchievements}</Text>
+                </View>
+              </View>
+              <Text style={[styles.modernTabText, activeTab === 'achievements' && styles.modernTabTextActive]}>
+                Achievements
+              </Text>
+              {activeTab === 'achievements' && <View style={styles.tabIndicator} />}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.modernTab, activeTab === 'seasons' && styles.modernTabActive]}
+              onPress={() => setActiveTab('seasons')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.tabIconContainer}>
+                <Text style={styles.tabIcon}>📅</Text>
+              </View>
+              <Text style={[styles.modernTabText, activeTab === 'seasons' && styles.modernTabTextActive]}>
+                Seasons
+              </Text>
+              {activeTab === 'seasons' && <View style={styles.tabIndicator} />}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.modernTab, activeTab === 'history' && styles.modernTabActive]}
+              onPress={() => setActiveTab('history')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.tabIconContainer}>
+                <Text style={styles.tabIcon}>📜</Text>
+              </View>
+              <Text style={[styles.modernTabText, activeTab === 'history' && styles.modernTabTextActive]}>
+                History
+              </Text>
+              {activeTab === 'history' && <View style={styles.tabIndicator} />}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {/* Content based on active tab */}
@@ -622,7 +645,7 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
                     ]}
                   >
                     <View style={styles.seasonHeader}>
-                      <Text style={styles.seasonName}>📅 {season.seasonName}</Text>
+                      <Text style={styles.seasonName} numberOfLines={2} ellipsizeMode="tail">📅 {season.seasonName}</Text>
                       <Text style={styles.seasonNumber}>Season {season.seasonNumber}</Text>
                     </View>
                     
@@ -739,16 +762,16 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center',
   },
   profileContainer: {
-    paddingTop: SPACING.md,
-    marginBottom: SPACING.sm,
+    paddingTop: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   profileContent: {
-    paddingBottom: SPACING.lg,
-    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
     alignItems: 'center',
   },
   avatarSection: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.xl,
   },
   avatarWrapper: {
     position: 'relative',
@@ -756,14 +779,14 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   avatarCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 5,
-    borderColor: '#FFFFFF',
+    borderWidth: 6,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
     overflow: 'hidden',
     ...SHADOWS.xl,
   },
@@ -795,96 +818,110 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   levelBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    bottom: 4,
+    right: 4,
     backgroundColor: COLORS.gold,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
+    borderWidth: 5,
     borderColor: '#FFFFFF',
-    ...SHADOWS.lg,
+    ...SHADOWS.glowGold,
   },
   levelBadgeText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   editBadge: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
+    bottom: 4,
+    left: 4,
     backgroundColor: COLORS.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
+    borderWidth: 5,
     borderColor: '#FFFFFF',
-    ...SHADOWS.lg,
+    ...SHADOWS.glow,
   },
   editIcon: {
     fontSize: 14,
   },
   userInfo: {
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   username: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: TYPOGRAPHY.fontSize['4xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.extrabold,
     color: '#FFFFFF',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
+    letterSpacing: TYPOGRAPHY.letterSpacing.wider,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 6,
   },
   titleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
+    marginTop: SPACING.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    ...SHADOWS.sm,
   },
   titleIcon: {
-    fontSize: 16,
-    marginRight: SPACING.xs,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    marginRight: SPACING.sm,
   },
   titleText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: '#FFFFFF',
+    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
   },
-  tierBadge: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
-    borderWidth: 2,
+  ratingBadgeContainer: {
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
-  tierText: {
-    fontSize: 14,
+  tierBadgeCompact: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+    marginTop: 2,
+  },
+  tierTextCompact: {
+    fontSize: 10,
     fontWeight: 'bold',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    marginBottom: SPACING.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: RADIUS.xl,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    ...SHADOWS.md,
   },
   statItem: {
     alignItems: 'center',
@@ -892,25 +929,25 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flex: 1,
   },
   statValue: {
-    fontSize: 26,
-    fontWeight: 'bold',
+    fontSize: TYPOGRAPHY.fontSize['3xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.extrabold,
     color: '#FFFFFF',
-    marginBottom: 2,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginBottom: SPACING.xs,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   statLabel: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: TYPOGRAPHY.letterSpacing.widest,
   },
   statDivider: {
     width: 1,
-    height: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    height: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
   rankBadge: {
     flexDirection: 'row',
@@ -935,126 +972,157 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   xpSection: {
     width: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    ...SHADOWS.sm,
   },
-  xpRow: {
+  xpHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  xpLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: SPACING.sm,
   },
   xpLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.extrabold,
     color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
+  },
+  xpPercentage: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: 'rgba(255, 255, 255, 0.75)',
   },
   xpNumbers: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.extrabold,
+    color: COLORS.gold,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   progressBarContainer: {
     width: '100%',
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 4,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: RADIUS.md,
     overflow: 'hidden',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: COLORS.gold,
-    borderRadius: 4,
+    borderRadius: RADIUS.md,
+    shadowColor: COLORS.gold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
   },
   xpSubtext: {
-    fontSize: 10,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
-    marginBottom: SPACING.xs,
-  },
-  fixLevelButton: {
-    backgroundColor: COLORS.gold,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.md,
-    alignSelf: 'center',
-  },
-  fixLevelText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    letterSpacing: TYPOGRAPHY.letterSpacing.normal,
   },
   content: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.xs,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
-  tabContainer: {
-    flexDirection: 'row',
+  tabNavigationWrapper: {
     backgroundColor: COLORS.surface,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.xs,
-    ...SHADOWS.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    marginBottom: SPACING.md,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
+  tabScrollContent: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.xs,
+  },
+  modernTab: {
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     position: 'relative',
-    minHeight: 44,
+    minWidth: 90,
   },
-  activeTab: {
-    backgroundColor: COLORS.primary,
-    ...SHADOWS.sm,
+  modernTabActive: {
+    // Active state handled by indicator
   },
-  tabText: {
+  tabIconContainer: {
+    position: 'relative',
+    marginBottom: SPACING.xs,
+  },
+  tabIcon: {
+    fontSize: 24,
+  },
+  modernTabText: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.textSecondary,
-  },
-  activeTabText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  tabBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: COLORS.gold,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-    minWidth: 20,
-  },
-  tabBadgeText: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.background,
     textAlign: 'center',
   },
+  modernTabTextActive: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: COLORS.primary,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  modernTabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: COLORS.gold,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.surface,
+  },
+  modernTabBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#000',
+  },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.extrabold,
     color: COLORS.text,
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
+    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
   },
   sectionSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    letterSpacing: TYPOGRAPHY.letterSpacing.normal,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -SPACING.xs,
+    justifyContent: 'space-between',
+    gap: SPACING.md,
   },
   achievementsGrid: {
     flexDirection: 'row',
@@ -1075,48 +1143,60 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.lg,
   },
   starredPhrasesIcon: {
-    fontSize: 32,
-    marginRight: SPACING.md,
+    fontSize: 36,
   },
   starredPhrasesTextContainer: {
     flex: 1,
   },
   starredPhrasesTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 2,
+    marginBottom: 4,
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   starredPhrasesSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontWeight: '500',
+    letterSpacing: 0.2,
   },
   starredPhrasesArrow: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#FFFFFF',
-    marginLeft: SPACING.sm,
+    fontWeight: 'bold',
   },
   loader: {
-    marginTop: SPACING.xl * 2,
+    marginVertical: SPACING.xl * 1.5,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: SPACING.xl * 3,
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl * 2.5,
+    paddingHorizontal: SPACING.xl,
   },
   emptyIcon: {
-    fontSize: 64,
+    fontSize: 56,
     marginBottom: SPACING.lg,
+    opacity: 0.8,
   },
   emptyText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontSize: 18,
+    fontWeight: '700',
     color: COLORS.text,
     marginBottom: SPACING.sm,
+    letterSpacing: 0.2,
   },
   emptySubtext: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    fontWeight: '500',
+    letterSpacing: 0.1,
+    lineHeight: 20,
   },
   seasonCard: {
     backgroundColor: COLORS.surface,
@@ -1126,9 +1206,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     ...SHADOWS.md,
   },
   seasonHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: SPACING.md,
     paddingBottom: SPACING.sm,
     borderBottomWidth: 1,
@@ -1138,6 +1215,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
+    marginBottom: SPACING.xxs,
   },
   seasonNumber: {
     fontSize: TYPOGRAPHY.fontSize.sm,

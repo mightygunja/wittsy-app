@@ -58,6 +58,12 @@ service cloud.firestore {
         (!('username' in request.resource.data) || 
          request.resource.data.username == resource.data.username);
       allow delete: if false; // Users cannot delete their own accounts
+      
+      // Season History subcollection
+      match /seasonHistory/{seasonId} {
+        allow read: if isSignedIn() && isOwner(userId);
+        allow write: if isSignedIn() && isOwner(userId);
+      }
     }
     
     // ==================== GAME ROOMS ====================
@@ -280,6 +286,12 @@ service cloud.firestore {
     // Avatars - users can read/write their own avatar
     match /avatars/{userId} {
       allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Daily Rewards - users can read/write their own daily rewards
+    match /dailyRewards/{userId} {
+      allow read: if isSignedIn() && isOwner(userId);
       allow write: if isSignedIn() && isOwner(userId);
     }
     

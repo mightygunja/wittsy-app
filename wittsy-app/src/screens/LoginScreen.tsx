@@ -5,7 +5,6 @@ import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { validateEmail, validatePassword } from '../utils/validation';
-import { SPACING } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
 
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {

@@ -49,7 +49,7 @@ export const getGlobalLeaderboard = async (
     );
     
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc, index) => {
+    const entries = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         userId: doc.id,
@@ -63,9 +63,24 @@ export const getGlobalLeaderboard = async (
         winRate: data.stats?.gamesPlayed > 0 
           ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
           : 0,
-        position: index + 1,
+        position: 0,
       };
     });
+    
+    // Assign positions with tie handling
+    let currentPosition = 1;
+    for (let i = 0; i < entries.length; i++) {
+      if (i > 0 && entries[i].rating === entries[i - 1].rating) {
+        // Same rating as previous entry - same position
+        entries[i].position = entries[i - 1].position;
+      } else {
+        // Different rating - assign current position
+        entries[i].position = currentPosition;
+      }
+      currentPosition++;
+    }
+    
+    return entries;
   } catch (error: any) {
     if (error?.code === 'permission-denied' || error?.code === 'failed-precondition') {
       console.warn('Leaderboard requires Firestore permissions. Returning empty.');
@@ -92,7 +107,7 @@ export const getRegionalLeaderboard = async (
     );
     
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc, index) => {
+    const entries = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         userId: doc.id,
@@ -106,9 +121,22 @@ export const getRegionalLeaderboard = async (
         winRate: data.stats?.gamesPlayed > 0 
           ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
           : 0,
-        position: index + 1,
+        position: 0,
       };
     });
+    
+    // Assign positions with tie handling
+    let currentPosition = 1;
+    for (let i = 0; i < entries.length; i++) {
+      if (i > 0 && entries[i].rating === entries[i - 1].rating) {
+        entries[i].position = entries[i - 1].position;
+      } else {
+        entries[i].position = currentPosition;
+      }
+      currentPosition++;
+    }
+    
+    return entries;
   } catch (error) {
     console.error('Error fetching regional leaderboard:', error);
     return [];
@@ -179,11 +207,17 @@ export const getFriendsLeaderboard = async (
       position: 0,
     });
     
-    // Sort by rating and assign positions
+    // Sort by rating and assign positions with tie handling
     friendsData.sort((a, b) => b.rating - a.rating);
-    friendsData.forEach((entry, index) => {
-      entry.position = index + 1;
-    });
+    let currentPosition = 1;
+    for (let i = 0; i < friendsData.length; i++) {
+      if (i > 0 && friendsData[i].rating === friendsData[i - 1].rating) {
+        friendsData[i].position = friendsData[i - 1].position;
+      } else {
+        friendsData[i].position = currentPosition;
+      }
+      currentPosition++;
+    }
     
     return friendsData;
   } catch (error) {

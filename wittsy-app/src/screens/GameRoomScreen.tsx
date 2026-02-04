@@ -1247,6 +1247,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.xs,
     marginBottom: SPACING.xs,
+    flexWrap: 'wrap',
   },
   compactRankedBadge: {
     flexDirection: 'row',
@@ -1258,22 +1259,27 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   },
   compactSeasonBadge: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
+    maxWidth: '100%',
+    flex: 1,
   },
   compactBadgeIcon: {
     fontSize: 12,
     marginRight: 4,
+    flexShrink: 0,
   },
   compactBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     color: COLORS.text,
+    flex: 1,
+    flexWrap: 'wrap',
   },
   autoStartHint: {
     fontSize: 11,

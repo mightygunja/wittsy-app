@@ -67,7 +67,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.05,
+          toValue: 1.02,
           duration: 1000,
           useNativeDriver: true,
         }),
@@ -658,26 +658,26 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         style={styles.roomCard}
                         onPress={() => handleJoinRoom(room.roomId)}
                       >
-                        <View style={styles.roomCardHeader}>
-                          <View style={styles.roomCardTitleRow}>
-                            <Text style={styles.roomCardName}>{room.name}</Text>
+                        <View style={styles.roomCardContent}>
+                          <View style={styles.roomCardTop}>
+                            <Text style={styles.roomCardName} numberOfLines={1} ellipsizeMode="tail">{room.name}</Text>
                             {isUserInRoom && (
                               <Badge text="YOU'RE IN" variant="success" size="sm" />
                             )}
                           </View>
-                          <Text style={styles.roomCardPlayers}>
-                            👥 {room.players?.length || 0}/{room.settings.maxPlayers}
-                          </Text>
-                        </View>
-                        <View style={styles.roomCardFooter}>
-                          <Text style={styles.roomCardStatus}>
-                            {room.status === 'waiting' ? '⏳' : '🎮'} {roomStatus}
-                          </Text>
-                          {room.countdownStartedAt && room.countdownDuration && (
-                            <Text style={styles.roomCardCountdown}>
-                              ⏱️ Starting soon
+                          <View style={styles.roomCardBottom}>
+                            <Text style={styles.roomCardPlayers}>
+                              👥 {room.players?.length || 0}/{room.settings.maxPlayers}
                             </Text>
-                          )}
+                            <Text style={styles.roomCardStatus}>
+                              {room.status === 'waiting' ? '⏳' : '🎮'} {roomStatus}
+                            </Text>
+                            {room.countdownStartedAt && room.countdownDuration && (
+                              <Text style={styles.roomCardCountdown}>
+                                ⏱️ Starting soon
+                              </Text>
+                            )}
+                          </View>
                         </View>
                       </TouchableOpacity>
                     );
@@ -914,32 +914,30 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.xs,
   },
-  roomCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
+  roomCardContent: {
+    gap: SPACING.xs,
   },
-  roomCardTitleRow: {
+  roomCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
-    flex: 1,
+    marginBottom: SPACING.xs,
   },
   roomCardName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    flex: 1,
+  },
+  roomCardBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    flexWrap: 'wrap',
   },
   roomCardPlayers: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.8)',
-  },
-  roomCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: SPACING.xs,
   },
   roomCardStatus: {
     fontSize: 13,

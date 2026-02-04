@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { Text, StyleSheet, Animated } from 'react-native';
 import { SPACING, RADIUS, SHADOWS } from '../../utils/constants'
-import { useTheme } from '../../hooks/useTheme';;
+import { useTheme } from '../../hooks/useTheme';
 
 interface AnimatedStatCardProps {
   label: string;
@@ -85,10 +85,9 @@ export const AnimatedStatCard: React.FC<AnimatedStatCardProps> = ({
 
 const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
-    width: '48%',
+    width: '47%',
     backgroundColor: COLORS.surface,
     padding: SPACING.lg,
-    margin: '1%',
     borderRadius: RADIUS.lg,
     alignItems: 'center',
     ...SHADOWS.md,
