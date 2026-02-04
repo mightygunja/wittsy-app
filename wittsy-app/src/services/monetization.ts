@@ -4,13 +4,27 @@
  */
 
 import { Platform } from 'react-native';
-import * as RNIap from 'react-native-iap';
-import type { Product as IAPProduct, Purchase as IAPPurchase, PurchaseError } from 'react-native-iap';
 import { firestore } from './firebase';
 import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 import { analytics } from './analytics';
 import { errorTracking } from './errorTracking';
 import { isIAPAvailable } from '../utils/platform';
+
+// Dynamic import for Expo Go compatibility
+let RNIap: any = null;
+let IAPProduct: any = null;
+let IAPPurchase: any = null;
+let PurchaseError: any = null;
+
+try {
+  const iapModule = require('react-native-iap');
+  RNIap = iapModule;
+  IAPProduct = iapModule.Product;
+  IAPPurchase = iapModule.Purchase;
+  PurchaseError = iapModule.PurchaseError;
+} catch (e) {
+  console.log('⏭️ Skipping IAP import (Expo Go)');
+}
 
 // Product IDs
 export const COIN_PRODUCTS = {

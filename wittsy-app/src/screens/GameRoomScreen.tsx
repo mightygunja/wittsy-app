@@ -581,21 +581,16 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
-  // Save current room on mount and cleanup on unmount
+  // Save current room on mount
   useEffect(() => {
     if (user?.uid && room?.name) {
       saveCurrentRoom(roomId, user.uid, room.name);
     }
     
     return () => {
+      // Only stop timer on unmount - do NOT auto-leave room
+      // Room leaving should only happen on explicit user actions (back button, leave button)
       gameTimerService.stopTimer(roomId);
-      // Auto-leave room when component unmounts (app closes, user navigates away)
-      if (user?.uid) {
-        leaveRoom(roomId, user.uid).catch(err => 
-          console.error('Failed to auto-leave on unmount:', err)
-        );
-        clearCurrentRoom();
-      }
     };
   }, [roomId, user?.uid, room?.name]);
 
@@ -905,43 +900,85 @@ const GameRoomScreen: React.FC = () => {
       <View style={styles.mainContent}>
         {/* Waiting lobby (before game starts) */}
         {!gameState && room.status === 'waiting' && (
-          <View style={styles.lobby}>
+          <ScrollView 
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.lobbyScrollContent}
+          >
             {countdownRemaining !== null && countdownRemaining > 0 ? (
               <View style={styles.countdownContainer}>
-                <Text style={styles.countdownTitle}>Game Starting In</Text>
-                <Text style={styles.countdownNumber}>{countdownRemaining}</Text>
-                <Text style={styles.countdownSubtitle}>Get ready!</Text>
+                <View style={styles.countdownCard}>
+                  <Text style={styles.countdownTitle}>🚀 Game Starting In</Text>
+                  <Text style={styles.countdownNumber}>{countdownRemaining}</Text>
+                  <Text style={styles.countdownSubtitle}>Get ready to play!</Text>
+                </View>
               </View>
             ) : (
-              <>
-                <Text style={styles.lobbyTitle}>Waiting for game to start...</Text>
-                <Text style={styles.lobbySubtitle}>
-                  {room.players.length}/{room.settings.maxPlayers} players
-                </Text>
-                {room.isRanked && room.settings.autoStart && (
-                  <Text style={styles.rankedInfo}>
-                    🏆 Ranked Game - Auto-starts at {room.settings.countdownTriggerPlayers} players
-                  </Text>
-                )}
-              </>
+              <View style={styles.lobbyTopSection}>
+                <View style={styles.lobbyUnifiedCard}>
+                  <View style={styles.playerCountSection}>
+                    <View style={styles.playerCountRow}>
+                      <Text style={styles.playerCountBig}>{room.players.length}</Text>
+                      <Text style={styles.playerCountDivider}>/</Text>
+                      <Text style={styles.playerCountMax}>{room.settings.maxPlayers}</Text>
+                    </View>
+                    <Text style={styles.playerCountLabel}>Players</Text>
+                  </View>
+                  
+                  <View style={styles.lobbyCardDivider} />
+                  
+                  <View style={styles.lobbyCardContent}>
+                    <View style={styles.lobbyBadgesRow}>
+                      {room.isRanked && (
+                        <View style={styles.compactRankedBadge}>
+                          <Text style={styles.compactBadgeIcon}>🏆</Text>
+                          <Text style={styles.compactBadgeText}>Ranked</Text>
+                        </View>
+                      )}
+                      {room.seasonName && (
+                        <View style={styles.compactSeasonBadge}>
+                          <Text style={styles.compactBadgeIcon}>📅</Text>
+                          <Text style={styles.compactBadgeText}>{room.seasonName}</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    {room.isRanked && room.settings.autoStart && (
+                      <Text style={styles.autoStartHint}>
+                        Auto-starts at {room.settings.countdownTriggerPlayers}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
             )}
             
-            <PlayerList players={room.players} currentUserId={user?.uid} />
+            <View style={styles.lobbyPlayersSection}>
+              <Text style={styles.lobbyPlayersTitle}>Players in Lobby</Text>
+              <PlayerList players={room.players} currentUserId={user?.uid} />
+            </View>
             
             {!room.isRanked && room.hostId === user?.uid && (
-              <Button
-                title="START GAME"
-                onPress={handleStartGame}
-                disabled={room.players.length < 1}
-                size="md"
-                style={styles.startButton}
-              />
+              <View style={styles.lobbyActionSection}>
+                <Button
+                  title="START GAME"
+                  onPress={handleStartGame}
+                  disabled={room.players.length < 1}
+                  size="lg"
+                  variant="primary"
+                  style={styles.startButton}
+                />
+              </View>
             )}
             
             {!room.isRanked && room.hostId !== user?.uid && (
-              <Text style={styles.waitingForHost}>Waiting for host to start...</Text>
+              <View style={styles.lobbyActionSection}>
+                <View style={styles.waitingCard}>
+                  <Text style={styles.waitingIcon}>⏳</Text>
+                  <Text style={styles.waitingText}>Waiting for host to start the game...</Text>
+                </View>
+              </View>
             )}
-          </View>
+          </ScrollView>
         )}
 
         {/* Active game */}
@@ -1064,12 +1101,12 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     backgroundColor: COLORS.surface,
-    borderBottomWidth: 2,
+    borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    minHeight: 60,
+    minHeight: 56,
   },
   headerLeft: {
     flex: 1,
@@ -1140,55 +1177,180 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
   },
-  lobby: {
-    flex: 1,
+  lobbyScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+  },
+  lobbyTopSection: {
+    marginBottom: SPACING.xl,
+  },
+  lobbyUnifiedCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: SPACING.lg,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-    countdownContainer: {
+  playerCountSection: {
     alignItems: 'center',
-    marginVertical: SPACING.xl,
+    paddingRight: SPACING.md,
   },
-  countdownTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+  playerCountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
-  countdownNumber: {
-    fontSize: 72,
+  playerCountBig: {
+    fontSize: 36,
     fontWeight: 'bold',
     color: COLORS.primary,
-    marginVertical: SPACING.md,
+    lineHeight: 36,
   },
-  countdownSubtitle: {
-    fontSize: 16,
+  playerCountDivider: {
+    fontSize: 28,
+    fontWeight: '300',
+    color: COLORS.textSecondary,
+    marginHorizontal: 2,
+  },
+  playerCountMax: {
+    fontSize: 28,
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
-  rankedInfo: {
-    fontSize: 14,
-    color: COLORS.gold || '#FFD700',
-    marginTop: SPACING.sm,
-    textAlign: 'center',
+  playerCountLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: SPACING.xs,
   },
-  lobbyTitle: {
+  lobbyCardDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: COLORS.border,
+    marginRight: SPACING.lg,
+  },
+  lobbyCardContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  lobbyBadgesRow: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
+  },
+  compactRankedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.gold || '#FFD700',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  compactSeasonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  compactBadgeIcon: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  compactBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: COLORS.text,
+  },
+  autoStartHint: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  lobbyPlayersSection: {
+    flex: 1,
+  },
+  lobbyPlayersTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 8,
+    marginBottom: SPACING.lg,
+    letterSpacing: 0.5,
+  },
+  lobbyActionSection: {
+    marginTop: SPACING.md,
+  },
+  countdownContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.xl,
+  },
+  countdownCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: SPACING.xl * 2,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  countdownTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginBottom: SPACING.lg,
     textAlign: 'center',
   },
-  lobbySubtitle: {
-    fontSize: 14,
+  countdownNumber: {
+    fontSize: 96,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginVertical: SPACING.lg,
+    textShadowColor: COLORS.primary,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 20,
+  },
+  countdownSubtitle: {
+    fontSize: 18,
     color: COLORS.textSecondary,
-    marginBottom: 20,
+    fontWeight: '600',
     textAlign: 'center',
   },
-  waitingForHost: {
-    fontSize: 14,
+  waitingCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  waitingIcon: {
+    fontSize: 48,
+    marginBottom: SPACING.md,
+  },
+  waitingText: {
+    fontSize: 16,
     color: COLORS.textSecondary,
-    marginTop: 16,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   gameContent: {
     flex: 1,

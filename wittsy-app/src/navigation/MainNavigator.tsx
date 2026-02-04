@@ -23,6 +23,9 @@ import { LanguageSettingsScreen } from '../screens/settings/LanguageSettingsScre
 import { AccessibilitySettingsScreen } from '../screens/settings/AccessibilitySettingsScreen';
 import { PrivacySettingsScreen } from '../screens/settings/PrivacySettingsScreen';
 import { NotificationSettingsScreen } from '../screens/settings/NotificationSettingsScreen';
+import { ProfileEditScreen } from '../screens/settings/ProfileEditScreen';
+import { FeedbackScreen } from '../screens/settings/FeedbackScreen';
+import { AdminFeedbackScreen } from '../screens/settings/AdminFeedbackScreen';
 import { AvatarCreatorScreenV2 as AvatarCreatorScreen } from '../screens/AvatarCreatorScreenV2';
 import { AvatarShopScreen } from '../screens/AvatarShopScreen';
 import { CoinShopScreen } from '../screens/CoinShopScreen';
@@ -100,7 +103,7 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="QuickPlay" 
         component={QuickPlayScreen}
-        options={{ title: 'Quick Play' }}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen 
@@ -131,37 +134,52 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="ThemeSettings" 
         component={ThemeSettingsScreen}
-        options={{ title: 'Theme' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="AudioSettings" 
         component={AudioSettingsScreen}
-        options={{ title: 'Audio' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="GameplaySettings" 
         component={GameplaySettingsScreen}
-        options={{ title: 'Gameplay' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="LanguageSettings" 
         component={LanguageSettingsScreen}
-        options={{ title: 'Language' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="AccessibilitySettings" 
         component={AccessibilitySettingsScreen}
-        options={{ title: 'Accessibility' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="PrivacySettings" 
         component={PrivacySettingsScreen}
-        options={{ title: 'Privacy' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="NotificationSettings" 
         component={NotificationSettingsScreen}
-        options={{ title: 'Notifications' }}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="ProfileEdit" 
+        component={ProfileEditScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="Feedback" 
+        component={FeedbackScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="AdminFeedback" 
+        component={AdminFeedbackScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="AvatarCreator" 

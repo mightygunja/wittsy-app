@@ -17,6 +17,7 @@ import {
 import { firestore } from './firebase';
 import { Room, RoomSettings } from '../types';
 import { generateUniqueRoomName } from '../utils/roomNameGenerator';
+import { getCurrentSeason } from './seasons';
 
 const ELO_RANGE = 200; // ±200 ELO for matchmaking
 
@@ -107,6 +108,14 @@ export const createRankedRoom = async (
   try {
     console.log(`🎮 Creating new ranked room for ${username} (${userId})`);
     
+    // Get current active season
+    const currentSeason = await getCurrentSeason();
+    if (!currentSeason) {
+      console.warn('⚠️ No active season found, creating ranked room without season link');
+    } else {
+      console.log(`📅 Linking to season: ${currentSeason.name} (${currentSeason.id})`);
+    }
+    
     // Get all active room names to ensure uniqueness
     const activeRoomsQuery = query(
       collection(firestore, 'rooms'),
@@ -126,6 +135,9 @@ export const createRankedRoom = async (
       spectators: [],
       status: 'waiting' as const,
       isRanked: true,
+      seasonId: currentSeason?.id || null,
+      seasonNumber: currentSeason?.number || null,
+      seasonName: currentSeason?.name || null,
       currentRound: 0,
       currentPrompt: null,
       scores: {},

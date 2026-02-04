@@ -10,10 +10,17 @@ import {
   signInWithCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
 import { referralService } from './referralService';
+
+// Dynamic import for Expo Go compatibility
+let GoogleSignin: any = null;
+try {
+  GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+} catch (e) {
+  console.log('⏭️ Skipping Google Sign-In import (Expo Go)');
+}
 
 // Helper to create default avatar
 const getDefaultAvatar = (): Avatar => ({

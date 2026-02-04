@@ -16,6 +16,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getUserMatches } from '../services/database';
 import { getUserAchievements } from '../services/achievements';
 import { getXPProgress, getAvailableTitles, updateUserTitle, TITLES } from '../services/progression';
+import { getUserSeasonHistory, SeasonStats } from '../services/seasonHistory';
 import { AnimatedStatCard } from '../components/profile/AnimatedStatCard';
 import { AnimatedAchievementBadge } from '../components/profile/AnimatedAchievementBadge';
 import { AnimatedMatchHistoryItem } from '../components/profile/AnimatedMatchHistoryItem';
@@ -40,9 +41,10 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
   const isOwnProfile = viewingUserId === currentUserProfile?.uid;
   
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'history'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'history' | 'seasons'>('stats');
   const [matches, setMatches] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [seasonHistory, setSeasonHistory] = useState<SeasonStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
@@ -82,6 +84,8 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
   useEffect(() => {
     if (activeTab === 'history' && userProfile) {
       loadMatchHistory();
+    } else if (activeTab === 'seasons' && userProfile) {
+      loadSeasonHistory();
     }
   }, [activeTab, userProfile]);
 
@@ -161,12 +165,28 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
     }
   };
 
+  const loadSeasonHistory = async () => {
+    if (!userProfile?.uid) return;
+    
+    setLoading(true);
+    try {
+      const history = await getUserSeasonHistory(userProfile.uid);
+      setSeasonHistory(history);
+    } catch (error) {
+      console.error('Error loading season history:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     if (activeTab === 'achievements') {
       await loadAchievements();
     } else if (activeTab === 'history') {
       await loadMatchHistory();
+    } else if (activeTab === 'seasons') {
+      await loadSeasonHistory();
     }
     setRefreshing(false);
   };
@@ -392,6 +412,14 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
             </View>
           </TouchableOpacity>
           <TouchableOpacity 
+            style={[styles.tab, activeTab === 'seasons' && styles.activeTab]}
+            onPress={() => setActiveTab('seasons')}
+          >
+            <Text style={[styles.tabText, activeTab === 'seasons' && styles.activeTabText]}>
+              📅 Seasons
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
             style={[styles.tab, activeTab === 'history' && styles.activeTab]}
             onPress={() => setActiveTab('history')}
           >
@@ -568,6 +596,89 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
                   <Text style={styles.emptyIcon}>🏆</Text>
                   <Text style={styles.emptyText}>No achievements yet</Text>
                   <Text style={styles.emptySubtext}>Start playing to unlock achievements!</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {activeTab === 'seasons' && (
+            <View>
+              <Text style={styles.sectionTitle}>Season History</Text>
+              <Text style={styles.sectionSubtitle}>
+                Your ranked performance across all seasons
+              </Text>
+              {loading ? (
+                <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+              ) : seasonHistory.length > 0 ? (
+                seasonHistory.map((season, index) => (
+                  <Animated.View
+                    key={season.seasonId}
+                    style={[
+                      styles.seasonCard,
+                      {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                      },
+                    ]}
+                  >
+                    <View style={styles.seasonHeader}>
+                      <Text style={styles.seasonName}>📅 {season.seasonName}</Text>
+                      <Text style={styles.seasonNumber}>Season {season.seasonNumber}</Text>
+                    </View>
+                    
+                    <View style={styles.seasonStatsGrid}>
+                      <View style={styles.seasonStat}>
+                        <Text style={styles.seasonStatValue}>{season.gamesPlayed}</Text>
+                        <Text style={styles.seasonStatLabel}>Games</Text>
+                      </View>
+                      <View style={styles.seasonStat}>
+                        <Text style={[styles.seasonStatValue, { color: COLORS.success }]}>{season.gamesWon}</Text>
+                        <Text style={styles.seasonStatLabel}>Wins</Text>
+                      </View>
+                      <View style={styles.seasonStat}>
+                        <Text style={styles.seasonStatValue}>
+                          {season.gamesPlayed > 0 ? Math.round((season.gamesWon / season.gamesPlayed) * 100) : 0}%
+                        </Text>
+                        <Text style={styles.seasonStatLabel}>Win Rate</Text>
+                      </View>
+                      <View style={styles.seasonStat}>
+                        <Text style={[styles.seasonStatValue, { color: COLORS.primary }]}>{season.totalVotes}</Text>
+                        <Text style={styles.seasonStatLabel}>Votes</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.seasonRankRow}>
+                      <View style={styles.seasonRankItem}>
+                        <Text style={styles.seasonRankLabel}>Best Rank</Text>
+                        <Text style={styles.seasonRankValue}>#{season.bestRank}</Text>
+                      </View>
+                      <View style={styles.seasonRankItem}>
+                        <Text style={styles.seasonRankLabel}>Final Rank</Text>
+                        <Text style={styles.seasonRankValue}>#{season.finalRank}</Text>
+                      </View>
+                      <View style={styles.seasonRankItem}>
+                        <Text style={styles.seasonRankLabel}>Final ELO</Text>
+                        <Text style={[styles.seasonRankValue, { color: getRatingColor(season.finalElo) }]}>
+                          {season.finalElo}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {season.topPhrases.length > 0 && (
+                      <View style={styles.topPhrasesSection}>
+                        <Text style={styles.topPhrasesTitle}>⭐ Top Phrases</Text>
+                        {season.topPhrases.slice(0, 3).map((phrase, i) => (
+                          <Text key={i} style={styles.topPhrase}>"{phrase}"</Text>
+                        ))}
+                      </View>
+                    )}
+                  </Animated.View>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📅</Text>
+                  <Text style={styles.emptyText}>No season history yet</Text>
+                  <Text style={styles.emptySubtext}>Play ranked games to build your season history!</Text>
                 </View>
               )}
             </View>
@@ -1006,5 +1117,89 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     textAlign: 'center',
+  },
+  seasonCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.md,
+  },
+  seasonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+    paddingBottom: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  seasonName: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  seasonNumber: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  seasonStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: SPACING.md,
+  },
+  seasonStat: {
+    alignItems: 'center',
+  },
+  seasonStatValue: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  seasonStatLabel: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xxs,
+    textTransform: 'uppercase',
+  },
+  seasonRankRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  seasonRankItem: {
+    alignItems: 'center',
+  },
+  seasonRankLabel: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xxs,
+  },
+  seasonRankValue: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  topPhrasesSection: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  topPhrasesTitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  topPhrase: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+    marginBottom: SPACING.xs,
   },
 });

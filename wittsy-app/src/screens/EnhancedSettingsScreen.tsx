@@ -81,6 +81,13 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
 
   const settingsCategories = [
     {
+      id: 'profile',
+      title: 'Edit Profile',
+      icon: '✏️',
+      description: 'Update username, bio, avatar',
+      screen: 'ProfileEdit',
+    },
+    {
       id: 'tutorial',
       title: 'How to Play',
       icon: '🎮',
@@ -140,6 +147,13 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
       description: 'Language, date/time format',
       screen: 'LanguageSettings',
       badge: settings.language.language.toUpperCase(),
+    },
+    {
+      id: 'feedback',
+      title: 'Send Feedback',
+      icon: '💭',
+      description: 'Report bugs, suggest features',
+      screen: 'Feedback',
     },
   ];
 

@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
@@ -10,6 +9,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useTheme } from '../../hooks/useTheme';
+import { SPACING } from '../../utils/constants';
+import { createSettingsStyles } from '../../styles/settingsStyles';
+
 const LANGUAGES = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
   { code: 'es', name: 'Español', flag: '🇪🇸' },
@@ -37,6 +39,7 @@ export const LanguageSettingsScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
   const navigation = useNavigation();
   const { settings, updateLanguage } = useSettings();
+  const styles = useMemo(() => createSettingsStyles(COLORS, SPACING), [COLORS]);
 
   const handleLanguageChange = async (languageCode: string) => {
     await updateLanguage({ language: languageCode });
@@ -49,8 +52,6 @@ export const LanguageSettingsScreen: React.FC = () => {
   const handleTimeFormatChange = async (format: '12h' | '24h') => {
     await updateLanguage({ timeFormat: format });
   };
-  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
-
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -65,26 +66,26 @@ export const LanguageSettingsScreen: React.FC = () => {
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         {/* Language Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Language</Text>
-          <Text style={styles.sectionDescription}>
-            Choose your preferred language for the app
-          </Text>
+
           {LANGUAGES.map((lang) => (
             <TouchableOpacity
               key={lang.code}
               style={[
-                styles.option,
+                styles.optionCard,
                 settings.language.language === lang.code && styles.optionSelected,
               ]}
               onPress={() => handleLanguageChange(lang.code)}
             >
-              <Text style={styles.flag}>{lang.flag}</Text>
-              <Text style={styles.optionText}>{lang.name}</Text>
+              <Text style={styles.optionIcon}>{lang.flag}</Text>
+              <View style={styles.optionInfo}>
+                <Text style={styles.optionLabel}>{lang.name}</Text>
+              </View>
               {settings.language.language === lang.code && (
-                <Text style={styles.checkmark}>✓</Text>
+                <Text style={styles.optionCheckmark}>✓</Text>
               )}
             </TouchableOpacity>
           ))}
@@ -93,24 +94,22 @@ export const LanguageSettingsScreen: React.FC = () => {
         {/* Date Format */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Date Format</Text>
-          <Text style={styles.sectionDescription}>
-            Choose how dates are displayed
-          </Text>
+
           {DATE_FORMATS.map((format) => (
             <TouchableOpacity
               key={format.value}
               style={[
-                styles.option,
+                styles.optionCard,
                 settings.language.dateFormat === format.value && styles.optionSelected,
               ]}
               onPress={() => handleDateFormatChange(format.value as any)}
             >
-              <View style={styles.optionContent}>
-                <Text style={styles.optionText}>{format.label}</Text>
-                <Text style={styles.optionExample}>{format.example}</Text>
+              <View style={styles.optionInfo}>
+                <Text style={styles.optionLabel}>{format.label}</Text>
+                <Text style={styles.optionDescription}>{format.example}</Text>
               </View>
               {settings.language.dateFormat === format.value && (
-                <Text style={styles.checkmark}>✓</Text>
+                <Text style={styles.optionCheckmark}>✓</Text>
               )}
             </TouchableOpacity>
           ))}
@@ -119,134 +118,26 @@ export const LanguageSettingsScreen: React.FC = () => {
         {/* Time Format */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Time Format</Text>
-          <Text style={styles.sectionDescription}>
-            Choose how time is displayed
-          </Text>
+
           {TIME_FORMATS.map((format) => (
             <TouchableOpacity
               key={format.value}
               style={[
-                styles.option,
+                styles.optionCard,
                 settings.language.timeFormat === format.value && styles.optionSelected,
               ]}
               onPress={() => handleTimeFormatChange(format.value as any)}
             >
-              <Text style={styles.optionText}>{format.label}</Text>
+              <View style={styles.optionInfo}>
+                <Text style={styles.optionLabel}>{format.label}</Text>
+              </View>
               {settings.language.timeFormat === format.value && (
-                <Text style={styles.checkmark}>✓</Text>
+                <Text style={styles.optionCheckmark}>✓</Text>
               )}
             </TouchableOpacity>
           ))}
-        </View>
-
-        {/* Note */}
-        <View style={styles.noteContainer}>
-          <Text style={styles.noteText}>
-            ℹ️ Language translations are currently in development. Most content will remain in English.
-          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
-
-const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: COLORS.primary,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  headerRight: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 12,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: COLORS.surface,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  optionSelected: {
-    backgroundColor: COLORS.primary + '20',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  flag: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionText: {
-    fontSize: 16,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  optionExample: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  checkmark: {
-    fontSize: 20,
-    color: COLORS.primary,
-    fontWeight: 'bold',
-  },
-  noteContainer: {
-    margin: 16,
-    padding: 12,
-    backgroundColor: COLORS.info + '20',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.info,
-  },
-  noteText: {
-    fontSize: 14,
-    color: COLORS.text,
-    lineHeight: 20,
-  },
-});
-
-
-

@@ -97,6 +97,9 @@ export interface Room {
   createdAt: string;
   startedAt?: string;
   isRanked: boolean;
+  seasonId?: string | null;
+  seasonNumber?: number | null;
+  seasonName?: string | null;
   countdownStartedAt?: string;
   countdownDuration?: number;
 }

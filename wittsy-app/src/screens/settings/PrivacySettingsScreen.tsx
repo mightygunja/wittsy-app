@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useTheme } from '../../hooks/useTheme';
+import { SPACING } from '../../utils/constants';
+import { createSettingsStyles } from '../../styles/settingsStyles';
 export const PrivacySettingsScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
   const navigation = useNavigation();
@@ -87,7 +89,7 @@ export const PrivacySettingsScreen: React.FC = () => {
       }
     });
   };
-  const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
+  const styles = useMemo(() => createSettingsStyles(COLORS, SPACING), [COLORS]);
 
 
   return (
@@ -103,54 +105,60 @@ export const PrivacySettingsScreen: React.FC = () => {
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         {/* Profile Visibility */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile Visibility</Text>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Show Online Status</Text>
-              <Text style={styles.settingDescription}>
-                Let others see when you're online
-              </Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Show Online Status</Text>
+                <Text style={styles.settingDescription}>
+                  Let others see when you're online
+                </Text>
+              </View>
+              <Switch
+                value={settings.privacy.showOnlineStatus}
+                onValueChange={(value) => handleToggle('showOnlineStatus', value)}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.surface}
+              />
             </View>
-            <Switch
-              value={settings.privacy.showOnlineStatus}
-              onValueChange={(value) => handleToggle('showOnlineStatus', value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.surface}
-            />
           </View>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Show Game Activity</Text>
-              <Text style={styles.settingDescription}>
-                Display what game you're currently playing
-              </Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Show Game Activity</Text>
+                <Text style={styles.settingDescription}>
+                  Display what game you're currently playing
+                </Text>
+              </View>
+              <Switch
+                value={settings.privacy.showActivity}
+                onValueChange={(value) => handleToggle('showActivity', value)}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.surface}
+              />
             </View>
-            <Switch
-              value={settings.privacy.showActivity}
-              onValueChange={(value) => handleToggle('showActivity', value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.surface}
-            />
           </View>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Show Stats</Text>
-              <Text style={styles.settingDescription}>
-                Display your wins, rating, and achievements
-              </Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Show Stats</Text>
+                <Text style={styles.settingDescription}>
+                  Display your wins, rating, and achievements
+                </Text>
+              </View>
+              <Switch
+                value={settings.privacy.showStats}
+                onValueChange={(value) => handleToggle('showStats', value)}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.surface}
+              />
             </View>
-            <Switch
-              value={settings.privacy.showStats}
-              onValueChange={(value) => handleToggle('showStats', value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.surface}
-            />
           </View>
         </View>
 
@@ -158,34 +166,38 @@ export const PrivacySettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Data & Analytics</Text>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Analytics</Text>
-              <Text style={styles.settingDescription}>
-                Help improve the app by sharing usage data
-              </Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Analytics</Text>
+                <Text style={styles.settingDescription}>
+                  Help improve the app by sharing usage data
+                </Text>
+              </View>
+              <Switch
+                value={settings.privacy.analytics}
+                onValueChange={(value) => handleToggle('analytics', value)}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.surface}
+              />
             </View>
-            <Switch
-              value={settings.privacy.analytics}
-              onValueChange={(value) => handleToggle('analytics', value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.surface}
-            />
           </View>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Personalized Ads</Text>
-              <Text style={styles.settingDescription}>
-                Show ads based on your interests
-              </Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Personalized Ads</Text>
+                <Text style={styles.settingDescription}>
+                  Show ads based on your interests
+                </Text>
+              </View>
+              <Switch
+                value={settings.privacy.personalizedAds}
+                onValueChange={(value) => handleToggle('personalizedAds', value)}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.surface}
+              />
             </View>
-            <Switch
-              value={settings.privacy.personalizedAds}
-              onValueChange={(value) => handleToggle('personalizedAds', value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.surface}
-            />
           </View>
         </View>
 
@@ -193,34 +205,38 @@ export const PrivacySettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Communication</Text>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Allow Friend Requests</Text>
-              <Text style={styles.settingDescription}>
-                Let other players send you friend requests
-              </Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Allow Friend Requests</Text>
+                <Text style={styles.settingDescription}>
+                  Let other players send you friend requests
+                </Text>
+              </View>
+              <Switch
+                value={settings.privacy.allowFriendRequests}
+                onValueChange={(value) => handleToggle('allowFriendRequests', value)}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.surface}
+              />
             </View>
-            <Switch
-              value={settings.privacy.allowFriendRequests}
-              onValueChange={(value) => handleToggle('allowFriendRequests', value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.surface}
-            />
           </View>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Allow Game Invites</Text>
-              <Text style={styles.settingDescription}>
-                Receive invitations to join games
-              </Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Allow Game Invites</Text>
+                <Text style={styles.settingDescription}>
+                  Receive invitations to join games
+                </Text>
+              </View>
+              <Switch
+                value={settings.privacy.allowGameInvites}
+                onValueChange={(value) => handleToggle('allowGameInvites', value)}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.surface}
+              />
             </View>
-            <Switch
-              value={settings.privacy.allowGameInvites}
-              onValueChange={(value) => handleToggle('allowGameInvites', value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.surface}
-            />
           </View>
         </View>
 
@@ -243,8 +259,8 @@ export const PrivacySettingsScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.actionButton, styles.dangerButton]} onPress={handleDeleteAccount}>
-            <Text style={[styles.actionButtonText, styles.dangerText]}>Delete My Account</Text>
-            <Text style={[styles.actionButtonIcon, styles.dangerText]}>⚠️</Text>
+            <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete My Account</Text>
+            <Text style={[styles.actionButtonIcon, styles.dangerButtonText]}>⚠️</Text>
           </TouchableOpacity>
         </View>
 
@@ -252,16 +268,16 @@ export const PrivacySettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Legal</Text>
           
-          <TouchableOpacity style={styles.linkButton} onPress={() => openLink('https://wittsy.app/privacy', 'Privacy Policy')}>
-            <Text style={styles.linkText}>Privacy Policy</Text>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittsy.app/privacy', 'Privacy Policy')}>
+            <Text style={styles.actionButtonText}>Privacy Policy →</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.linkButton} onPress={() => openLink('https://wittsy.app/terms', 'Terms of Service')}>
-            <Text style={styles.linkText}>Terms of Service</Text>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittsy.app/terms', 'Terms of Service')}>
+            <Text style={styles.actionButtonText}>Terms of Service →</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.linkButton} onPress={() => openLink('https://wittsy.app/cookies', 'Cookie Policy')}>
-            <Text style={styles.linkText}>Cookie Policy</Text>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittsy.app/cookies', 'Cookie Policy')}>
+            <Text style={styles.actionButtonText}>Cookie Policy →</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -269,107 +285,7 @@ export const PrivacySettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: COLORS.primary,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  headerRight: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 16,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  settingDescription: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: COLORS.surface,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.text,
-  },
-  actionButtonIcon: {
-    fontSize: 18,
-    color: COLORS.textSecondary,
-  },
-  dangerButton: {
-    backgroundColor: COLORS.error + '10',
-    borderWidth: 1,
-    borderColor: COLORS.error,
-  },
-  dangerText: {
-    color: COLORS.error,
-  },
-  linkButton: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  linkText: {
-    fontSize: 16,
-    color: COLORS.primary,
-  },
-});
+// Styles now imported from unified settingsStyles
 
 
 
