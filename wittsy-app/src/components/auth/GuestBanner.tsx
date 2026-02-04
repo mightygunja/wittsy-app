@@ -7,14 +7,11 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SPACING, RADIUS } from '../../utils/constants';
-import { useTheme } from '../../hooks/useTheme';
-
 interface GuestBannerProps {
   onUpgrade: () => void;
 }
 
 export const GuestBanner: React.FC<GuestBannerProps> = ({ onUpgrade }) => {
-  const { colors: COLORS } = useTheme();
 
   return (
     <TouchableOpacity

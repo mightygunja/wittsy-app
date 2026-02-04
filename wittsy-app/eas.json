@@ -20,8 +20,13 @@
       }
     },
     "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_yUmCfydhZjlaJPpgvugvNvZvlAA"
+      },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "buildConfiguration": "Release"
       }
     }
   },

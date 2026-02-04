@@ -8,8 +8,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Animated,
   Dimensions,
   Alert,
@@ -93,7 +91,7 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
   route,
 }) => {
   const { colors: COLORS } = useTheme();
-  const { user } = useAuth();
+  const { user, userProfile, refreshUserProfile } = useAuth();
   const [unlockedItems, setUnlockedItems] = useState<string[]>([]);
   const [userCoins, setUserCoins] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -115,7 +113,7 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
   }, []);
 
   const loadShopData = async () => {
-    if (!user) return;
+    if (!user || !userProfile) return;
 
     try {
       const avatarData = await avatarService.getUserAvatar(user.uid);
@@ -123,9 +121,8 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
         setUnlockedItems(avatarData.unlockedItems);
       }
 
-      // Load user coins from Firestore
-      // This would be a real API call in production
-      setUserCoins(2500); // Mock data
+      // Load user coins from userProfile
+      setUserCoins(userProfile.coins || 0);
     } catch (error) {
       console.error('Failed to load shop data:', error);
     } finally {
@@ -248,23 +245,11 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => {
-              haptics.light();
-              navigation.goBack();
-            }}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Avatar Shop</Text>
-          <View style={styles.coinsContainer}>
-            <Text style={styles.coinsIcon}>🪙</Text>
-            <Text style={styles.coinsText}>{userCoins}</Text>
-          </View>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        {/* Coins Display */}
+        <View style={styles.coinsDisplay}>
+          <Text style={styles.coinsIcon}>🪙</Text>
+          <Text style={styles.coinsText}>{userCoins} coins</Text>
         </View>
 
         {/* Shop Items */}
@@ -443,6 +428,18 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.md,
     gap: 4,
+  },
+  coinsDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    gap: 8,
   },
   coinsIcon: { fontSize: 20 },
   coinsText: {

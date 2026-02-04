@@ -5,11 +5,15 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged,
-  User as FirebaseUser
+  User as FirebaseUser,
+  GoogleAuthProvider,
+  signInWithCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
+import { referralService } from './referralService';
 
 // Helper to create default avatar
 const getDefaultAvatar = (): Avatar => ({
@@ -94,7 +98,8 @@ export const getOrCreateUserProfile = async (firebaseUser: FirebaseUser): Promis
 export const registerUser = async (
   email: string,
   password: string,
-  username: string
+  username: string,
+  referralCode?: string
 ): Promise<User> => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -151,6 +156,16 @@ export const registerUser = async (
     };
 
     await setDoc(doc(firestore, 'users', firebaseUser.uid), newUser);
+    
+    // Initialize referral data
+    try {
+      await referralService.initializeReferralData(firebaseUser.uid, username, referralCode);
+      console.log('✅ Referral data initialized');
+    } catch (error) {
+      console.error('⚠️ Failed to initialize referral data:', error);
+      // Don't fail registration if referral fails
+    }
+    
     return newUser;
   } catch (error: any) {
     console.error('Error registering user:', error);
@@ -176,9 +191,86 @@ export const signIn = async (email: string, password: string): Promise<FirebaseU
   }
 };
 
+// Configure Google Sign-In (call this on app startup)
+export const configureGoogleSignIn = () => {
+  try {
+    GoogleSignin.configure({
+      webClientId: '1836a769-48db-4dc3-bffb-6487530c5daa.apps.googleusercontent.com',
+      offlineAccess: true,
+      iosClientId: 'com.googleusercontent.apps.1836a769-48db-4dc3-bffb-6487530c5daa',
+    });
+    console.log('✅ Google Sign-In configured');
+  } catch (error) {
+    console.error('Failed to configure Google Sign-In:', error);
+  }
+};
+
 // Sign in with Google
 export const signInWithGoogle = async (): Promise<FirebaseUser> => {
-  throw new Error('Google Sign-In requires additional setup');
+  try {
+    console.log('🔵 Starting Google Sign-In...');
+    
+    // Check if device supports Google Play services (Android only)
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    } catch (playServicesError: any) {
+      // On iOS, this will fail but that's okay
+      if (playServicesError.code !== 'PLAY_SERVICES_NOT_AVAILABLE') {
+        throw playServicesError;
+      }
+    }
+    
+    // Get user info from Google
+    const userInfo = await GoogleSignin.signIn();
+    console.log('✅ Got Google user info');
+    
+    // Create a Google credential with the token
+    const googleCredential = GoogleAuthProvider.credential(userInfo.data?.idToken);
+    
+    // Sign in to Firebase with the Google credential
+    const userCredential = await signInWithCredential(auth, googleCredential);
+    console.log('✅ Signed in to Firebase with Google credential');
+    
+    // Get or create user profile
+    const userProfile = await getOrCreateUserProfile(userCredential.user);
+    
+    // Initialize referral data for new Google sign-ins
+    if (userProfile) {
+      try {
+        const existingReferral = await referralService.getReferralData(userCredential.user.uid);
+        if (!existingReferral) {
+          await referralService.initializeReferralData(
+            userCredential.user.uid, 
+            userProfile.username || 'Player'
+          );
+        }
+      } catch (error) {
+        console.error('⚠️ Failed to initialize referral data:', error);
+      }
+    }
+    
+    // Update last active
+    await setDoc(
+      doc(firestore, 'users', userCredential.user.uid),
+      { lastActive: new Date().toISOString() },
+      { merge: true }
+    );
+    
+    console.log('✅ Google Sign-In complete');
+    return userCredential.user;
+  } catch (error: any) {
+    console.error('❌ Google Sign-In error:', error);
+    
+    if (error.code === 'SIGN_IN_CANCELLED' || error.code === '-5') {
+      throw new Error('Sign-in was cancelled');
+    } else if (error.code === 'IN_PROGRESS') {
+      throw new Error('Sign-in is already in progress');
+    } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+      throw new Error('Google Play Services not available');
+    }
+    
+    throw new Error(error.message || 'Failed to sign in with Google');
+  }
 };
 
 // Sign out

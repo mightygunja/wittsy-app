@@ -25,7 +25,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const { colors: COLORS } = useTheme();
   const bgColor = backgroundColor || COLORS.border;
   const progColor = progressColor || COLORS.primary;
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(), []);
   const animatedWidth = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     width: '100%',
     borderRadius: 100,

@@ -1,8 +1,8 @@
 export default {
   expo: {
-    name: "Wittsy",
+    name: "Wittz",
     slug: "wittsy-app",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -18,13 +18,36 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wittsy.app",
+      buildNumber: "3",
       infoPlist: {
-        ITSAppUsesNonExemptEncryption: false
+        NSCameraUsageDescription: "Wittz needs access to your camera to take profile photos.",
+        NSPhotoLibraryUsageDescription: "Wittz needs access to your photo library to select profile photos.",
+        NSMicrophoneUsageDescription: "Wittz needs access to your microphone for voice chat features.",
+        NSUserNotificationsUsageDescription: "Wittz needs to send you notifications about game invites, challenges, and events."
       },
-      associatedDomains: ["applinks:wittsy.app"]
+      config: {
+        usesNonExemptEncryption: false
+      },
+      associatedDomains: [
+        "applinks:wittsy.app",
+        "applinks:www.wittsy.app"
+      ]
     },
     android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#6C63FF"
+      },
       package: "com.wittsy.app",
+      versionCode: 1,
+      permissions: [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ],
       intentFilters: [
         {
           action: "VIEW",
@@ -32,21 +55,19 @@ export default {
           data: [
             {
               scheme: "https",
-              host: "wittsy.app"
-            },
-            {
-              scheme: "wittsy"
+              host: "wittsy.app",
+              pathPrefix: "/"
             }
           ],
-          category: ["BROWSABLE", "DEFAULT"]
+          category: [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
-      ],
-      permissions: [
-        "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED"
       ]
     },
     web: {
+      favicon: "./assets/favicon.png",
       bundler: "metro"
     },
     plugins: [
@@ -54,7 +75,16 @@ export default {
         "expo-notifications",
         {
           icon: "./assets/notification-icon.png",
-          color: "#6C63FF"
+          color: "#6C63FF",
+          sounds: [
+            "./assets/audio/notification.mp3"
+          ]
+        }
+      ],
+      [
+        "expo-av",
+        {
+          microphonePermission: "Allow Wittz to access your microphone for voice chat."
         }
       ]
     ],
@@ -62,13 +92,17 @@ export default {
       eas: {
         projectId: "1836a769-48db-4dc3-bffb-6487530c5daa"
       },
-      EXPO_PUBLIC_FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
+      // Environment variables - these will be available via expo-constants
+      revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
+      revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
+    },
+    owner: "mightygunja",
+    updates: {
+      fallbackToCacheTimeout: 0,
+      url: "https://u.expo.dev/your-project-id"
+    },
+    runtimeVersion: {
+      policy: "sdkVersion"
     }
   }
-}
+};

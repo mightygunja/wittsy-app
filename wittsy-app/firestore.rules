@@ -64,24 +64,15 @@ service cloud.firestore {
     
     match /rooms/{roomId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && 
-        request.resource.data.hostId == request.auth.uid &&
-        isValidString(request.resource.data.name, 1, 50) &&
-        request.resource.data.maxPlayers >= 2 &&
-        request.resource.data.maxPlayers <= 10 &&
-        hasValidTimestamp();
-      allow update: if isSignedIn() && (
-        // Host can update room settings
-        resource.data.hostId == request.auth.uid ||
-        // Players can join/leave
-        request.auth.uid in request.resource.data.players
-      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
       allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
     }
     
     match /prompts/{promptId} {
       allow read: if isSignedIn();
-      allow write: if false;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
     
     match /matches/{matchId} {
@@ -127,10 +118,11 @@ service cloud.firestore {
       );
     }
     
-    // Seasons - read-only for users, write for system
+    // Seasons - allow app to create default season
     match /seasons/{seasonId} {
       allow read: if isSignedIn();
-      allow write: if false; // Only backend can create/update seasons
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
     
     // Season Stats - users can read their own and others
@@ -145,10 +137,11 @@ service cloud.firestore {
       allow write: if false; // Only backend updates rating history
     }
     
-    // Prompts - read for all, write for admins only
+    // Prompts - allow app to seed prompts
     match /prompts/{promptId} {
       allow read: if isSignedIn();
-      allow write: if false; // Only admins/backend can create prompts
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
     
     // ==================== CONTENT MODERATION ====================
@@ -227,10 +220,11 @@ service cloud.firestore {
       );
     }
     
-    // Challenges
+    // Challenges - allow app to seed challenges
     match /challenges/{challengeId} {
       allow read: if isSignedIn();
-      allow write: if false; // Only backend can create challenges
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
     
     // Challenge Progress
@@ -289,10 +283,11 @@ service cloud.firestore {
       allow write: if isSignedIn() && isOwner(userId);
     }
     
-    // Battle Pass Seasons - read-only for users
+    // Battle Pass Seasons - allow app to create default season
     match /battlePassSeasons/{seasonId} {
       allow read: if isSignedIn();
-      allow write: if false; // Only backend can manage seasons
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
     
     // User Battle Pass Progress

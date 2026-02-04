@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../hooks/useAuth';
 import { getUserMatches } from '../services/database';
 import { getUserAchievements } from '../services/achievements';
@@ -7,11 +8,12 @@ import { StatCard } from '../components/profile/StatCard';
 import { AchievementBadge } from '../components/profile/AchievementBadge';
 import { MatchHistoryItem } from '../components/profile/MatchHistoryItem';
 import { Achievement } from '../types';
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
 
 export const ProfileScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
   const { userProfile } = useAuth();
+  const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'history'>('stats');
   const [matches, setMatches] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -19,7 +21,6 @@ export const ProfileScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
-
 
   useEffect(() => {
     if (userProfile) {
@@ -106,6 +107,21 @@ export const ProfileScreen: React.FC = () => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
+      {/* Referral Button */}
+      <TouchableOpacity 
+        style={styles.referralButton}
+        onPress={() => navigation.navigate('Referral')}
+      >
+        <View style={styles.referralContent}>
+          <Text style={styles.referralIcon}>🎁</Text>
+          <View style={styles.referralText}>
+            <Text style={styles.referralTitle}>Invite Friends & Earn Coins</Text>
+            <Text style={styles.referralSubtitle}>Get rewards for every friend who joins!</Text>
+          </View>
+          <Text style={styles.referralArrow}>›</Text>
+        </View>
+      </TouchableOpacity>
+
       {/* Header with Avatar and Basic Info */}
       <View style={styles.header}>
         <View style={styles.avatar}>
@@ -332,6 +348,45 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background
+  },
+  referralButton: {
+    margin: 16,
+    marginBottom: 0,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  referralContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  referralIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  referralText: {
+    flex: 1,
+  },
+  referralTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  referralSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  referralArrow: {
+    fontSize: 28,
+    color: COLORS.white,
+    fontWeight: '300',
   },
   header: {
     alignItems: 'center',

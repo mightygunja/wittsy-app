@@ -21,8 +21,7 @@ const getStyleFromId = (id: string): string => {
 };
 
 export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100 }) => {
-  const { colors: COLORS } = useTheme();
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(), []);
   console.log('🎨 AvatarDisplay rendering:', { size, config });
   
   const skinColor = DEFAULT_SKIN_TONES.find(s => s.id === config.skin)?.color || '#FFE0BD';
@@ -125,7 +124,7 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     position: 'relative',
     justifyContent: 'center',

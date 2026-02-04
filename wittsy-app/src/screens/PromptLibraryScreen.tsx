@@ -8,6 +8,7 @@ import {
   TextInput,
   Animated,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -177,7 +178,7 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
                 <TouchableOpacity
                   key={pack.id}
                   style={styles.packCard}
-                  onPress={() => navigation.navigate('PromptPackDetail', { packId: pack.id })}
+                  onPress={() => Alert.alert('Coming Soon', 'Prompt pack details will be available in a future update!')}
                 >
                   <LinearGradient
                     colors={[COLORS.primaryLight, COLORS.primary]}

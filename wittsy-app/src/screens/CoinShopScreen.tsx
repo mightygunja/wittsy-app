@@ -8,8 +8,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Animated,
   Dimensions,
   Alert,
@@ -17,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
-import { monetization, COIN_PACKAGES, PREMIUM_PACKAGES, Product } from '../services/monetization';
+import { monetization, COIN_PACKAGES, Product } from '../services/monetization';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { Card } from '../components/common/Card';
@@ -27,11 +25,13 @@ import { useTheme } from '../hooks/useTheme';;
 
 const { width } = Dimensions.get('window');
 
-export const CoinShopScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const CoinShopScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
-  const { user } = useAuth();
-  const [selectedTab, setSelectedTab] = useState<'coins' | 'premium'>('coins');
+  const { user, refreshUserProfile } = useAuth();
+  // Removed premium tab - only coins available
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [hasFirstPurchase, setHasFirstPurchase] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   
@@ -40,6 +40,7 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
     analytics.screenView('CoinShop');
+    loadPurchaseStatus();
 
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -56,6 +57,19 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
     ]).start();
   }, []);
 
+  const loadPurchaseStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const hasPurchased = await monetization.hasUserMadeFirstPurchase(user.uid);
+      setHasFirstPurchase(hasPurchased);
+    } catch (error) {
+      console.error('Failed to load purchase status:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePurchase = async (product: Product) => {
     if (!user) return;
 
@@ -64,19 +78,22 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
     try {
       let result;
-      if (product.type === 'coins') {
-        result = await monetization.purchaseCoins(product.id);
-      } else {
-        result = await monetization.purchasePremium(product.id);
-      }
+      result = await monetization.purchaseCoins(product.id);
 
       if (result.success) {
         haptics.success();
+        
+        // Refresh user profile to update coin balance
+        await refreshUserProfile();
+        
+        // Reload purchase status if this was first-time offer
+        if (product.firstTimeOnly) {
+          await loadPurchaseStatus();
+        }
+        
         Alert.alert(
           '🎉 Purchase Successful!',
-          `You received ${product.coins || product.premium} ${
-            product.type === 'coins' ? 'coins' : 'gems'
-          }!`,
+          `You received ${product.coins} coins!${product.firstTimeOnly ? '\n\nThank you for your first purchase!' : ''}`,
           [{ text: 'Awesome!' }]
         );
       } else {
@@ -108,6 +125,11 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
             <Text style={styles.bestValueText}>💎 BEST VALUE</Text>
           </View>
         )}
+        {product.specialOffer && (
+          <View style={styles.specialOfferBadge}>
+            <Text style={styles.specialOfferText}>🎁 SPECIAL OFFER</Text>
+          </View>
+        )}
         {product.discount && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountText}>{product.discount}% OFF</Text>
@@ -123,10 +145,10 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
           style={styles.productHeader}
         >
           <Text style={styles.productIcon}>
-            {isCoins ? '🪙' : '💎'}
+            🪙
           </Text>
           <Text style={styles.productAmount}>
-            {product.coins || product.premium}
+            {product.coins}
           </Text>
         </LinearGradient>
 
@@ -160,75 +182,15 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
     );
   };
 
-  const products = selectedTab === 'coins' ? COIN_PACKAGES : PREMIUM_PACKAGES;
+  // Filter products based on first purchase status
+  const products = loading 
+    ? [] 
+    : COIN_PACKAGES.filter(p => !p.firstTimeOnly || !hasFirstPurchase);
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => {
-              haptics.light();
-              navigation.goBack();
-            }}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Shop</Text>
-          <TouchableOpacity
-            style={styles.restoreButton}
-            onPress={async () => {
-              haptics.light();
-              const success = await monetization.restorePurchases();
-              if (success) {
-                Alert.alert('Success', 'Purchases restored!');
-              }
-            }}
-          >
-            <Text style={styles.restoreText}>Restore</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tabs */}
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'coins' && styles.tabActive]}
-            onPress={() => {
-              haptics.selection();
-              setSelectedTab('coins');
-            }}
-          >
-            <Text style={styles.tabIcon}>🪙</Text>
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === 'coins' && styles.tabTextActive,
-              ]}
-            >
-              Coins
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'premium' && styles.tabActive]}
-            onPress={() => {
-              haptics.selection();
-              setSelectedTab('premium');
-            }}
-          >
-            <Text style={styles.tabIcon}>💎</Text>
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === 'premium' && styles.tabTextActive,
-              ]}
-            >
-              Premium
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        {/* Removed tabs - only coins available */}
 
         {/* Products */}
         <Animated.ScrollView
@@ -244,12 +206,10 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
             {/* Info Section */}
             <Card variant="glass" style={styles.infoCard}>
               <Text style={styles.infoTitle}>
-                {selectedTab === 'coins' ? '🪙 About Coins' : '💎 About Premium Gems'}
+                🪙 About Coins
               </Text>
               <Text style={styles.infoText}>
-                {selectedTab === 'coins'
-                  ? 'Use coins to unlock avatar items, enter special events, and customize your experience!'
-                  : 'Premium gems unlock exclusive items, special features, and give you VIP status!'}
+                Use coins to unlock avatar items, enter special events, and customize your experience!
               </Text>
             </Card>
 
@@ -370,6 +330,21 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     zIndex: 10,
   },
   bestValueText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.text,
+  },
+  specialOfferBadge: {
+    position: 'absolute',
+    top: SPACING.xs,
+    left: SPACING.xs,
+    backgroundColor: '#FF6B9D',
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+    zIndex: 10,
+  },
+  specialOfferText: {
     fontSize: 10,
     fontWeight: 'bold',
     color: COLORS.text,

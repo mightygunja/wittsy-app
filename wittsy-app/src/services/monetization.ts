@@ -1,10 +1,11 @@
 /**
- * Monetization Service
- * In-App Purchases, Subscriptions, and Revenue Management
+ * Simplified Monetization Service
+ * Direct In-App Purchases using react-native-iap (NO RevenueCat)
  */
 
 import { Platform } from 'react-native';
-import Purchases, { PurchasesPackage, CustomerInfo, PurchasesOffering } from 'react-native-purchases';
+import * as RNIap from 'react-native-iap';
+import type { Product as IAPProduct, Purchase as IAPPurchase, PurchaseError } from 'react-native-iap';
 import { firestore } from './firebase';
 import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 import { analytics } from './analytics';
@@ -12,6 +13,10 @@ import { errorTracking } from './errorTracking';
 
 // Product IDs
 export const COIN_PRODUCTS = {
+  FIRST_TIME: Platform.select({
+    ios: 'com.wittz.coins.firsttime',
+    android: 'coins_firsttime',
+  }),
   SMALL: Platform.select({
     ios: 'com.wittz.coins.500',
     android: 'coins_500',
@@ -30,33 +35,26 @@ export const COIN_PRODUCTS = {
   }),
 };
 
-export const PREMIUM_PRODUCTS = {
-  SMALL: Platform.select({
-    ios: 'com.wittz.premium.10',
-    android: 'premium_10',
+export const BATTLE_PASS_PRODUCTS = {
+  PREMIUM: Platform.select({
+    ios: 'com.wittz.battlepass.premium',
+    android: 'battlepass_premium',
   }),
-  MEDIUM: Platform.select({
-    ios: 'com.wittz.premium.50',
-    android: 'premium_50',
+  SKIP_1: Platform.select({
+    ios: 'com.wittz.battlepass.skip.1',
+    android: 'battlepass_skip_1',
   }),
-  LARGE: Platform.select({
-    ios: 'com.wittz.premium.100',
-    android: 'premium_100',
+  SKIP_5: Platform.select({
+    ios: 'com.wittz.battlepass.skip.5',
+    android: 'battlepass_skip_5',
   }),
-  MEGA: Platform.select({
-    ios: 'com.wittz.premium.500',
-    android: 'premium_500',
+  SKIP_10: Platform.select({
+    ios: 'com.wittz.battlepass.skip.10',
+    android: 'battlepass_skip_10',
   }),
-};
-
-export const SUBSCRIPTION_PRODUCTS = {
-  MONTHLY: Platform.select({
-    ios: 'com.wittz.premium.monthly',
-    android: 'premium_monthly',
-  }),
-  YEARLY: Platform.select({
-    ios: 'com.wittz.premium.yearly',
-    android: 'premium_yearly',
+  SKIP_25: Platform.select({
+    ios: 'com.wittz.battlepass.skip.25',
+    android: 'battlepass_skip_25',
   }),
 };
 
@@ -75,9 +73,24 @@ export interface Product {
   popular?: boolean;
   bestValue?: boolean;
   discount?: number;
+  firstTimeOnly?: boolean;
+  specialOffer?: boolean;
 }
 
 export const COIN_PACKAGES: Product[] = [
+  {
+    id: COIN_PRODUCTS.FIRST_TIME!,
+    type: 'coins',
+    name: '🎁 First-Time Special',
+    description: '1,000 coins',
+    price: '$0.99',
+    priceValue: 0.99,
+    currency: 'USD',
+    coins: 1000,
+    firstTimeOnly: true,
+    specialOffer: true,
+    discount: 50,
+  },
   {
     id: COIN_PRODUCTS.SMALL!,
     type: 'coins',
@@ -108,7 +121,6 @@ export const COIN_PACKAGES: Product[] = [
     priceValue: 4.99,
     currency: 'USD',
     coins: 3000,
-    bestValue: true,
     discount: 20,
   },
   {
@@ -120,700 +132,20 @@ export const COIN_PACKAGES: Product[] = [
     priceValue: 14.99,
     currency: 'USD',
     coins: 10000,
+    bestValue: true,
     discount: 25,
   },
 ];
 
-export const PREMIUM_PACKAGES: Product[] = [
-  {
-    id: PREMIUM_PRODUCTS.SMALL!,
-    type: 'premium',
-    name: 'Gem Pouch',
-    description: '10 premium gems',
-    price: '$0.99',
-    priceValue: 0.99,
-    currency: 'USD',
-    premium: 10,
-  },
-  {
-    id: PREMIUM_PRODUCTS.MEDIUM!,
-    type: 'premium',
-    name: 'Gem Bag',
-    description: '50 premium gems',
-    price: '$4.99',
-    priceValue: 4.99,
-    currency: 'USD',
-    premium: 50,
-    popular: true,
-  },
-  {
-    id: PREMIUM_PRODUCTS.LARGE!,
-    type: 'premium',
-    name: 'Gem Chest',
-    description: '100 premium gems',
-    price: '$8.99',
-    priceValue: 8.99,
-    currency: 'USD',
-    premium: 100,
-    bestValue: true,
-    discount: 15,
-  },
-  {
-    id: PREMIUM_PRODUCTS.MEGA!,
-    type: 'premium',
-    name: 'Gem Vault',
-    description: '500 premium gems',
-    price: '$29.99',
-    priceValue: 29.99,
-    currency: 'USD',
-    premium: 500,
-    discount: 30,
-  },
-];
-
-export const SUBSCRIPTION_PLANS: Product[] = [
-  {
-    id: SUBSCRIPTION_PRODUCTS.MONTHLY!,
-    type: 'subscription',
-    name: 'Premium Monthly',
-    description: 'Monthly subscription',
-    price: '$4.99/month',
-    priceValue: 4.99,
-    currency: 'USD',
-    features: [
-      '500 coins per month',
-      '10 premium gems per month',
-      'Exclusive avatar items',
-      'Ad-free experience',
-      'Priority matchmaking',
-      'Custom room themes',
-    ],
-    popular: true,
-  },
-  {
-    id: SUBSCRIPTION_PRODUCTS.YEARLY!,
-    type: 'subscription',
-    name: 'Premium Yearly',
-    description: 'Yearly subscription',
-    price: '$49.99/year',
-    priceValue: 49.99,
-    currency: 'USD',
-    features: [
-      '6,000 coins per year',
-      '120 premium gems per year',
-      'All monthly benefits',
-      'Exclusive yearly avatar',
-      'VIP badge',
-      'Early access to features',
-    ],
-    bestValue: true,
-    discount: 17,
-  },
-];
-
-class MonetizationService {
-  private purchaseHistory: Purchase[] = [];
-  private activeSubscription: Subscription | null = null;
-  private initialized: boolean = false;
-  private customerInfo: CustomerInfo | null = null;
-  private offerings: PurchasesOffering | null = null;
-  private currentUserId: string | null = null;
-
-  /**
-   * Initialize RevenueCat
-   */
-  async initialize(userId?: string): Promise<void> {
-    try {
-      if (this.initialized) return;
-
-      // Get API keys from environment
-      const apiKey = Platform.select({
-        ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
-        android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
-      });
-
-      if (!apiKey) {
-        console.warn('RevenueCat API key not found. IAP will not work.');
-        return;
-      }
-
-      // Configure RevenueCat
-      Purchases.configure({ apiKey });
-
-      // Set user ID if provided
-      if (userId) {
-        await Purchases.logIn(userId);
-        this.currentUserId = userId;
-      }
-
-      // Get initial customer info
-      this.customerInfo = await Purchases.getCustomerInfo();
-
-      // Fetch offerings to get real prices
-      await this.fetchOfferings();
-
-      this.initialized = true;
-      console.log('✅ RevenueCat initialized successfully');
-      
-      analytics.logEvent('revenuecat_initialized', {});
-    } catch (error) {
-      console.error('❌ RevenueCat initialization failed:', error);
-      errorTracking.logError(error as Error, { context: 'RevenueCat init' });
-    }
-  }
-
-  /**
-   * Purchase coins using RevenueCat
-   */
-  async purchaseCoins(productId: string): Promise<PurchaseResult> {
-    try {
-      if (!this.initialized) {
-        throw new Error('RevenueCat not initialized');
-      }
-
-      const product = COIN_PACKAGES.find((p) => p.id === productId);
-      if (!product) {
-        throw new Error('Product not found');
-      }
-
-      // Get offerings from RevenueCat
-      const offerings = await Purchases.getOfferings();
-      const packageToPurchase = this.findPackageByProductId(offerings, productId);
-
-      if (!packageToPurchase) {
-        // DEVELOPMENT MODE: If package not found (Test Store), simulate purchase for testing
-        console.warn('⚠️ Package not found in RevenueCat - using development mode');
-        console.log('💡 In production, ensure products are configured in App Store Connect and RevenueCat');
-        
-        // For testing: Just grant the coins without actual purchase
-        if (this.currentUserId) {
-          await this.grantCoinsToUser(this.currentUserId, product.coins!);
-          console.log(`✅ [DEV MODE] Granted ${product.coins} coins to user ${this.currentUserId}`);
-        } else {
-          throw new Error('User not logged in');
-        }
-
-        const purchase: Purchase = {
-          id: `dev_purchase_${Date.now()}`,
-          productId,
-          type: 'coins',
-          amount: product.coins!,
-          price: product.priceValue,
-          currency: product.currency,
-          timestamp: new Date(),
-          status: 'completed',
-        };
-
-        this.purchaseHistory.push(purchase);
-
-        analytics.logEvent('purchase_dev_mode', {
-          product_id: productId,
-          product_name: product.name,
-          amount: product.coins,
-        });
-
-        console.log('✅ [DEV MODE] Coin purchase simulated:', productId);
-
-        return {
-          success: true,
-          purchase,
-        };
-      }
-
-      // Make the purchase
-      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
-      this.customerInfo = customerInfo;
-
-      // ✅ CRITICAL: Grant coins to user's Firestore balance
-      if (this.currentUserId) {
-        await this.grantCoinsToUser(this.currentUserId, product.coins!);
-        console.log(`✅ Granted ${product.coins} coins to user ${this.currentUserId}`);
-      } else {
-        console.error('❌ No user ID available to grant coins!');
-        throw new Error('User not logged in');
-      }
-
-      const purchase: Purchase = {
-        id: `purchase_${Date.now()}`,
-        productId,
-        type: 'coins',
-        amount: product.coins!,
-        price: product.priceValue,
-        currency: product.currency,
-        timestamp: new Date(),
-        status: 'completed',
-      };
-
-      this.purchaseHistory.push(purchase);
-
-      // Track analytics
-      analytics.logEvent('purchase', {
-        product_id: productId,
-        product_name: product.name,
-        price: product.priceValue,
-        currency: product.currency,
-        type: 'coins',
-        amount: product.coins,
-      });
-
-      console.log('✅ Coin purchase successful:', productId);
-
-      return {
-        success: true,
-        purchase,
-      };
-    } catch (error) {
-      console.error('❌ Coin purchase failed:', error);
-      errorTracking.logError(error as Error, { context: 'Purchase coins' });
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Purchase failed',
-      };
-    }
-  }
-
-  /**
-   * Purchase premium currency using RevenueCat
-   */
-  async purchasePremium(productId: string): Promise<PurchaseResult> {
-    try {
-      if (!this.initialized) {
-        throw new Error('RevenueCat not initialized');
-      }
-
-      const product = PREMIUM_PACKAGES.find((p) => p.id === productId);
-      if (!product) {
-        throw new Error('Product not found');
-      }
-
-      const offerings = await Purchases.getOfferings();
-      const packageToPurchase = this.findPackageByProductId(offerings, productId);
-
-      if (!packageToPurchase) {
-        // DEVELOPMENT MODE: If package not found (Test Store), simulate purchase for testing
-        console.warn('⚠️ Package not found in RevenueCat - using development mode');
-        console.log('💡 In production, ensure products are configured in App Store Connect and RevenueCat');
-        
-        // For testing: Just grant the premium gems without actual purchase
-        if (this.currentUserId) {
-          await this.grantPremiumToUser(this.currentUserId, product.premium!);
-          console.log(`✅ [DEV MODE] Granted ${product.premium} gems to user ${this.currentUserId}`);
-        } else {
-          throw new Error('User not logged in');
-        }
-
-        const purchase: Purchase = {
-          id: `dev_purchase_${Date.now()}`,
-          productId,
-          type: 'premium',
-          amount: product.premium!,
-          price: product.priceValue,
-          currency: product.currency,
-          timestamp: new Date(),
-          status: 'completed',
-        };
-
-        this.purchaseHistory.push(purchase);
-
-        analytics.logEvent('purchase_dev_mode', {
-          product_id: productId,
-          product_name: product.name,
-          amount: product.premium,
-        });
-
-        console.log('✅ [DEV MODE] Premium purchase simulated:', productId);
-
-        return {
-          success: true,
-          purchase,
-        };
-      }
-
-      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
-      this.customerInfo = customerInfo;
-
-      // ✅ CRITICAL: Grant premium gems to user's Firestore balance
-      if (this.currentUserId) {
-        await this.grantPremiumToUser(this.currentUserId, product.premium!);
-        console.log(`✅ Granted ${product.premium} gems to user ${this.currentUserId}`);
-      } else {
-        console.error('❌ No user ID available to grant premium!');
-        throw new Error('User not logged in');
-      }
-
-      const purchase: Purchase = {
-        id: `purchase_${Date.now()}`,
-        productId,
-        type: 'premium',
-        amount: product.premium!,
-        price: product.priceValue,
-        currency: product.currency,
-        timestamp: new Date(),
-        status: 'completed',
-      };
-
-      this.purchaseHistory.push(purchase);
-
-      analytics.logEvent('purchase', {
-        product_id: productId,
-        product_name: product.name,
-        price: product.priceValue,
-        currency: product.currency,
-        type: 'premium',
-        amount: product.premium,
-      });
-
-      console.log('✅ Premium purchase successful:', productId);
-
-      return {
-        success: true,
-        purchase,
-      };
-    } catch (error) {
-      console.error('❌ Premium purchase failed:', error);
-      errorTracking.logError(error as Error, { context: 'Purchase premium' });
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Purchase failed',
-      };
-    }
-  }
-
-  /**
-   * Subscribe to premium using RevenueCat
-   */
-  async subscribe(productId: string): Promise<SubscriptionResult> {
-    try {
-      if (!this.initialized) {
-        throw new Error('RevenueCat not initialized');
-      }
-
-      const product = SUBSCRIPTION_PLANS.find((p) => p.id === productId);
-      if (!product) {
-        throw new Error('Subscription not found');
-      }
-
-      const offerings = await Purchases.getOfferings();
-      const packageToPurchase = this.findPackageByProductId(offerings, productId);
-
-      if (!packageToPurchase) {
-        throw new Error('Subscription package not found in RevenueCat');
-      }
-
-      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
-      this.customerInfo = customerInfo;
-
-      const subscription: Subscription = {
-        id: `sub_${Date.now()}`,
-        productId,
-        status: 'active',
-        startDate: new Date(),
-        renewalDate: this.calculateRenewalDate(productId),
-        price: product.priceValue,
-        currency: product.currency,
-      };
-
-      this.activeSubscription = subscription;
-
-      analytics.logEvent('subscribe', {
-        product_id: productId,
-        product_name: product.name,
-        price: product.priceValue,
-        currency: product.currency,
-        plan: productId.includes('yearly') ? 'yearly' : 'monthly',
-      });
-
-      console.log('✅ Subscription successful:', productId);
-
-      return {
-        success: true,
-        subscription,
-      };
-    } catch (error) {
-      console.error('❌ Subscription failed:', error);
-      errorTracking.logError(error as Error, { context: 'Subscribe' });
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Subscription failed',
-      };
-    }
-  }
-
-  /**
-   * Cancel subscription
-   */
-  async cancelSubscription(): Promise<boolean> {
-    try {
-      if (!this.activeSubscription) {
-        return false;
-      }
-
-      this.activeSubscription.status = 'cancelled';
-
-      analytics.logEvent('cancel_subscription', {
-        subscription_id: this.activeSubscription.id,
-      });
-
-      return true;
-    } catch (error) {
-      errorTracking.logError(error as Error, { context: 'Cancel subscription' });
-      return false;
-    }
-  }
-
-  /**
-   * Check subscription status
-   */
-  isSubscriptionActive(): boolean {
-    return this.activeSubscription?.status === 'active';
-  }
-
-  /**
-   * Get active subscription
-   */
-  getActiveSubscription(): Subscription | null {
-    return this.activeSubscription;
-  }
-
-  /**
-   * Get purchase history
-   */
-  getPurchaseHistory(): Purchase[] {
-    return this.purchaseHistory;
-  }
-
-  /**
-   * Calculate total revenue
-   */
-  getTotalRevenue(): number {
-    const purchaseRevenue = this.purchaseHistory.reduce(
-      (sum, p) => sum + p.price,
-      0
-    );
-    const subscriptionRevenue = this.activeSubscription?.price || 0;
-    return purchaseRevenue + subscriptionRevenue;
-  }
-
-  /**
-   * Calculate renewal date
-   */
-  private calculateRenewalDate(productId: string): Date {
-    const now = new Date();
-    if (productId.includes('yearly')) {
-      return new Date(now.setFullYear(now.getFullYear() + 1));
-    } else {
-      return new Date(now.setMonth(now.getMonth() + 1));
-    }
-  }
-
-  /**
-   * Restore purchases using RevenueCat
-   */
-  async restorePurchases(): Promise<boolean> {
-    try {
-      if (!this.initialized) {
-        throw new Error('RevenueCat not initialized');
-      }
-
-      const customerInfo = await Purchases.restorePurchases();
-      this.customerInfo = customerInfo;
-
-      analytics.logEvent('restore_purchases', {});
-      console.log('✅ Purchases restored successfully');
-      return true;
-    } catch (error) {
-      console.error('❌ Restore purchases failed:', error);
-      errorTracking.logError(error as Error, { context: 'Restore purchases' });
-      return false;
-    }
-  }
-
-  /**
-   * Fetch and cache offerings from RevenueCat
-   */
-  private async fetchOfferings(): Promise<void> {
-    try {
-      const offerings = await Purchases.getOfferings();
-      this.offerings = offerings.current;
-      
-      // Update product packages with real prices
-      if (this.offerings) {
-        this.updateProductPrices();
-      }
-    } catch (error) {
-      console.error('❌ Failed to fetch offerings:', error);
-    }
-  }
-
-  /**
-   * Update product packages with real prices from RevenueCat
-   */
-  private updateProductPrices(): void {
-    if (!this.offerings) return;
-
-    const allPackages = this.offerings.availablePackages;
-
-    // Update coin packages
-    COIN_PACKAGES.forEach((product) => {
-      const rcPackage = allPackages.find((pkg) => pkg.product.identifier === product.id);
-      if (rcPackage) {
-        product.price = rcPackage.product.priceString;
-        product.priceValue = rcPackage.product.price;
-        product.currency = rcPackage.product.currencyCode;
-        console.log(`✅ Updated ${product.name}: ${product.price}`);
-      }
-    });
-
-    // Update premium packages
-    PREMIUM_PACKAGES.forEach((product) => {
-      const rcPackage = allPackages.find((pkg) => pkg.product.identifier === product.id);
-      if (rcPackage) {
-        product.price = rcPackage.product.priceString;
-        product.priceValue = rcPackage.product.price;
-        product.currency = rcPackage.product.currencyCode;
-        console.log(`✅ Updated ${product.name}: ${product.price}`);
-      }
-    });
-
-    // Update subscription plans
-    SUBSCRIPTION_PLANS.forEach((product) => {
-      const rcPackage = allPackages.find((pkg) => pkg.product.identifier === product.id);
-      if (rcPackage) {
-        product.price = rcPackage.product.priceString;
-        product.priceValue = rcPackage.product.price;
-        product.currency = rcPackage.product.currencyCode;
-        console.log(`✅ Updated ${product.name}: ${product.price}`);
-      }
-    });
-  }
-
-  /**
-   * Get available offerings from RevenueCat
-   */
-  async getOfferings(): Promise<PurchasesOffering | null> {
-    return this.offerings;
-  }
-
-  /**
-   * Get product packages with real prices
-   */
-  getCoinPackages(): Product[] {
-    return COIN_PACKAGES;
-  }
-
-  getPremiumPackages(): Product[] {
-    return PREMIUM_PACKAGES;
-  }
-
-  getSubscriptionPlans(): Product[] {
-    return SUBSCRIPTION_PLANS;
-  }
-
-  /**
-   * Get customer info
-   */
-  getCustomerInfo(): CustomerInfo | null {
-    return this.customerInfo;
-  }
-
-  /**
-   * Check if user has active entitlement
-   */
-  hasEntitlement(entitlementId: string): boolean {
-    if (!this.customerInfo) return false;
-    return this.customerInfo.entitlements.active[entitlementId] !== undefined;
-  }
-
-  /**
-   * Grant coins to user's Firestore balance
-   */
-  private async grantCoinsToUser(userId: string, amount: number): Promise<void> {
-    try {
-      const userRef = doc(firestore, 'users', userId);
-      
-      // Check if user document exists
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        throw new Error('User document not found');
-      }
-
-      // Update coins using increment to avoid race conditions
-      await updateDoc(userRef, {
-        'stats.coins': increment(amount)
-      });
-
-      console.log(`✅ Successfully added ${amount} coins to user ${userId}`);
-    } catch (error) {
-      console.error('❌ Failed to grant coins:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Grant premium gems to user's Firestore balance
-   */
-  private async grantPremiumToUser(userId: string, amount: number): Promise<void> {
-    try {
-      const userRef = doc(firestore, 'users', userId);
-      
-      // Check if user document exists
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        throw new Error('User document not found');
-      }
-
-      // Update premium gems using increment
-      await updateDoc(userRef, {
-        'stats.premium': increment(amount)
-      });
-
-      console.log(`✅ Successfully added ${amount} gems to user ${userId}`);
-    } catch (error) {
-      console.error('❌ Failed to grant premium:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Helper to find package by product ID
-   */
-  private findPackageByProductId(
-    offerings: { current: PurchasesOffering | null },
-    productId: string
-  ): PurchasesPackage | null {
-    if (!offerings.current) return null;
-
-    const allPackages = [
-      ...offerings.current.availablePackages,
-      offerings.current.monthly,
-      offerings.current.annual,
-      offerings.current.lifetime,
-    ].filter((pkg): pkg is PurchasesPackage => pkg !== null);
-
-    return allPackages.find((pkg) => pkg.product.identifier === productId) || null;
-  }
-}
-
-// Types
 export interface Purchase {
   id: string;
   productId: string;
-  type: 'coins' | 'premium';
+  type: 'coins' | 'premium' | 'subscription';
   amount: number;
   price: number;
   currency: string;
   timestamp: Date;
-  status: 'pending' | 'completed' | 'failed';
-}
-
-export interface Subscription {
-  id: string;
-  productId: string;
-  status: 'active' | 'cancelled' | 'expired';
-  startDate: Date;
-  renewalDate: Date;
-  price: number;
-  currency: string;
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
 }
 
 export interface PurchaseResult {
@@ -822,31 +154,408 @@ export interface PurchaseResult {
   error?: string;
 }
 
-export interface SubscriptionResult {
-  success: boolean;
-  subscription?: Subscription;
-  error?: string;
+class MonetizationService {
+  private initialized = false;
+  private currentUserId: string | null = null;
+  private purchaseHistory: Purchase[] = [];
+  private availableProducts: IAPProduct[] = [];
+  private purchaseUpdateSubscription: any = null;
+  private purchaseErrorSubscription: any = null;
+
+  /**
+   * Initialize IAP connection
+   */
+  async initialize(userId?: string): Promise<void> {
+    try {
+      if (this.initialized) {
+        console.log('✅ IAP already initialized');
+        return;
+      }
+
+      console.log('🔵 Initializing IAP...');
+
+      // Initialize connection to App Store/Play Store
+      await RNIap.initConnection();
+      console.log('✅ IAP connection established');
+
+      if (userId) {
+        this.currentUserId = userId;
+        console.log('✅ User ID set:', userId);
+      }
+
+      // Get available products
+      const productIds = [
+        COIN_PRODUCTS.SMALL!,
+        COIN_PRODUCTS.MEDIUM!,
+        COIN_PRODUCTS.LARGE!,
+        COIN_PRODUCTS.MEGA!,
+      ];
+
+      console.log('🔵 Fetching products:', productIds);
+      const products = await RNIap.fetchProducts({ skus: productIds });
+      this.availableProducts = (products || []) as IAPProduct[];
+      console.log('✅ Products loaded:', this.availableProducts.length);
+
+      // Set up purchase listeners
+      this.purchaseUpdateSubscription = RNIap.purchaseUpdatedListener(
+        async (purchase: IAPPurchase) => {
+          console.log('🔵 Purchase update received:', purchase);
+          await this.handlePurchaseUpdate(purchase);
+        }
+      );
+
+      this.purchaseErrorSubscription = RNIap.purchaseErrorListener(
+        (error: PurchaseError) => {
+          console.error('❌ Purchase error:', error);
+          errorTracking.logError(new Error(error.message), { context: 'IAP purchase error' });
+        }
+      );
+
+      this.initialized = true;
+      console.log('✅ IAP initialized successfully');
+
+      analytics.logEvent('iap_initialized', {});
+    } catch (error: any) {
+      console.error('❌ IAP initialization failed:', error);
+      errorTracking.logError(error as Error, { context: 'IAP init' });
+      
+      // Mark as initialized anyway to allow app to continue
+      this.initialized = true;
+      console.log('⚠️ IAP initialization had errors but marked as initialized');
+    }
+  }
+
+  /**
+   * Handle purchase updates
+   */
+  private async handlePurchaseUpdate(purchase: IAPPurchase): Promise<void> {
+    try {
+      const receipt = purchase.transactionId;
+      
+      if (!receipt || !this.currentUserId) {
+        console.error('❌ No receipt or user ID');
+        return;
+      }
+
+      console.log('🔵 Processing purchase:', purchase.productId);
+
+      // Handle coin packages
+      const coinProduct = COIN_PACKAGES.find(p => p.id === purchase.productId);
+      if (coinProduct && coinProduct.coins) {
+        await this.grantCoinsToUser(this.currentUserId, coinProduct.coins);
+        console.log(`✅ Granted ${coinProduct.coins} coins to user ${this.currentUserId}`);
+        
+        // Mark first-time purchase if applicable
+        if (coinProduct.firstTimeOnly) {
+          const userRef = doc(firestore, 'users', this.currentUserId);
+          await updateDoc(userRef, {
+            hasFirstTimePurchase: true,
+            firstPurchaseDate: new Date().toISOString(),
+          });
+          console.log('✅ Marked first-time purchase');
+        }
+        
+        await RNIap.finishTransaction({ purchase });
+        console.log('✅ Coin transaction finished');
+        
+        analytics.logEvent('purchase_success', {
+          product_id: purchase.productId,
+          coins: coinProduct.coins,
+          first_time: coinProduct.firstTimeOnly || false,
+        });
+        return;
+      }
+
+      // Handle battle pass premium
+      if (purchase.productId === 'com.wittz.battlepass.premium') {
+        await import('./battlePassService');
+        const userRef = doc(firestore, 'battlePasses', this.currentUserId);
+        
+        // Check if document exists, create if not
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+          const { battlePass } = await import('./battlePassService');
+          await battlePass.getUserBattlePass(this.currentUserId);
+        }
+        
+        await updateDoc(userRef, {
+          isPremium: true,
+          purchaseDate: new Date(),
+        });
+        console.log('✅ Granted Battle Pass Premium');
+        
+        await RNIap.finishTransaction({ purchase });
+        console.log('✅ Battle Pass Premium transaction finished');
+        
+        analytics.logEvent('purchase_success', {
+          product_id: purchase.productId,
+          type: 'battle_pass_premium',
+        });
+        return;
+      }
+
+      // Handle level skips
+      if (purchase.productId.startsWith('com.wittz.battlepass.skip.')) {
+        const levels = parseInt(purchase.productId.split('.').pop() || '0');
+        if (levels > 0) {
+          const { battlePass } = await import('./battlePassService');
+          const userBP = await battlePass.getUserBattlePass(this.currentUserId);
+          
+          if (userBP) {
+            const bpRef = doc(firestore, 'battlePasses', this.currentUserId);
+            const newLevel = Math.min(
+              userBP.currentLevel + levels,
+              battlePass.getCurrentSeason().maxLevel
+            );
+            
+            await updateDoc(bpRef, {
+              currentLevel: newLevel,
+              currentXP: 0,
+            });
+            console.log(`✅ Granted ${levels} level skip(s) - new level: ${newLevel}`);
+            
+            await RNIap.finishTransaction({ purchase });
+            console.log('✅ Level skip transaction finished');
+            
+            analytics.logEvent('purchase_success', {
+              product_id: purchase.productId,
+              type: 'level_skip',
+              levels,
+              new_level: newLevel,
+            });
+          }
+        }
+        return;
+      }
+
+      console.warn('⚠️ Unknown product purchased:', purchase.productId);
+      await RNIap.finishTransaction({ purchase });
+      
+    } catch (error: any) {
+      console.error('❌ Failed to handle purchase update:', error);
+      errorTracking.logError(error as Error, { context: 'Handle purchase update' });
+    }
+  }
+
+  /**
+   * Purchase coins
+   */
+  async purchaseCoins(productId: string): Promise<PurchaseResult> {
+    try {
+      console.log('🔵 Starting coin purchase for product:', productId);
+
+      if (!this.initialized) {
+        console.error('❌ IAP not initialized');
+        throw new Error('IAP not initialized');
+      }
+
+      const product = COIN_PACKAGES.find((p) => p.id === productId);
+      if (!product) {
+        console.error('❌ Product not found:', productId);
+        throw new Error('Product not found');
+      }
+
+      console.log('🔵 Requesting purchase for:', productId);
+      
+      // Request the purchase - using v14 API format
+      await RNIap.requestPurchase({
+        request: {
+          apple: { sku: productId },
+          google: { skus: [productId] },
+        },
+        type: 'in-app',
+      });
+      
+      console.log('✅ Purchase request sent');
+
+      // The actual purchase completion will be handled by purchaseUpdateListener
+      // Return success immediately
+      const purchase: Purchase = {
+        id: `purchase_${Date.now()}`,
+        productId,
+        type: 'coins',
+        amount: product.coins!,
+        price: product.priceValue,
+        currency: product.currency,
+        timestamp: new Date(),
+        status: 'pending',
+      };
+
+      this.purchaseHistory.push(purchase);
+
+      return {
+        success: true,
+        purchase,
+      };
+    } catch (error: any) {
+      console.error('❌ Coin purchase failed:', error);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      
+      errorTracking.logError(error as Error, { context: 'Purchase coins' });
+      
+      let errorMessage = 'Purchase failed';
+      if (error.code === 'E_USER_CANCELLED') {
+        errorMessage = 'Purchase cancelled';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Purchase a product (for battle pass premium, level skips, etc.)
+   * Similar to purchaseCoins but doesn't grant coins - just triggers the purchase
+   */
+  async purchaseProduct(productId: string): Promise<PurchaseResult> {
+    try {
+      console.log('🔵 Starting product purchase for:', productId);
+
+      if (!this.initialized) {
+        console.error('❌ Monetization not initialized');
+        throw new Error('Monetization not initialized');
+      }
+
+      console.log('🔵 Requesting purchase for:', productId);
+      
+      // Request the purchase - using v14 API format
+      await RNIap.requestPurchase({
+        request: {
+          apple: { sku: productId },
+          google: { skus: [productId] },
+        },
+        type: 'in-app',
+      });
+      
+      console.log('✅ Purchase request sent');
+
+      // The actual purchase completion will be handled by purchaseUpdateListener
+      const purchase: Purchase = {
+        id: `purchase_${Date.now()}`,
+        productId,
+        type: 'premium',
+        amount: 0,
+        price: 0,
+        currency: 'USD',
+        timestamp: new Date(),
+        status: 'pending',
+      };
+
+      this.purchaseHistory.push(purchase);
+
+      return {
+        success: true,
+        purchase,
+      };
+    } catch (error: any) {
+      console.error('❌ Product purchase failed:', error);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      
+      errorTracking.logError(error as Error, { context: 'Purchase product' });
+      
+      let errorMessage = 'Purchase failed';
+      if (error.code === 'E_USER_CANCELLED') {
+        errorMessage = 'Purchase cancelled';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Grant coins to user's Firestore balance
+   */
+  async grantCoinsToUser(userId: string, coins: number): Promise<void> {
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      await updateDoc(userRef, {
+        coins: increment(coins),
+        'stats.totalCoinsEarned': increment(coins),
+      });
+      console.log(`✅ Granted ${coins} coins to user ${userId}`);
+    } catch (error: any) {
+      console.error('❌ Failed to grant coins:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's coin balance
+   */
+  async getCoinBalance(userId: string): Promise<number> {
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        return userDoc.data().coins || 0;
+      }
+      
+      return 0;
+    } catch (error: any) {
+      console.error('❌ Failed to get coin balance:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Check if user has made first purchase
+   */
+  async hasUserMadeFirstPurchase(userId: string): Promise<boolean> {
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        return userDoc.data().hasFirstTimePurchase || false;
+      }
+      
+      return false;
+    } catch (error: any) {
+      console.error('❌ Failed to check first purchase status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get available products (optionally filter first-time offer)
+   */
+  getProducts(includeFirstTime: boolean = true): Product[] {
+    if (includeFirstTime) {
+      return COIN_PACKAGES;
+    }
+    return COIN_PACKAGES.filter(p => !p.firstTimeOnly);
+  }
+
+  /**
+   * Cleanup
+   */
+  async cleanup(): Promise<void> {
+    try {
+      if (this.purchaseUpdateSubscription) {
+        this.purchaseUpdateSubscription.remove();
+      }
+      if (this.purchaseErrorSubscription) {
+        this.purchaseErrorSubscription.remove();
+      }
+      await RNIap.endConnection();
+      this.initialized = false;
+      console.log('✅ IAP connection closed');
+    } catch (error: any) {
+      console.error('❌ Failed to cleanup IAP:', error);
+    }
+  }
 }
 
-// Export singleton
-export const monetizationService = new MonetizationService();
-
-// Export convenience functions
-export const monetization = {
-  initialize: (userId?: string) => monetizationService.initialize(userId),
-  purchaseCoins: (productId: string) => monetizationService.purchaseCoins(productId),
-  purchasePremium: (productId: string) => monetizationService.purchasePremium(productId),
-  subscribe: (productId: string) => monetizationService.subscribe(productId),
-  cancelSubscription: () => monetizationService.cancelSubscription(),
-  isSubscriptionActive: () => monetizationService.isSubscriptionActive(),
-  getActiveSubscription: () => monetizationService.getActiveSubscription(),
-  getPurchaseHistory: () => monetizationService.getPurchaseHistory(),
-  getTotalRevenue: () => monetizationService.getTotalRevenue(),
-  restorePurchases: () => monetizationService.restorePurchases(),
-  getOfferings: () => monetizationService.getOfferings(),
-  getCustomerInfo: () => monetizationService.getCustomerInfo(),
-  hasEntitlement: (entitlementId: string) => monetizationService.hasEntitlement(entitlementId),
-  getCoinPackages: () => monetizationService.getCoinPackages(),
-  getPremiumPackages: () => monetizationService.getPremiumPackages(),
-  getSubscriptionPlans: () => monetizationService.getSubscriptionPlans(),
-};
+export const monetization = new MonetizationService();

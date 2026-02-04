@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { isUserAdmin } from '../utils/adminCheck';
 import {
   getPendingPromptSubmissions,
   approvePromptSubmission,
@@ -28,6 +29,14 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
   const { user } = useAuth();
   const { colors: COLORS } = useTheme();
   const [submissions, setSubmissions] = useState<PromptSubmission[]>([]);
+  
+  // Redirect non-admins
+  React.useEffect(() => {
+    if (!isUserAdmin(user)) {
+      Alert.alert('Access Denied', 'You do not have permission to access this area.');
+      navigation.goBack();
+    }
+  }, [user, navigation]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });

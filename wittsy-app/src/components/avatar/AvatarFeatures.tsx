@@ -4,7 +4,6 @@
  */
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Ellipse, G, Rect } from 'react-native-svg';
 
 // SKIN TONES
@@ -320,10 +319,3 @@ export const HAIR_COLORS = {
   green: '#00FF00',
   purple: '#800080',
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

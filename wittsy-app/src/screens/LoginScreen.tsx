@@ -65,46 +65,52 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={styles.title}>🎮 Wittz</Text>
             <Text style={styles.subtitle}>Welcome back!</Text>
 
-            <Input
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              error={errors.email}
-            />
+            <View style={{ marginBottom: 24 }}>
+              <Input
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                error={errors.email}
+              />
 
-            <Input
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter your password"
-              secureTextEntry
-              error={errors.password}
-            />
+              <Input
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                secureTextEntry
+                error={errors.password}
+              />
+            </View>
 
             <Button
               title="Sign In"
               onPress={handleLogin}
               loading={loading}
-              size="sm"
+              size="lg"
               style={styles.button}
             />
 
+            <View style={{ marginVertical: 16, alignItems: 'center' }}>
+              <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>or</Text>
+            </View>
+
             <Button
-              title="Sign In with Google"
+              title="🔐 Sign In with Google"
               onPress={handleGoogleSignIn}
               variant="outline"
               disabled={loading}
-              size="sm"
+              size="lg"
               style={styles.button}
             />
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Don't have an account? </Text>
               <Text
-                style={styles.link}
+                style={[styles.link, { marginTop: 0, marginLeft: 4 }]}
                 onPress={() => navigation.navigate('Register')}
               >
                 Sign Up
@@ -134,43 +140,50 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     backgroundColor: COLORS.background
   },
   scrollContent: {
-    paddingVertical: 20,
-    paddingHorizontal: 20
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24
   },
   content: {
-    width: '100%'
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center'
   },
   title: {
-    fontSize: 24,
+    fontSize: 48,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 2,
-    color: COLORS.text
+    marginBottom: 8,
+    color: COLORS.text,
+    letterSpacing: 1
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 18,
     textAlign: 'center',
-    marginBottom: 12,
-    color: COLORS.textSecondary
+    marginBottom: 40,
+    color: COLORS.textSecondary,
+    fontWeight: '500'
   },
   button: {
-    marginBottom: 8,
-    height: 40
+    marginBottom: 16,
+    height: 48
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 8
+    marginTop: 24,
+    alignItems: 'center'
   },
   footerText: {
-    fontSize: 13,
+    fontSize: 15,
     color: COLORS.textSecondary
   },
   link: {
-    fontSize: 13,
+    fontSize: 15,
     color: COLORS.primary,
     fontWeight: '600',
     textAlign: 'center',
-    marginTop: 6
+    marginTop: 16
   }
 });

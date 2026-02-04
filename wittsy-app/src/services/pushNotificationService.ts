@@ -1,13 +1,25 @@
 /**
  * Push Notification Service
  * Handles push notifications for events, challenges, friends, etc.
+ * Using expo-notifications instead of React Native Firebase
  */
 
-import messaging, { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
-import { Platform, Alert } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { firestore } from './firebase';
 import { analytics } from './analytics';
+
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export type NotificationType = 
   | 'friend_request'
@@ -37,18 +49,21 @@ export interface NotificationPayload {
  */
 export const requestNotificationPermission = async (): Promise<boolean> => {
   try {
-    const authStatus = await messaging().requestPermission();
-    const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-    if (enabled) {
-      console.log('✅ Notification permission granted');
-      return true;
-    } else {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
       console.log('❌ Notification permission denied');
       return false;
     }
+    
+    console.log('✅ Notification permission granted');
+    return true;
   } catch (error) {
     console.error('Failed to request notification permission:', error);
     return false;
@@ -56,33 +71,33 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 };
 
 /**
- * Get FCM token for this device
+ * Get Expo Push Token for this device
  */
 export const getFCMToken = async (): Promise<string | null> => {
   try {
-    const token = await messaging().getToken();
-    console.log('FCM Token:', token);
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    console.log('Expo Push Token:', token);
     return token;
   } catch (error) {
-    console.error('Failed to get FCM token:', error);
+    console.error('Failed to get Expo push token:', error);
     return null;
   }
 };
 
 /**
- * Save FCM token to user's profile
+ * Save push token to user's profile
  */
 export const saveFCMToken = async (userId: string, token: string): Promise<void> => {
   try {
     const userRef = doc(firestore, 'users', userId);
     await updateDoc(userRef, {
-      fcmToken: token,
-      fcmTokenUpdatedAt: new Date().toISOString(),
+      expoPushToken: token,
+      pushTokenUpdatedAt: new Date().toISOString(),
       platform: Platform.OS,
     });
-    console.log('✅ FCM token saved to user profile');
+    console.log('✅ Push token saved to user profile');
   } catch (error) {
-    console.error('Failed to save FCM token:', error);
+    console.error('Failed to save push token:', error);
   }
 };
 
@@ -98,42 +113,23 @@ export const initializePushNotifications = async (userId: string): Promise<void>
       return;
     }
 
-    // Get FCM token
+    // Get push token
     const token = await getFCMToken();
     if (token) {
       await saveFCMToken(userId, token);
     }
 
-    // Listen for token refresh
-    messaging().onTokenRefresh(async (newToken) => {
-      console.log('FCM token refreshed:', newToken);
-      await saveFCMToken(userId, newToken);
+    // Handle notifications received while app is in foreground
+    Notifications.addNotificationReceivedListener((notification) => {
+      console.log('Foreground notification:', notification);
+      handleForegroundNotification(notification);
     });
 
-    // Handle foreground notifications
-    messaging().onMessage(async (remoteMessage) => {
-      console.log('Foreground notification:', remoteMessage);
-      handleForegroundNotification(remoteMessage);
+    // Handle notification taps
+    Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('Notification tapped:', response);
+      handleNotificationPress(response.notification);
     });
-
-    // Handle background/quit state notifications
-    messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-      console.log('Background notification:', remoteMessage);
-      // Process notification in background
-    });
-
-    // Handle notification opened app
-    messaging().onNotificationOpenedApp((remoteMessage) => {
-      console.log('Notification opened app:', remoteMessage);
-      handleNotificationPress(remoteMessage);
-    });
-
-    // Check if app was opened from a notification
-    const initialNotification = await messaging().getInitialNotification();
-    if (initialNotification) {
-      console.log('App opened from notification:', initialNotification);
-      handleNotificationPress(initialNotification);
-    }
 
     console.log('✅ Push notifications initialized');
   } catch (error) {
@@ -142,47 +138,34 @@ export const initializePushNotifications = async (userId: string): Promise<void>
 };
 
 /**
- * Handle foreground notification (show alert)
+ * Handle foreground notification
  */
-const handleForegroundNotification = (remoteMessage: FirebaseMessagingTypes.RemoteMessage): void => {
-  const { notification, data } = remoteMessage;
+const handleForegroundNotification = (notification: Notifications.Notification): void => {
+  const { data } = notification.request.content;
   
-  if (notification) {
-    Alert.alert(
-      notification.title || 'Notification',
-      notification.body || '',
-      [
-        { text: 'Dismiss', style: 'cancel' },
-        {
-          text: 'View',
-          onPress: () => handleNotificationPress(remoteMessage),
-        },
-      ]
-    );
-  }
-
   // Track analytics
   analytics.logEvent('notification_received_foreground', {
-    type: data?.type || 'unknown',
+    type: (data as any)?.type || 'unknown',
   });
 };
 
 /**
  * Handle notification press (navigate to appropriate screen)
  */
-const handleNotificationPress = (remoteMessage: FirebaseMessagingTypes.RemoteMessage): void => {
-  const { data } = remoteMessage;
+const handleNotificationPress = (notification: Notifications.Notification): void => {
+  const { data } = notification.request.content;
   
   if (!data) return;
 
   // Track analytics
   analytics.logEvent('notification_opened', {
-    type: data.type || 'unknown',
+    type: (data as any).type || 'unknown',
   });
 
   // Navigate based on notification type
   // This would need to be integrated with your navigation system
-  switch (data.type) {
+  const notifData = data as any;
+  switch (notifData.type) {
     case 'friend_request':
       // Navigate to friends screen
       break;
@@ -243,8 +226,14 @@ export const scheduleLocalNotification = async (
   data?: Record<string, any>
 ): Promise<void> => {
   try {
-    // This would use a local notification library like @notifee/react-native
-    // For now, just log
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data: data || {},
+      },
+      trigger: null,
+    });
     console.log('Local notification scheduled:', { title, body, triggerTime });
   } catch (error) {
     console.error('Failed to schedule local notification:', error);

@@ -28,6 +28,8 @@ export const findAvailableRankedRoom = async (
   userElo: number
 ): Promise<Room | null> => {
   try {
+    console.log(`🔍 Searching for ranked rooms (User ELO: ${userElo})`);
+    
     const q = query(
       collection(firestore, 'rooms'),
       where('isRanked', '==', true),
@@ -36,24 +38,61 @@ export const findAvailableRankedRoom = async (
 
     const snapshot = await getDocs(q);
     
-    if (snapshot.empty) return null;
+    if (snapshot.empty) {
+      console.log('❌ No ranked rooms found in waiting state');
+      return null;
+    }
 
-    // Filter by ELO range and available space
+    console.log(`📋 Found ${snapshot.docs.length} waiting ranked rooms`);
+
+    // Filter by available space and countdown status
     const availableRooms = snapshot.docs
       .map(doc => ({ roomId: doc.id, ...doc.data() } as Room))
       .filter(room => {
         const hasSpace = room.players.length < room.settings.maxPlayers;
         const countdownNotFinished = !room.countdownStartedAt || 
           (Date.now() - new Date(room.countdownStartedAt).getTime()) < (room.countdownDuration || 30) * 1000;
-        return hasSpace && countdownNotFinished;
+        const isJoinable = hasSpace && countdownNotFinished;
+        
+        if (!isJoinable) {
+          console.log(`⏭️ Skipping room ${room.roomId}: hasSpace=${hasSpace}, countdownOk=${countdownNotFinished}`);
+        }
+        
+        return isJoinable;
       });
 
-    if (availableRooms.length === 0) return null;
+    if (availableRooms.length === 0) {
+      console.log('❌ No joinable rooms after filtering');
+      return null;
+    }
 
-    // Return first available room
-    return availableRooms[0];
+    console.log(`✅ Found ${availableRooms.length} joinable rooms`);
+
+    // Sort by ELO proximity (closest match first)
+    availableRooms.sort((a, b) => {
+      const avgEloA = a.players.length > 0 
+        ? a.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / a.players.length
+        : 1000;
+      const avgEloB = b.players.length > 0
+        ? b.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / b.players.length
+        : 1000;
+      
+      const diffA = Math.abs(avgEloA - userElo);
+      const diffB = Math.abs(avgEloB - userElo);
+      
+      return diffA - diffB;
+    });
+
+    const selectedRoom = availableRooms[0];
+    const avgElo = selectedRoom.players.length > 0
+      ? selectedRoom.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / selectedRoom.players.length
+      : 1000;
+    
+    console.log(`🎯 Selected room ${selectedRoom.roomId} (Avg ELO: ${avgElo.toFixed(0)}, Players: ${selectedRoom.players.length}/${selectedRoom.settings.maxPlayers})`);
+    
+    return selectedRoom;
   } catch (error) {
-    console.error('Error finding ranked room:', error);
+    console.error('❌ Error finding ranked room:', error);
     return null;
   }
 };
@@ -66,6 +105,8 @@ export const createRankedRoom = async (
   username: string
 ): Promise<string> => {
   try {
+    console.log(`🎮 Creating new ranked room for ${username} (${userId})`);
+    
     // Get all active room names to ensure uniqueness
     const activeRoomsQuery = query(
       collection(firestore, 'rooms'),
@@ -76,34 +117,46 @@ export const createRankedRoom = async (
     
     // Generate a unique room name
     const roomName = generateUniqueRoomName(existingNames);
+    console.log(`📝 Generated room name: "${roomName}"`);
     
     const roomData = {
       name: roomName,
       hostId: userId,
       players: [],
-      status: 'waiting',
+      spectators: [],
+      status: 'waiting' as const,
       isRanked: true,
+      currentRound: 0,
+      currentPrompt: null,
+      scores: {},
+      gameState: 'lobby' as const,
       settings: {
         maxPlayers: 12,
+        minPlayers: 3,
         submissionTime: 20,
         votingTime: 15,
-        winningScore: 20,
+        winningVotes: 20,
+        joinLockVoteThreshold: 8,
+        promptPacks: ['default'],
         isPrivate: false,
-        minPlayers: 3,
+        profanityFilter: 'medium' as const,
+        spectatorChatEnabled: true,
+        allowJoinMidGame: false,
         autoStart: true,
         countdownTriggerPlayers: 6,
       } as RoomSettings,
       createdAt: serverTimestamp(),
+      startedAt: null,
       countdownStartedAt: null,
       countdownDuration: 30,
     };
 
     const docRef = await addDoc(collection(firestore, 'rooms'), roomData);
-    console.log(`✨ Created ranked room: "${roomName}" (${docRef.id})`);
+    console.log(`✅ Successfully created ranked room: "${roomName}" (${docRef.id})`);
     return docRef.id;
   } catch (error) {
-    console.error('Error creating ranked room:', error);
-    throw error;
+    console.error('❌ Error creating ranked room:', error);
+    throw new Error(`Failed to create ranked room: ${error}`);
   }
 };
 
@@ -114,6 +167,8 @@ export const getBrowsableRankedRooms = async (
   userElo: number
 ): Promise<Room[]> => {
   try {
+    console.log(`📋 Fetching browsable ranked rooms (User ELO: ${userElo})`);
+    
     const q = query(
       collection(firestore, 'rooms'),
       where('isRanked', '==', true),
@@ -122,16 +177,23 @@ export const getBrowsableRankedRooms = async (
 
     const snapshot = await getDocs(q);
     
-    return snapshot.docs
+    const rooms = snapshot.docs
       .map(doc => ({ roomId: doc.id, ...doc.data() } as Room))
       .filter(room => {
         const hasSpace = room.players.length < room.settings.maxPlayers;
         const countdownNotFinished = !room.countdownStartedAt || 
           (Date.now() - new Date(room.countdownStartedAt).getTime()) < (room.countdownDuration || 30) * 1000;
         return hasSpace && countdownNotFinished;
+      })
+      .sort((a, b) => {
+        // Sort by player count (more players = more attractive)
+        return b.players.length - a.players.length;
       });
+    
+    console.log(`✅ Found ${rooms.length} browsable ranked rooms`);
+    return rooms;
   } catch (error) {
-    console.error('Error getting browsable ranked rooms:', error);
+    console.error('❌ Error getting browsable ranked rooms:', error);
     return [];
   }
 };

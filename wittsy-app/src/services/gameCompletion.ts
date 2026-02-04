@@ -2,6 +2,8 @@ import { firestore } from './firebase';
 import { doc, getDoc, updateDoc, setDoc, increment } from 'firebase/firestore';
 import { awardXP, XP_VALUES } from './progression';
 import { checkAchievements } from './achievements';
+import { processGameRatings } from './ratingIntegration';
+import { reviewPromptService } from './reviewPromptService';
 
 /**
  * Game Completion Service
@@ -13,6 +15,7 @@ interface GameResult {
   roomName: string;
   winnerId: string;
   winnerUsername: string;
+  isRanked: boolean;  // Added for rating system
   players: Array<{
     userId: string;
     username: string;
@@ -28,10 +31,39 @@ interface GameResult {
 
 /**
  * Process game completion for all players
+ * Enhanced with ELO rating system integration
  */
 export const processGameCompletion = async (gameResult: GameResult): Promise<void> => {
-  const { roomId, roomName, winnerId, players, totalRounds, playerCount } = gameResult;
+  const { roomId, roomName, winnerId, players, totalRounds, playerCount, isRanked } = gameResult;
 
+  // Process ratings first (if ranked game)
+  if (isRanked) {
+    try {
+      // Sort players by score to determine placement
+      const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+      
+      const ratingData = {
+        roomId,
+        roomName,
+        isRanked,
+        players: sortedPlayers.map((player, index) => ({
+          userId: player.userId,
+          username: player.username,
+          score: player.score,
+          totalVotes: player.totalVotes,
+          placement: index + 1,
+        })),
+      };
+      
+      await processGameRatings(ratingData);
+      console.log('✅ Ratings processed for ranked game');
+    } catch (error) {
+      console.error('Error processing game ratings:', error);
+      // Continue with other processing even if ratings fail
+    }
+  }
+
+  // Process individual player results
   for (const player of players) {
     try {
       await processPlayerGameResult(
@@ -45,6 +77,7 @@ export const processGameCompletion = async (gameResult: GameResult): Promise<voi
         roomId,
         roomName,
         playerCount,
+        isRanked,
         player.bestPhrase
       );
     } catch (error) {
@@ -67,6 +100,7 @@ const processPlayerGameResult = async (
   roomId: string,
   roomName: string,
   playerCount: number,
+  isRanked: boolean,
   bestPhrase?: string
 ): Promise<void> => {
   // Calculate XP
@@ -99,7 +133,7 @@ const processPlayerGameResult = async (
     currentStreak: won ? 1 : -1, // Will be handled properly in updateUserStats
   });
   
-  // Save match to history
+  // Save match to history with ranked flag
   await saveMatchHistory(userId, {
     roomId,
     roomName,
@@ -109,6 +143,7 @@ const processPlayerGameResult = async (
     totalVotes,
     roundsWon,
     playerCount,
+    isRanked,
     bestPhrase,
     xpEarned,
     leveledUp: xpResult.leveledUp,
@@ -121,6 +156,14 @@ const processPlayerGameResult = async (
   if (userDoc.exists()) {
     const userStats = userDoc.data().stats;
     await checkAchievements(userId, userStats);
+    
+    // Check for review prompt (after positive experience)
+    if (won && userStats) {
+      const winRate = userStats.gamesPlayed > 0 
+        ? userStats.gamesWon / userStats.gamesPlayed 
+        : 0;
+      await reviewPromptService.checkAndPromptAfterGame(userId, won, winRate);
+    }
   }
 };
 
@@ -205,6 +248,7 @@ const saveMatchHistory = async (
     totalVotes: number;
     roundsWon: number;
     playerCount: number;
+    isRanked: boolean;
     bestPhrase?: string;
     xpEarned: number;
     leveledUp: boolean;

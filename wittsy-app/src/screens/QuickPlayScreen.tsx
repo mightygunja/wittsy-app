@@ -17,9 +17,10 @@ import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants';
 
 export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { colors: COLORS } = useTheme();
   const [searching, setSearching] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1 },
@@ -110,38 +111,72 @@ export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   }), [SPACING, RADIUS]);
 
   const handleQuickPlay = async () => {
-    if (!user) return;
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to play');
+      return;
+    }
+
+    if (!userProfile?.username) {
+      Alert.alert('Error', 'Profile not loaded. Please try again.');
+      return;
+    }
 
     setSearching(true);
+    setStatusMessage('Searching for matches...');
+    
     try {
-      const userElo = 1000;
+      // Use actual user ELO from profile (ranked rating or default)
+      const userElo = userProfile.rankedRating || userProfile.rating || 1000;
+      console.log(`🎮 Quick Play: User ELO = ${userElo}`);
+      
+      // Try to find existing ranked room
+      setStatusMessage('Looking for available games...');
       let room = await findAvailableRankedRoom(userElo);
 
       if (room) {
-        console.log('Found existing room:', room.roomId);
+        console.log('✅ Found existing room:', room.roomId);
+        setStatusMessage('Joining game...');
+        
         const alreadyInRoom = room.players?.some(p => p.userId === user.uid);
         
         if (alreadyInRoom) {
           console.log('User already in room, navigating directly');
           navigation.navigate('GameRoom', { roomId: room.roomId });
         } else {
-          await joinRoom(room.roomId, user.uid, user.displayName || 'Player');
+          await joinRoom(room.roomId, user.uid, userProfile.username);
           navigation.navigate('GameRoom', { roomId: room.roomId });
         }
       } else {
-        console.log('No rooms available, creating new room');
-        const roomId = await createRankedRoom(user.uid, user.displayName || 'Player');
-        await joinRoom(roomId, user.uid, user.displayName || 'Player');
+        // No room found - AUTO-CREATE new ranked room
+        console.log('⚠️ No rooms available - creating new ranked room');
+        setStatusMessage('Creating new game...');
+        
+        const roomId = await createRankedRoom(user.uid, userProfile.username);
+        console.log(`✨ Created new ranked room: ${roomId}`);
+        
+        setStatusMessage('Joining your new game...');
+        await joinRoom(roomId, user.uid, userProfile.username);
+        
+        console.log('✅ Successfully joined new ranked room');
         navigation.navigate('GameRoom', { roomId });
       }
     } catch (error: any) {
-      console.error('Quick Play error:', error);
-      const errorMessage = error.message === 'Already in room' 
-        ? 'You are already in a game. Navigating to your current game...'
-        : 'Failed to join game. Please try again.';
-      Alert.alert('Quick Play', errorMessage);
+      console.error('❌ Quick Play error:', error);
+      
+      let errorMessage = 'Failed to join game. Please try again.';
+      
+      if (error.message === 'Already in room') {
+        errorMessage = 'You are already in a game.';
+      } else if (error.message?.includes('create')) {
+        errorMessage = 'Failed to create game. Please try again.';
+      } else if (error.message?.includes('join')) {
+        errorMessage = 'Failed to join game. Please try again.';
+      }
+      
+      Alert.alert('Quick Play Error', errorMessage);
     } finally {
       setSearching(false);
+      setStatusMessage('');
     }
   };
 
@@ -187,7 +222,9 @@ export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           {searching && (
             <View style={styles.searchingContainer}>
               <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.searchingText}>Finding the perfect match...</Text>
+              <Text style={styles.searchingText}>
+                {statusMessage || 'Finding the perfect match...'}
+              </Text>
             </View>
           )}
         </View>

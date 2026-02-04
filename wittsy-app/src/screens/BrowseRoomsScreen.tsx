@@ -22,8 +22,8 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
     try {
       let activeRooms: Room[];
       if (roomType === 'ranked') {
-        // TODO: Get user's ELO from profile
-        const userElo = 1000;
+        // Get user's ELO from profile, default to 1000 for new players
+        const userElo = userProfile?.rating || 1000;
         activeRooms = await getBrowsableRankedRooms(userElo);
       } else {
         activeRooms = await getActiveRooms({ isPrivate: false, maxResults: 50 });

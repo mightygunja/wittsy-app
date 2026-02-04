@@ -4,6 +4,16 @@ import { doc, getDoc, updateDoc, setDoc, collection, query, where, orderBy, limi
 /**
  * Ranking & Rating System
  * Implements Elo-style rating with rank tiers
+ * 
+ * @deprecated This system is deprecated in favor of eloRatingService.ts
+ * Use eloRatingService.ts for all new rating calculations
+ * This file is kept for:
+ * - RANK_TIERS constant (used by UI components)
+ * - getRankFromRating() function (used for display)
+ * - Backward compatibility
+ * 
+ * DO NOT USE: calculateNewRating, updateUserRating, calculateMultiplayerRating
+ * USE INSTEAD: eloRatingService.ts functions
  */
 
 // Rank Tiers Configuration

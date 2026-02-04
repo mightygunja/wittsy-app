@@ -13,11 +13,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getCurrentSeason, getAllSeasons } from '../services/seasons';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth';
+import { isUserAdmin } from '../utils/adminCheck';
 
 export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
+  const { user } = useAuth();
   const [seasons, setSeasons] = useState<any[]>([]);
+  
+  // Redirect non-admins
+  React.useEffect(() => {
+    if (!isUserAdmin(user)) {
+      Alert.alert('Access Denied', 'You do not have permission to access this area.');
+      navigation.goBack();
+    }
+  }, [user, navigation]);
   const [currentSeason, setCurrentSeason] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   

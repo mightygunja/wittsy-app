@@ -4,12 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNotifications } from '../hooks/useNotifications';
 import { useTheme } from '../hooks/useTheme';
-import { ScreenHeader } from '../components/common/ScreenHeader';
 import { SPACING } from '../utils/constants';
 
 export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, loading, markAsRead } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
 
   const styles = useMemo(() => StyleSheet.create({
@@ -157,18 +156,6 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader
-          title="Notifications"
-          onBack={() => navigation.goBack()}
-          rightComponent={
-            unreadCount > 0 ? (
-              <TouchableOpacity style={styles.markAllButton} onPress={markAllAsRead}>
-                <Text style={styles.markAllText}>Mark All Read</Text>
-              </TouchableOpacity>
-            ) : undefined
-          }
-        />
-
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.content}

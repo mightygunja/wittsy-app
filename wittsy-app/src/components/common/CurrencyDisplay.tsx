@@ -4,21 +4,17 @@ import { useAuth } from '../../hooks/useAuth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { firestore } from '../../services/firebase';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 interface CurrencyDisplayProps {
   variant?: 'full' | 'compact';
-  showPremium?: boolean;
 }
 
 export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({ 
-  variant = 'full',
-  showPremium = false 
+  variant = 'full'
 }) => {
   const { user } = useAuth();
   const navigation = useNavigation();
   const [coins, setCoins] = useState<number>(0);
-  const [premium, setPremium] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +29,6 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
       if (snapshot.exists()) {
         const data = snapshot.data();
         setCoins(data?.stats?.coins || 0);
-        setPremium(data?.stats?.premium || 0);
       }
       setLoading(false);
     }, (error) => {

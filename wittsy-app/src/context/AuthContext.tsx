@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { User } from 'firebase/auth';
 import * as authService from '../services/auth';
 import * as guestAuth from '../services/guestAuth';
 import { UserProfile } from '../types';
 import { monetization } from '../services/monetization';
+import { battlePass } from '../services/battlePassService';
+import { seedChallenges } from '../utils/seedChallenges';
+import { seedPrompts } from '../utils/seedPrompts';
 
 interface AuthContextType {
   user: User | null;
@@ -11,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   isGuest: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, username: string) => Promise<void>;
+  signUp: (email: string, password: string, username: string, referralCode?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -35,6 +39,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (firebaseUser) {
         // Initialize RevenueCat with user ID
         await monetization.initialize(firebaseUser.uid);
+        
+        // Initialize Battle Pass (requires authentication)
+        await battlePass.initialize();
+        
+        // Seed data after authentication
+        await seedChallenges();
+        await seedPrompts();
         
         // Create or fetch user profile from Firestore
         const userDoc = await authService.getOrCreateUserProfile(firebaseUser);
@@ -114,10 +125,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (email: string, password: string, username: string, referralCode?: string) => {
     setLoading(true);
     try {
-      await authService.registerUser(email, password, username);
+      await authService.registerUser(email, password, username, referralCode);
     } finally {
       setLoading(false);
     }
@@ -135,7 +146,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInAsGuest = async () => {
     setLoading(true);
     try {
+      console.log('🎮 Starting guest sign in...');
       await guestAuth.signInAsGuest();
+      console.log('✅ Guest sign in completed');
+    } catch (error) {
+      console.error('❌ Guest sign in failed:', error);
+      Alert.alert('Error', `Failed to start game: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }

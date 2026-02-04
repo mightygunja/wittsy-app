@@ -14,6 +14,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
 
@@ -37,7 +38,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     setLoading(true);
 
     try {
-      await signUp(email, password, username);
+      await signUp(email, password, username, referralCode || undefined);
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message || 'An error occurred');
     } finally {
@@ -104,11 +105,20 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               error={errors.confirmPassword}
             />
 
+            <Input
+              label="Referral Code (Optional)"
+              value={referralCode}
+              onChangeText={(text) => setReferralCode(text.toUpperCase())}
+              placeholder="Enter a friend's code"
+              autoCapitalize="characters"
+              maxLength={8}
+            />
+
             <Button
               title="Create Account"
               onPress={handleRegister}
               loading={loading}
-              size="sm"
+              size="lg"
               style={styles.button}
             />
 
@@ -159,7 +169,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   button: {
     marginBottom: 8,
-    height: 40
+    height: 48
   },
   footer: {
     flexDirection: 'row',

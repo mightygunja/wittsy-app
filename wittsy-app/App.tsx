@@ -9,10 +9,7 @@ import { errorTracking } from './src/services/errorTracking';
 import { analytics } from './src/services/analytics';
 import { monetization } from './src/services/monetization';
 import { abTesting } from './src/services/abTesting';
-import { battlePass } from './src/services/battlePassService';
 import { audioService } from './src/services/audioService';
-import { seedChallenges } from './src/utils/seedChallenges';
-import { seedPrompts } from './src/utils/seedPrompts';
 import './src/utils/adminHelpers'; // Load admin helpers
 
 export default function App() {
@@ -40,14 +37,11 @@ export default function App() {
         // Initialize A/B testing
         await abTesting.initialize();
         
-        // Initialize Battle Pass (fetch active season)
-        await battlePass.initialize();
+        // Configure Google Sign-In
+        configureGoogleSignIn();
         
-        // Seed challenges if they don't exist
-        await seedChallenges();
-        
-        // Seed prompts if they don't exist
-        await seedPrompts();
+        // Note: Battle Pass, seeding, and other auth-dependent services 
+        // will initialize after user authentication in AuthContext
         
         // Initialize push notifications
         await notifications.initialize();

@@ -4,7 +4,7 @@ import { useTheme } from '../../hooks/useTheme';;
 
 export const Loading: React.FC = () => {
   const { colors: COLORS } = useTheme();
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => createStyles(), []);
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={COLORS.primary} />
@@ -12,7 +12,7 @@ export const Loading: React.FC = () => {
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

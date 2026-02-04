@@ -31,9 +31,15 @@ import { useTheme } from '../hooks/useTheme';
 import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
 import { getRatingTier, getRatingColor } from '../services/eloRatingService';
 
-export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { userProfile } = useAuth();
+export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
+  const { userProfile: currentUserProfile } = useAuth();
   const { colors: COLORS } = useTheme();
+  
+  // Get userId from route params, default to current user
+  const viewingUserId = route?.params?.userId || currentUserProfile?.uid;
+  const isOwnProfile = viewingUserId === currentUserProfile?.uid;
+  
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'history'>('stats');
   const [matches, setMatches] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -48,8 +54,8 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigatio
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
   useEffect(() => {
-    // Load user avatar
-    loadAvatar();
+    // Load the profile for the viewing user
+    loadUserProfile();
     
     // Initial animation
     Animated.parallel([
@@ -64,10 +70,11 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigatio
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [viewingUserId]);
 
   useEffect(() => {
     if (userProfile) {
+      loadAvatar();
       loadAchievements();
     }
   }, [userProfile]);
@@ -77,6 +84,25 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigatio
       loadMatchHistory();
     }
   }, [activeTab, userProfile]);
+
+  const loadUserProfile = async () => {
+    if (!viewingUserId) return;
+    
+    try {
+      if (isOwnProfile && currentUserProfile) {
+        setUserProfile(currentUserProfile);
+      } else {
+        // Load other user's profile from Firestore
+        const { doc, getDoc } = await import('firebase/firestore');
+        const userDoc = await getDoc(doc(firestore, 'users', viewingUserId));
+        if (userDoc.exists()) {
+          setUserProfile(userDoc.data());
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
 
   // Reload avatar when screen comes into focus (e.g., after saving in Avatar Creator)
   useEffect(() => {
@@ -94,7 +120,7 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigatio
     
     console.log('🔄 Loading avatar for user:', userProfile.uid);
     try {
-      const userAvatar = await avatarService.getUserAvatar(userProfile.uid);
+      const userAvatar = await avatarService.getUserAvatar(viewingUserId);
       console.log('📦 Avatar data received:', userAvatar);
       if (userAvatar && userAvatar.config) {
         console.log('✅ Setting avatar config:', userAvatar.config);
@@ -193,7 +219,7 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigatio
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView 
         style={styles.scrollView}
         refreshControl={
@@ -201,26 +227,17 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any }> = ({ navigatio
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Modern Profile Header */}
+        {/* Profile Content */}
         <Animated.View 
           style={[
-            styles.headerContainer,
+            styles.profileContainer,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }]
             }
           ]}
         >
-          {/* Background Gradient */}
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.primaryDark] as any}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.headerGradient}
-          />
-          
-          {/* Content */}
-          <View style={styles.headerContent}>
+          <View style={styles.profileContent}>
             {/* Avatar Section - REBUILT */}
             <View style={styles.avatarSection}>
               <TouchableOpacity 
@@ -610,21 +627,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerContainer: {
-    position: 'relative',
+  profileContainer: {
+    paddingTop: SPACING.md,
     marginBottom: SPACING.sm,
   },
-  headerGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderBottomLeftRadius: RADIUS.xl,
-    borderBottomRightRadius: RADIUS.xl,
-  },
-  headerContent: {
-    paddingTop: SPACING.md,
+  profileContent: {
     paddingBottom: SPACING.lg,
     paddingHorizontal: SPACING.lg,
     alignItems: 'center',

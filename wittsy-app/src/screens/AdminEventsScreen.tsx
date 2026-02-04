@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SPACING, TYPOGRAPHY } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth';
+import { isUserAdmin } from '../utils/adminCheck';;
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { getActiveEvents } from '../services/events';
@@ -20,7 +22,16 @@ import { Event, EventType, EventStatus } from '../types/social';
 
 export const AdminEventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
+  
+  // Redirect non-admins
+  React.useEffect(() => {
+    if (!isUserAdmin(user)) {
+      Alert.alert('Access Denied', 'You do not have permission to access this area.');
+      navigation.goBack();
+    }
+  }, [user, navigation]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
 

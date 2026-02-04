@@ -3,7 +3,7 @@
  * Manages when and how to prompt guest users to create accounts
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from './useAuth';
 import { getGuestProgress, shouldShowUpgradePrompt } from '../services/guestAuth';
 

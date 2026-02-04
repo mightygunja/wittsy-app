@@ -107,7 +107,13 @@ const scrollViewRef = useRef<ScrollView>(null);
             if (success) {
               haptics.success();
               Alert.alert('Success!', 'You now have premium access!');
-              loadBattlePass();
+              
+              // Refresh battle pass data immediately
+              await loadBattlePass();
+              await refreshUserProfile();
+              
+              // Force a re-render by updating state
+              setLoading(false);
             } else {
               haptics.error();
               Alert.alert('Failed', 'Purchase failed. Please try again.');
@@ -210,7 +216,13 @@ const scrollViewRef = useRef<ScrollView>(null);
     if (success) {
       haptics.success();
       Alert.alert('Success!', `Skipped ${levels} levels!`);
-      loadBattlePass();
+      
+      // Refresh battle pass data immediately
+      await loadBattlePass();
+      await refreshUserProfile();
+      
+      // Force a re-render by updating state
+      setLoading(false);
     } else {
       haptics.error();
       Alert.alert('Failed', 'Purchase failed. Please try again.');
@@ -281,7 +293,7 @@ const scrollViewRef = useRef<ScrollView>(null);
           <View style={styles.rewardInfo}>
             <Text style={styles.rewardType} numberOfLines={1}>
               {displayReward.type === 'coins' ? `${displayReward.amount} Coins` :
-               displayReward.type === 'premium' ? `${displayReward.amount} Gems` :
+               displayReward.type === 'premium' ? `${displayReward.amount} Coins` :
                displayReward.type === 'avatar' ? `🎨 ${displayReward.name}` :
                displayReward.name || displayReward.type}
             </Text>
@@ -347,7 +359,7 @@ const scrollViewRef = useRef<ScrollView>(null);
                 `• 100 levels total\n\n` +
                 `💎 Premium Benefits:\n` +
                 `• Exclusive avatar items\n` +
-                `• More coins & gems\n` +
+                `• More coins\n` +
                 `• Special effects\n` +
                 `• $30+ value for $${season.price}!`,
                 [{ text: 'Got it!' }]
@@ -384,11 +396,7 @@ const scrollViewRef = useRef<ScrollView>(null);
             <View style={styles.currencyRow}>
               <View style={styles.currencyItem}>
                 <Text style={styles.currencyIcon}>🪙</Text>
-                <Text style={styles.currencyValue}>{(userProfile as any)?.currency?.coins || 0}</Text>
-              </View>
-              <View style={styles.currencyItem}>
-                <Text style={styles.currencyIcon}>💎</Text>
-                <Text style={styles.currencyValue}>{(userProfile as any)?.currency?.gems || 0}</Text>
+                <Text style={styles.currencyValue}>{userProfile?.coins || 0}</Text>
               </View>
             </View>
 

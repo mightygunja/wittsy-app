@@ -10,7 +10,6 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
@@ -24,12 +23,13 @@ import {
   SpecializedLeaderboardEntry,
   LeaderboardType,
 } from '../services/leaderboards';
+import { getCommunityStarredPhrases, StarredPhrase } from '../services/starredPhrases';
 import { getCurrentSeason, getSeasonLeaderboard, getDaysRemainingInSeason } from '../services/seasons';
 import { RANK_TIERS } from '../services/ranking';
 import { useTheme } from '../hooks/useTheme';
 import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
 
-type TabType = 'global' | 'friends' | 'specialized' | 'season';
+type TabType = 'global' | 'friends' | 'specialized' | 'season' | 'starred';
 
 type LeaderboardNavigationProp = StackNavigationProp<any, 'Leaderboard'>;
 
@@ -40,6 +40,7 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('global');
   const [specializedType, setSpecializedType] = useState<LeaderboardType>('hall_of_fame');
   const [leaderboard, setLeaderboard] = useState<(LeaderboardEntry | SpecializedLeaderboardEntry)[]>([]);
+  const [starredPhrases, setStarredPhrases] = useState<StarredPhrase[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userPosition, setUserPosition] = useState<number>(-1);
@@ -83,7 +84,12 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
       );
 
       const loadPromise = (async () => {
-        if (activeTab === 'season' && currentSeason) {
+        if (activeTab === 'starred') {
+          // Load community starred phrases
+          const phrases = await getCommunityStarredPhrases(50);
+          setStarredPhrases(phrases);
+          return [];
+        } else if (activeTab === 'season' && currentSeason) {
           const seasonData = await getSeasonLeaderboard(currentSeason.id, 100);
           return seasonData.map((s, index) => ({
             userId: s.userId,
@@ -253,24 +259,22 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <LinearGradient
-        colors={[COLORS.primary, COLORS.primaryDark] as any}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>🏆 Leaderboards</Text>
-        {userPosition > 0 && (
-          <Text style={styles.headerSubtitle}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* User Position Info */}
+      {userPosition > 0 && (
+        <View style={styles.userPositionBanner}>
+          <Text style={styles.userPositionText}>
             Your Global Rank: #{userPosition}
           </Text>
-        )}
-        {currentSeason && activeTab === 'season' && (
-          <Text style={styles.seasonInfo}>
+        </View>
+      )}
+      {currentSeason && activeTab === 'season' && (
+        <View style={styles.seasonBanner}>
+          <Text style={styles.seasonText}>
             {currentSeason.name} • {getDaysRemainingInSeason(currentSeason)} days left
           </Text>
-        )}
-      </LinearGradient>
+        </View>
+      )}
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
@@ -408,6 +412,31 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     opacity: 0.8,
     marginTop: SPACING.xs,
+  },
+  userPositionBanner: {
+    backgroundColor: COLORS.primary + '20',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.primary + '40',
+  },
+  userPositionText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.primary,
+  },
+  seasonBanner: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  seasonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
   },
   tabContainer: {
     flexDirection: 'row',

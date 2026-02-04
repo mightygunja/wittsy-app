@@ -1,12 +1,12 @@
 {
   "expo": {
     "name": "Wittz",
-    "slug": "wittz",
-    "version": "1.0.0",
+    "slug": "wittsy-app",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "wittz",
+    "scheme": "wittsy",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -17,21 +17,23 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wittz.app",
-      "buildNumber": "1.0.0",
+      "bundleIdentifier": "com.wittsy.app",
+      "buildNumber": "3",
       "infoPlist": {
         "NSCameraUsageDescription": "Wittz needs access to your camera to take profile photos.",
         "NSPhotoLibraryUsageDescription": "Wittz needs access to your photo library to select profile photos.",
         "NSMicrophoneUsageDescription": "Wittz needs access to your microphone for voice chat features.",
         "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events."
       },
-      "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
-        "usesNonExemptEncryption": false
+        "usesNonExemptEncryption": false,
+        "googleSignIn": {
+          "reservedClientId": "com.googleusercontent.apps.1836a769-48db-4dc3-bffb-6487530c5daa"
+        }
       },
       "associatedDomains": [
-        "applinks:wittz.app",
-        "applinks:www.wittz.app"
+        "applinks:wittsy.app",
+        "applinks:www.wittsy.app"
       ]
     },
     "android": {
@@ -39,7 +41,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6C63FF"
       },
-      "package": "com.wittz.app",
+      "package": "com.wittsy.app",
       "versionCode": 1,
       "permissions": [
         "CAMERA",
@@ -49,7 +51,6 @@
         "VIBRATE",
         "POST_NOTIFICATIONS"
       ],
-      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -57,7 +58,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "wittz.app",
+              "host": "wittsy.app",
               "pathPrefix": "/"
             }
           ],
@@ -73,7 +74,6 @@
       "bundler": "metro"
     },
     "plugins": [
-      "@react-native-firebase/app",
       [
         "expo-notifications",
         {
@@ -93,7 +93,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id-here"
+        "projectId": "1836a769-48db-4dc3-bffb-6487530c5daa"
       }
     },
     "owner": "mightygunja",

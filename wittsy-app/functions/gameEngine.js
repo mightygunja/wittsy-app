@@ -28,8 +28,8 @@ const DURATIONS = {
 async function startGame(roomId) {
   console.log(`🎮 Starting game: ${roomId}`);
   
-  // Get first prompt from cache
-  const prompt = await getRandomPrompt();
+  // Get first prompt from cache (pass roomId for tracking)
+  const prompt = await getRandomPrompt(roomId);
   if (!prompt) throw new Error('No prompts available');
   
   const now = Date.now();
@@ -107,7 +107,7 @@ async function startNewRound(roomId) {
   const roomDoc = await db.collection('rooms').doc(roomId).get();
   const room = roomDoc.data();
   
-  const prompt = await getRandomPrompt();
+  const prompt = await getRandomPrompt(roomId);
   if (!prompt) return;
   
   const newRound = (room.currentRound || 0) + 1;
@@ -208,29 +208,66 @@ async function endGame(roomId) {
   });
   
   await rtdb.ref(`rooms/${roomId}/game`).remove();
+  
+  // Clear used prompts for this room
+  clearRoomPrompts(roomId);
+  
   console.log(`🏁 Game ended: ${roomId}`);
 }
 
 /**
- * Get random prompt (with caching)
+ * Get random prompt (with caching and session-based deduplication)
  */
 let promptsCache = [];
 let cacheTime = 0;
+const usedPromptsPerRoom = new Map(); // Track used prompts per room session
 
-async function getRandomPrompt() {
+async function getRandomPrompt(roomId) {
   const now = Date.now();
   
-  if (promptsCache.length > 0 && (now - cacheTime) < 300000) {
-    const index = Math.floor(Math.random() * promptsCache.length);
-    return promptsCache[index];
+  // Refresh cache every 5 minutes
+  if (promptsCache.length === 0 || (now - cacheTime) > 300000) {
+    const snapshot = await db.collection('prompts')
+      .where('status', '==', 'active')
+      .limit(200)
+      .get();
+    promptsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    cacheTime = now;
+    console.log(`📚 Loaded ${promptsCache.length} prompts into cache`);
   }
   
-  const snapshot = await db.collection('prompts').limit(50).get();
-  promptsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  cacheTime = now;
+  // Get used prompts for this room session
+  const usedPrompts = usedPromptsPerRoom.get(roomId) || new Set();
   
-  const index = Math.floor(Math.random() * promptsCache.length);
-  return promptsCache[index];
+  // Filter out used prompts
+  const availablePrompts = promptsCache.filter(p => !usedPrompts.has(p.id));
+  
+  // If all prompts used, reset for this room
+  if (availablePrompts.length === 0) {
+    console.log(`🔄 All prompts used in room ${roomId}, resetting...`);
+    usedPrompts.clear();
+    usedPromptsPerRoom.set(roomId, usedPrompts);
+    return promptsCache[Math.floor(Math.random() * promptsCache.length)];
+  }
+  
+  // Select random prompt from available
+  const selectedPrompt = availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
+  
+  // Mark as used for this room
+  usedPrompts.add(selectedPrompt.id);
+  usedPromptsPerRoom.set(roomId, usedPrompts);
+  
+  console.log(`✅ Selected prompt for room ${roomId}: "${selectedPrompt.text?.substring(0, 40)}..." (${usedPrompts.size}/${promptsCache.length} used)`);
+  
+  return selectedPrompt;
+}
+
+/**
+ * Clear used prompts for a room (call when game ends)
+ */
+function clearRoomPrompts(roomId) {
+  usedPromptsPerRoom.delete(roomId);
+  console.log(`🧹 Cleared prompt history for room ${roomId}`);
 }
 
 /**
@@ -245,5 +282,6 @@ module.exports = {
   advancePhase,
   startNewRound,
   getPhaseDuration,
+  clearRoomPrompts,
   DURATIONS
 };

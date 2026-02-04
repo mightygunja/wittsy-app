@@ -18,6 +18,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { Card } from '../components/common/Card';
+import { GameplayTutorial } from '../components/tutorial/GameplayTutorial';
+import { isUserAdmin } from '../utils/adminCheck';
 import { Badge } from '../components/common/Badge';
 import { SPACING } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
@@ -27,6 +29,7 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
   const { user, userProfile, signOut } = useAuth();
   const { settings, resetSettings } = useSettings();
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [showTutorial, setShowTutorial] = useState(false);
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -77,6 +80,13 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
   };
 
   const settingsCategories = [
+    {
+      id: 'tutorial',
+      title: 'How to Play',
+      icon: '🎮',
+      description: 'View gameplay tutorial',
+      action: () => setShowTutorial(true),
+    },
     {
       id: 'theme',
       title: 'Theme & Appearance',
@@ -138,7 +148,7 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
       key={category.id}
       variant="elevated"
       style={styles.settingCard}
-      onPress={() => navigation.navigate(category.screen)}
+      onPress={() => category.action ? category.action() : navigation.navigate(category.screen)}
     >
       <View style={styles.settingContent}>
         <View style={styles.settingIcon}>
@@ -160,19 +170,13 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Settings</Text>
-          <View style={styles.headerRight} />
-        </View>
-
+      <GameplayTutorial
+        visible={showTutorial}
+        onComplete={() => setShowTutorial(false)}
+        onSkip={() => setShowTutorial(false)}
+      />
+      
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         {/* User Info */}
         <Animated.View style={[styles.userInfo, { opacity: fadeAnim }]}>
           <View style={styles.userAvatar}>
@@ -195,23 +199,25 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
           >
             {settingsCategories.map(renderSettingCard)}
 
-            {/* Admin Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🔧 Admin</Text>
-              <Card
-                variant="glass"
-                style={styles.adminCard}
-                onPress={() => navigation.navigate('AdminConsole')}
-              >
-                <View style={styles.adminContent}>
-                  <Text style={styles.adminTitle}>Season Management</Text>
-                  <Text style={styles.adminDescription}>
-                    Create and manage competitive seasons
-                  </Text>
-                </View>
-                <Text style={styles.settingArrow}>›</Text>
-              </Card>
-            </View>
+            {/* Admin Section - Only for admins */}
+            {isUserAdmin(user) && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>🔧 Admin</Text>
+                <Card
+                  variant="glass"
+                  style={styles.adminCard}
+                  onPress={() => navigation.navigate('AdminConsole')}
+                >
+                  <View style={styles.adminContent}>
+                    <Text style={styles.adminTitle}>Season Management</Text>
+                    <Text style={styles.adminDescription}>
+                      Create and manage competitive seasons
+                    </Text>
+                  </View>
+                  <Text style={styles.settingArrow}>›</Text>
+                </Card>
+              </View>
+            )}
 
             {/* Danger Zone */}
             <View style={styles.section}>

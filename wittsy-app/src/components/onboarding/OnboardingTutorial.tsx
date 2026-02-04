@@ -20,7 +20,7 @@ import { firestore } from '../../services/firebase';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../utils/constants';
 import * as haptics from '../../utils/haptics';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export interface TutorialStep {
   id: string;
@@ -108,7 +108,6 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
   visible,
   userId,
   onComplete,
-  navigation,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(0));

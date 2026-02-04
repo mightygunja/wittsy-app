@@ -4,6 +4,7 @@
  */
 
 import { Prompt, PromptCategory, PromptDifficulty } from '../types/prompts';
+import { HIP_PROMPTS_2026 } from './hipPrompts2026';
 
 export const PROMPTS_DATABASE: Omit<Prompt, 'id' | 'timesUsed' | 'averageRating' | 'reportCount' | 'createdAt'>[] = [
   // GENERAL (100 prompts)
@@ -163,6 +164,9 @@ export const PROMPTS_DATABASE: Omit<Prompt, 'id' | 'timesUsed' | 'averageRating'
   // Add 150 more prompts across remaining categories...
   // TRAVEL, ANIMALS, HISTORY, SCIENCE, RELATIONSHIPS, WORK, SCHOOL, HOLIDAYS, SEASONAL, TRENDING
   // (Truncated for brevity - would continue with similar pattern)
+  
+  // Merge in hip 2026 prompts
+  ...HIP_PROMPTS_2026,
 ];
 
-// Total: 1000+ prompts across all categories
+// Total: 1000+ prompts across all categories (including 90 hip 2026 prompts)

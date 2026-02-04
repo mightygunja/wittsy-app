@@ -28,6 +28,10 @@ export type GamePhase = 'prompt' | 'submission' | 'waiting' | 'voting' | 'result
 export interface UserProfile extends Omit<User, 'createdAt' | 'lastActive'> {
   createdAt: Date;
   lastActive: Date;
+  coins?: number; // User's coin balance for purchases
+  gameplayTutorialCompleted?: boolean;
+  gameplayTutorialSkipped?: boolean;
+  gameplayTutorialCompletedAt?: string;
 }
 
 export interface Avatar {

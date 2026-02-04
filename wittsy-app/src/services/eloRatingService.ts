@@ -9,33 +9,40 @@ import { firestore } from './firebase';
 import { analytics } from './analytics';
 
 // Rating constants based on industry standards
+// Tuned for party game dynamics (Recommendation 4)
 export const RATING_CONSTANTS = {
   // Starting rating for new players
   INITIAL_RATING: 1200,
   
   // K-factor determines how much ratings change per game
   // Higher K = more volatile ratings
-  K_FACTOR_NEW: 40,        // First 30 games (provisional)
-  K_FACTOR_NORMAL: 24,     // Standard players
-  K_FACTOR_HIGH: 16,       // High-rated players (2000+)
-  K_FACTOR_MASTER: 12,     // Master tier (2400+)
+  // Tuned higher for party game dynamics (more variance than chess)
+  K_FACTOR_PLACEMENT: 60,  // First 10 games (Recommendation 5)
+  K_FACTOR_NEW: 50,        // Games 11-30 (provisional)
+  K_FACTOR_NORMAL: 32,     // Standard players (increased from 24)
+  K_FACTOR_HIGH: 20,       // High-rated players (2000+)
+  K_FACTOR_MASTER: 16,     // Master tier (2400+)
   
-  // Provisional period
-  PROVISIONAL_GAMES: 30,
+  // Periods (Recommendation 5)
+  PLACEMENT_GAMES: 10,     // Placement matches
+  PROVISIONAL_GAMES: 30,   // Provisional period
   
   // Rating floors and ceilings
   MIN_RATING: 100,
-  MAX_RATING: 3000,
+  MAX_RATING: 4000,        // Increased ceiling
   
   // Rating tiers (for K-factor adjustment)
   HIGH_RATING_THRESHOLD: 2000,
   MASTER_RATING_THRESHOLD: 2400,
   
-  // Bonus for winning streaks
+  // Bonus for winning streaks (Recommendation 3)
   WIN_STREAK_BONUS: 2,
   MAX_STREAK_BONUS: 10,
   
-  // Rating deviation (uncertainty)
+  // Margin of victory bonus (Recommendation 3)
+  MARGIN_OF_VICTORY_MAX: 5,
+  
+  // Rating deviation (uncertainty) (Recommendation 6)
   INITIAL_RD: 350,
   MIN_RD: 50,
   MAX_RD: 350,
@@ -52,16 +59,24 @@ export interface RatingUpdate {
   gamesPlayed: number;
   winStreak: number;
   lossStreak: number;
+  marginBonus?: number;        // Margin of victory bonus (Recommendation 3)
+  confidenceLevel?: string;    // Confidence indicator (Recommendation 6)
+  isPlacement?: boolean;       // Placement match flag (Recommendation 5)
 }
 
 export interface PlayerRatingData {
   rating: number;
+  rankedRating?: number;       // Separate ranked rating (Recommendation 2)
+  casualRating?: number;       // Separate casual rating (Recommendation 2)
   gamesPlayed: number;
+  rankedGamesPlayed?: number;  // Ranked games count (Recommendation 2)
+  casualGamesPlayed?: number;  // Casual games count (Recommendation 2)
   wins: number;
   losses: number;
   winStreak: number;
   lossStreak: number;
   peakRating: number;
+  peakRankedRating?: number;   // Peak ranked rating (Recommendation 2)
   ratingDeviation: number;
   lastGameDate: string;
 }
@@ -76,8 +91,14 @@ const calculateExpectedScore = (ratingA: number, ratingB: number): number => {
 
 /**
  * Get K-factor based on player's rating and experience
+ * Recommendation 4 & 5: Tuned for party game with placement matches
  */
 const getKFactor = (rating: number, gamesPlayed: number): number => {
+  // Placement period - very high K for fast calibration (Recommendation 5)
+  if (gamesPlayed < RATING_CONSTANTS.PLACEMENT_GAMES) {
+    return RATING_CONSTANTS.K_FACTOR_PLACEMENT;
+  }
+  
   // Provisional period - higher K for faster calibration
   if (gamesPlayed < RATING_CONSTANTS.PROVISIONAL_GAMES) {
     return RATING_CONSTANTS.K_FACTOR_NEW;
@@ -93,7 +114,7 @@ const getKFactor = (rating: number, gamesPlayed: number): number => {
     return RATING_CONSTANTS.K_FACTOR_HIGH;
   }
   
-  // Normal K-factor
+  // Normal K-factor (tuned higher for party game)
   return RATING_CONSTANTS.K_FACTOR_NORMAL;
 };
 
@@ -105,6 +126,32 @@ const getStreakBonus = (winStreak: number): number => {
   
   const bonus = (winStreak - 2) * RATING_CONSTANTS.WIN_STREAK_BONUS;
   return Math.min(bonus, RATING_CONSTANTS.MAX_STREAK_BONUS);
+};
+
+/**
+ * Calculate margin of victory bonus (Recommendation 3)
+ * Rewards dominant performances
+ */
+const getMarginOfVictoryBonus = (
+  winnerVotes: number,
+  secondPlaceVotes: number,
+  totalVotes: number
+): number => {
+  if (totalVotes === 0) return 0;
+  
+  const margin = (winnerVotes - secondPlaceVotes) / totalVotes;
+  const bonus = Math.round(margin * RATING_CONSTANTS.MARGIN_OF_VICTORY_MAX);
+  return Math.max(0, Math.min(bonus, RATING_CONSTANTS.MARGIN_OF_VICTORY_MAX));
+};
+
+/**
+ * Get confidence level based on rating deviation (Recommendation 6)
+ */
+const getConfidenceLevel = (ratingDeviation: number): string => {
+  if (ratingDeviation >= 250) return 'Uncertain';
+  if (ratingDeviation >= 150) return 'Developing';
+  if (ratingDeviation >= 100) return 'Moderate';
+  return 'Confident';
 };
 
 /**
@@ -128,13 +175,16 @@ const updateRatingDeviation = (
 
 /**
  * Calculate new rating after a game
+ * Enhanced with all recommendations
  */
 export const calculateNewRating = (
   playerRating: number,
   opponentRating: number,
   playerWon: boolean,
   gamesPlayed: number,
-  winStreak: number = 0
+  winStreak: number = 0,
+  marginOfVictoryData?: { winnerVotes: number; secondPlaceVotes: number; totalVotes: number },
+  ratingDeviation: number = RATING_CONSTANTS.INITIAL_RD
 ): RatingUpdate => {
   // Calculate expected score (probability of winning)
   const expectedScore = calculateExpectedScore(playerRating, opponentRating);
@@ -149,9 +199,21 @@ export const calculateNewRating = (
   let ratingChange = kFactor * (actualScore - expectedScore);
   
   // Add win streak bonus
+  let streakBonus = 0;
   if (playerWon && winStreak >= 3) {
-    const streakBonus = getStreakBonus(winStreak);
+    streakBonus = getStreakBonus(winStreak);
     ratingChange += streakBonus;
+  }
+  
+  // Add margin of victory bonus (Recommendation 3)
+  let marginBonus = 0;
+  if (playerWon && marginOfVictoryData) {
+    marginBonus = getMarginOfVictoryBonus(
+      marginOfVictoryData.winnerVotes,
+      marginOfVictoryData.secondPlaceVotes,
+      marginOfVictoryData.totalVotes
+    );
+    ratingChange += marginBonus;
   }
   
   // Round to nearest integer
@@ -164,6 +226,12 @@ export const calculateNewRating = (
   newRating = Math.max(RATING_CONSTANTS.MIN_RATING, newRating);
   newRating = Math.min(RATING_CONSTANTS.MAX_RATING, newRating);
   
+  // Get confidence level (Recommendation 6)
+  const confidenceLevel = getConfidenceLevel(ratingDeviation);
+  
+  // Check if placement match (Recommendation 5)
+  const isPlacement = gamesPlayed < RATING_CONSTANTS.PLACEMENT_GAMES;
+  
   return {
     oldRating: playerRating,
     newRating,
@@ -174,13 +242,20 @@ export const calculateNewRating = (
     gamesPlayed: gamesPlayed + 1,
     winStreak: playerWon ? winStreak + 1 : 0,
     lossStreak: playerWon ? 0 : (winStreak > 0 ? 1 : winStreak + 1),
+    marginBonus: marginBonus > 0 ? marginBonus : undefined,
+    confidenceLevel,
+    isPlacement,
   };
 };
 
 /**
  * Get player's rating data
+ * Enhanced with ranked/casual split (Recommendation 2)
  */
-export const getPlayerRatingData = async (userId: string): Promise<PlayerRatingData> => {
+export const getPlayerRatingData = async (
+  userId: string,
+  isRanked: boolean = true
+): Promise<PlayerRatingData> => {
   try {
     const userDoc = await getDoc(doc(firestore, 'users', userId));
     
@@ -190,14 +265,28 @@ export const getPlayerRatingData = async (userId: string): Promise<PlayerRatingD
     
     const userData = userDoc.data();
     
+    // Use appropriate rating based on game type (Recommendation 2)
+    const rating = isRanked 
+      ? (userData.rankedRating || userData.rating || RATING_CONSTANTS.INITIAL_RATING)
+      : (userData.casualRating || userData.rating || RATING_CONSTANTS.INITIAL_RATING);
+    
+    const gamesPlayed = isRanked
+      ? (userData.rankedGamesPlayed || 0)
+      : (userData.casualGamesPlayed || 0);
+    
     return {
-      rating: userData.rating || RATING_CONSTANTS.INITIAL_RATING,
-      gamesPlayed: userData.gamesPlayed || 0,
+      rating,
+      rankedRating: userData.rankedRating || userData.rating || RATING_CONSTANTS.INITIAL_RATING,
+      casualRating: userData.casualRating || userData.rating || RATING_CONSTANTS.INITIAL_RATING,
+      gamesPlayed,
+      rankedGamesPlayed: userData.rankedGamesPlayed || 0,
+      casualGamesPlayed: userData.casualGamesPlayed || 0,
       wins: userData.gamesWon || 0,
       losses: userData.gamesLost || 0,
       winStreak: userData.winStreak || 0,
       lossStreak: userData.lossStreak || 0,
       peakRating: userData.peakRating || RATING_CONSTANTS.INITIAL_RATING,
+      peakRankedRating: userData.peakRankedRating || RATING_CONSTANTS.INITIAL_RATING,
       ratingDeviation: userData.ratingDeviation || RATING_CONSTANTS.INITIAL_RD,
       lastGameDate: userData.lastGameDate || new Date().toISOString(),
     };
@@ -209,29 +298,34 @@ export const getPlayerRatingData = async (userId: string): Promise<PlayerRatingD
 
 /**
  * Update player rating after a game
+ * Enhanced with ranked/casual split and margin of victory (Recommendations 2 & 3)
  */
 export const updatePlayerRating = async (
   winnerId: string,
-  loserId: string
+  loserId: string,
+  isRanked: boolean = true,
+  marginOfVictoryData?: { winnerVotes: number; secondPlaceVotes: number; totalVotes: number }
 ): Promise<{ winner: RatingUpdate; loser: RatingUpdate }> => {
   try {
-    // Get both players' rating data
+    // Get both players' rating data (with ranked/casual split)
     const [winnerData, loserData] = await Promise.all([
-      getPlayerRatingData(winnerId),
-      getPlayerRatingData(loserId),
+      getPlayerRatingData(winnerId, isRanked),
+      getPlayerRatingData(loserId, isRanked),
     ]);
     
     // Update rating deviation based on inactivity
     const winnerRD = updateRatingDeviation(winnerData.ratingDeviation, winnerData.lastGameDate);
     const loserRD = updateRatingDeviation(loserData.ratingDeviation, loserData.lastGameDate);
     
-    // Calculate new ratings
+    // Calculate new ratings with all enhancements
     const winnerUpdate = calculateNewRating(
       winnerData.rating,
       loserData.rating,
       true,
       winnerData.gamesPlayed,
-      winnerData.winStreak
+      winnerData.winStreak,
+      marginOfVictoryData,
+      winnerRD
     );
     
     const loserUpdate = calculateNewRating(
@@ -239,35 +333,60 @@ export const updatePlayerRating = async (
       winnerData.rating,
       false,
       loserData.gamesPlayed,
-      loserData.lossStreak
+      loserData.lossStreak,
+      undefined,
+      loserRD
     );
     
-    // Update winner's data
+    // Update winner's data with ranked/casual split (Recommendation 2)
     const winnerRef = doc(firestore, 'users', winnerId);
-    await updateDoc(winnerRef, {
-      rating: winnerUpdate.newRating,
-      gamesPlayed: increment(1),
-      gamesWon: increment(1),
+    const winnerUpdates: any = {
       winStreak: winnerUpdate.winStreak,
       lossStreak: 0,
-      peakRating: Math.max(winnerData.peakRating, winnerUpdate.newRating),
       ratingDeviation: Math.max(winnerRD - 10, RATING_CONSTANTS.MIN_RD),
       lastGameDate: new Date().toISOString(),
-    });
+    };
     
-    // Update loser's data
+    if (isRanked) {
+      winnerUpdates.rankedRating = winnerUpdate.newRating;
+      winnerUpdates.rankedGamesPlayed = increment(1);
+      winnerUpdates.peakRankedRating = Math.max(winnerData.peakRankedRating || 0, winnerUpdate.newRating);
+    } else {
+      winnerUpdates.casualRating = winnerUpdate.newRating;
+      winnerUpdates.casualGamesPlayed = increment(1);
+    }
+    
+    // Always update general stats
+    winnerUpdates.gamesPlayed = increment(1);
+    winnerUpdates.gamesWon = increment(1);
+    winnerUpdates.peakRating = Math.max(winnerData.peakRating, winnerUpdate.newRating);
+    
+    await updateDoc(winnerRef, winnerUpdates);
+    
+    // Update loser's data with ranked/casual split (Recommendation 2)
     const loserRef = doc(firestore, 'users', loserId);
-    await updateDoc(loserRef, {
-      rating: loserUpdate.newRating,
-      gamesPlayed: increment(1),
-      gamesLost: increment(1),
+    const loserUpdates: any = {
       winStreak: 0,
       lossStreak: loserUpdate.lossStreak,
       ratingDeviation: Math.max(loserRD - 10, RATING_CONSTANTS.MIN_RD),
       lastGameDate: new Date().toISOString(),
-    });
+    };
     
-    // Record rating history
+    if (isRanked) {
+      loserUpdates.rankedRating = loserUpdate.newRating;
+      loserUpdates.rankedGamesPlayed = increment(1);
+    } else {
+      loserUpdates.casualRating = loserUpdate.newRating;
+      loserUpdates.casualGamesPlayed = increment(1);
+    }
+    
+    // Always update general stats
+    loserUpdates.gamesPlayed = increment(1);
+    loserUpdates.gamesLost = increment(1);
+    
+    await updateDoc(loserRef, loserUpdates);
+    
+    // Record rating history with enhanced data
     await Promise.all([
       addDoc(collection(firestore, 'ratingHistory'), {
         userId: winnerId,
@@ -279,6 +398,10 @@ export const updatePlayerRating = async (
         opponentRating: loserData.rating,
         kFactor: winnerUpdate.kFactor,
         expectedScore: winnerUpdate.expectedScore,
+        isRanked,
+        isPlacement: winnerUpdate.isPlacement,
+        marginBonus: winnerUpdate.marginBonus,
+        confidenceLevel: winnerUpdate.confidenceLevel,
         timestamp: new Date().toISOString(),
       }),
       addDoc(collection(firestore, 'ratingHistory'), {
@@ -291,6 +414,9 @@ export const updatePlayerRating = async (
         opponentRating: winnerData.rating,
         kFactor: loserUpdate.kFactor,
         expectedScore: loserUpdate.expectedScore,
+        isRanked,
+        isPlacement: loserUpdate.isPlacement,
+        confidenceLevel: loserUpdate.confidenceLevel,
         timestamp: new Date().toISOString(),
       }),
     ]);
@@ -320,15 +446,18 @@ export const updatePlayerRating = async (
 /**
  * Update ratings for multiplayer game (3+ players)
  * Uses pairwise comparisons for all player combinations
+ * Enhanced with ranked/casual split and margin of victory (Recommendations 2 & 3)
  */
 export const updateMultiplayerRatings = async (
   playerIds: string[],
-  finalScores: Record<string, number>
+  finalScores: Record<string, number>,
+  isRanked: boolean = true,
+  voteData?: Record<string, number>
 ): Promise<Record<string, RatingUpdate>> => {
   try {
-    // Get all players' rating data
+    // Get all players' rating data with ranked/casual split
     const playersData = await Promise.all(
-      playerIds.map(id => getPlayerRatingData(id))
+      playerIds.map(id => getPlayerRatingData(id, isRanked))
     );
     
     const playerRatings = Object.fromEntries(
@@ -339,6 +468,15 @@ export const updateMultiplayerRatings = async (
     const sortedPlayers = [...playerIds].sort(
       (a, b) => finalScores[b] - finalScores[a]
     );
+    
+    // Calculate margin of victory if vote data provided (Recommendation 3)
+    let marginOfVictoryData: { winnerVotes: number; secondPlaceVotes: number; totalVotes: number } | undefined;
+    if (voteData && sortedPlayers.length >= 2) {
+      const winnerVotes = voteData[sortedPlayers[0]] || 0;
+      const secondPlaceVotes = voteData[sortedPlayers[1]] || 0;
+      const totalVotes = Object.values(voteData).reduce((sum, v) => sum + v, 0);
+      marginOfVictoryData = { winnerVotes, secondPlaceVotes, totalVotes };
+    }
     
     // Calculate rating changes using pairwise comparisons
     const ratingChanges: Record<string, number> = {};
@@ -358,12 +496,16 @@ export const updateMultiplayerRatings = async (
         const playerBData = playersData[playerIds.indexOf(playerB)];
         
         // Player A beat player B (higher score)
+        // Only winner gets margin bonus
+        const isWinner = i === 0;
         const updateA = calculateNewRating(
           playerRatings[playerA],
           playerRatings[playerB],
           true,
           playerAData.gamesPlayed,
-          playerAData.winStreak
+          playerAData.winStreak,
+          isWinner ? marginOfVictoryData : undefined,
+          playerAData.ratingDeviation
         );
         
         const updateB = calculateNewRating(
@@ -371,7 +513,9 @@ export const updateMultiplayerRatings = async (
           playerRatings[playerA],
           false,
           playerBData.gamesPlayed,
-          playerBData.lossStreak
+          playerBData.lossStreak,
+          undefined,
+          playerBData.ratingDeviation
         );
         
         // Accumulate rating changes (divided by number of comparisons)
@@ -402,21 +546,45 @@ export const updateMultiplayerRatings = async (
         gamesPlayed: playerData.gamesPlayed + 1,
         winStreak: isWinner ? playerData.winStreak + 1 : 0,
         lossStreak: isWinner ? 0 : playerData.lossStreak + 1,
+        marginBonus: isWinner && marginOfVictoryData ? getMarginOfVictoryBonus(
+          marginOfVictoryData.winnerVotes,
+          marginOfVictoryData.secondPlaceVotes,
+          marginOfVictoryData.totalVotes
+        ) : undefined,
+        confidenceLevel: getConfidenceLevel(playerData.ratingDeviation),
+        isPlacement: playerData.gamesPlayed < RATING_CONSTANTS.PLACEMENT_GAMES,
       };
       
-      // Update in Firestore
+      // Update in Firestore with ranked/casual split (Recommendation 2)
       const playerRef = doc(firestore, 'users', playerId);
-      await updateDoc(playerRef, {
-        rating: newRating,
+      const playerUpdates: any = {
         gamesPlayed: increment(1),
-        ...(isWinner ? { gamesWon: increment(1) } : { gamesLost: increment(1) }),
         winStreak: updates[playerId].winStreak,
         lossStreak: updates[playerId].lossStreak,
         peakRating: Math.max(playerData.peakRating, newRating),
         lastGameDate: new Date().toISOString(),
-      });
+      };
       
-      // Record rating history
+      if (isRanked) {
+        playerUpdates.rankedRating = newRating;
+        playerUpdates.rankedGamesPlayed = increment(1);
+        if (isWinner) {
+          playerUpdates.peakRankedRating = Math.max(playerData.peakRankedRating || 0, newRating);
+        }
+      } else {
+        playerUpdates.casualRating = newRating;
+        playerUpdates.casualGamesPlayed = increment(1);
+      }
+      
+      if (isWinner) {
+        playerUpdates.gamesWon = increment(1);
+      } else {
+        playerUpdates.gamesLost = increment(1);
+      }
+      
+      await updateDoc(playerRef, playerUpdates);
+      
+      // Record rating history with enhanced data
       await addDoc(collection(firestore, 'ratingHistory'), {
         userId: playerId,
         oldRating: playerData.rating,
@@ -427,6 +595,11 @@ export const updateMultiplayerRatings = async (
         playerCount: playerIds.length,
         finalScore: finalScores[playerId],
         placement: sortedPlayers.indexOf(playerId) + 1,
+        isRanked,
+        isPlacement: updates[playerId].isPlacement,
+        marginBonus: updates[playerId].marginBonus,
+        confidenceLevel: updates[playerId].confidenceLevel,
+        kFactor: updates[playerId].kFactor,
         timestamp: new Date().toISOString(),
       });
     }

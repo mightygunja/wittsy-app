@@ -122,28 +122,18 @@ class BattlePassService {
    */
   async purchasePremium(userId: string): Promise<boolean> {
     try {
-      // ✅ Use real RevenueCat IAP
-      const result = await monetization.subscribe('com.wittz.battlepass.premium');
+      // ✅ Use react-native-iap for battle pass premium
+      // NOTE: The actual granting of premium status happens in monetization.handlePurchaseUpdate()
+      // after Apple confirms the purchase. This just triggers the purchase flow.
+      const result = await monetization.purchaseProduct('com.wittz.battlepass.premium');
       
       if (!result.success) {
         console.error('Battle Pass purchase failed:', result.error);
         return false;
       }
-      
-      // Update Firestore after successful purchase
-      const bpRef = doc(firestore, 'battlePasses', userId);
-      await updateDoc(bpRef, {
-        isPremium: true,
-        purchaseDate: new Date(),
-      });
 
-      analytics.logEvent('battle_pass_purchase', {
-        user_id: userId,
-        season_id: this.currentSeason.id,
-        price: this.currentSeason.price,
-      });
-
-      console.log('✅ Battle Pass premium purchased successfully');
+      console.log('✅ Battle Pass premium purchase initiated');
+      // Purchase successful - benefit will be granted by purchaseUpdateListener
       return true;
     } catch (error) {
       console.error('Failed to purchase premium:', error);
@@ -263,9 +253,9 @@ class BattlePassService {
 
       case 'premium':
         await updateDoc(userRef, {
-          'stats.premium': increment(reward.amount),
+          coins: increment(reward.amount),
         });
-        console.log(`Granted ${reward.amount} gems to user ${userId}`);
+        console.log(`Granted ${reward.amount} coins to user ${userId}`);
         break;
 
       case 'avatar':
@@ -319,30 +309,19 @@ class BattlePassService {
           break;
       }
 
-      // ✅ Use real RevenueCat IAP for level skips
+      // ✅ Use react-native-iap for level skips
+      // NOTE: The actual granting of levels happens in monetization.handlePurchaseUpdate()
+      // after Apple confirms the purchase. This just triggers the purchase flow.
       const productId = `com.wittz.battlepass.skip.${levels}`;
-      const result = await monetization.purchaseCoins(productId); // Using coins purchase for now
+      const result = await monetization.purchaseProduct(productId);
       
       if (!result.success) {
         console.error('Level skip purchase failed:', result.error);
         return false;
       }
-      
-      // Update battle pass level after successful purchase
-      const bpRef = doc(firestore, 'battlePasses', userId);
-      await updateDoc(bpRef, {
-        currentLevel: battlePass.currentLevel + levels,
-        currentXP: 0,
-      });
 
-      analytics.logEvent('battle_pass_level_skip', {
-        user_id: userId,
-        levels_purchased: levels,
-        price,
-        new_level: battlePass.currentLevel + levels,
-      });
-
-      console.log(`✅ Level skip purchased: ${levels} levels`);
+      console.log(`✅ Level skip purchase initiated for ${levels} levels`);
+      // Purchase successful - levels will be granted by purchaseUpdateListener
       return true;
     } catch (error) {
       console.error('Failed to purchase level skip:', error);

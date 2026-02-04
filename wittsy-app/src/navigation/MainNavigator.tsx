@@ -6,13 +6,11 @@ import { CreateRoomScreen } from '../screens/CreateRoomScreen';
 import GameRoomScreen from '../screens/GameRoomScreen';
 import { EnhancedProfileScreen } from '../screens/EnhancedProfileScreen';
 import { EnhancedLeaderboardScreen } from '../screens/EnhancedLeaderboardScreen';
-import { SettingsScreen } from '../screens/SettingsScreen';
 import { AdminConsoleScreen } from '../screens/AdminConsoleScreen';
 import { PromptLibraryScreen } from '../screens/PromptLibraryScreen';
 import { SubmitPromptScreen } from '../screens/SubmitPromptScreen';
 import { PromptApprovalScreen } from '../screens/PromptApprovalScreen';
 import { QuickPlayScreen } from '../screens/QuickPlayScreen';
-import { BrowseRankedRoomsScreen } from '../screens/BrowseRankedRoomsScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ChallengesScreen } from '../screens/ChallengesScreen';
@@ -32,6 +30,7 @@ import { AnalyticsDashboardScreen } from '../screens/AnalyticsDashboardScreen';
 import { BattlePassScreen } from '../screens/BattlePassScreen';
 import { AdminEventsScreen } from '../screens/AdminEventsScreen';
 import { StarredPhrasesScreen } from '../screens/StarredPhrasesScreen';
+import { ReferralScreen } from '../screens/ReferralScreen';
 
 const Stack = createStackNavigator();
 
@@ -71,17 +70,12 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="Profile" 
         component={EnhancedProfileScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Profile' }}
       />
       <Stack.Screen 
         name="Leaderboard" 
         component={EnhancedLeaderboardScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen 
-        name="Settings" 
-        component={SettingsScreen}
-        options={{ title: 'Settings' }}
+        options={{ title: 'Leaderboard' }}
       />
       <Stack.Screen 
         name="AdminConsole" 
@@ -91,108 +85,108 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="PromptLibrary" 
         component={PromptLibraryScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Prompt Library' }}
       />
       <Stack.Screen 
         name="SubmitPrompt" 
         component={SubmitPromptScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Submit Prompt' }}
       />
       <Stack.Screen 
         name="PromptApproval" 
         component={PromptApprovalScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Approve Prompts' }}
       />
       <Stack.Screen 
         name="QuickPlay" 
         component={QuickPlayScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Quick Play' }}
       />
 
       <Stack.Screen 
         name="Friends" 
         component={FriendsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Friends' }}
       />
       <Stack.Screen 
         name="Notifications" 
         component={NotificationsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Notifications' }}
       />
       <Stack.Screen 
         name="Challenges" 
         component={ChallengesScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Challenges' }}
       />
       <Stack.Screen 
         name="Events" 
         component={EventsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Events' }}
       />
       <Stack.Screen 
         name="EnhancedSettings" 
         component={EnhancedSettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Settings' }}
       />
       <Stack.Screen 
         name="ThemeSettings" 
         component={ThemeSettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Theme' }}
       />
       <Stack.Screen 
         name="AudioSettings" 
         component={AudioSettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Audio' }}
       />
       <Stack.Screen 
         name="GameplaySettings" 
         component={GameplaySettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Gameplay' }}
       />
       <Stack.Screen 
         name="LanguageSettings" 
         component={LanguageSettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Language' }}
       />
       <Stack.Screen 
         name="AccessibilitySettings" 
         component={AccessibilitySettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Accessibility' }}
       />
       <Stack.Screen 
         name="PrivacySettings" 
         component={PrivacySettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Privacy' }}
       />
       <Stack.Screen 
         name="NotificationSettings" 
         component={NotificationSettingsScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Notifications' }}
       />
       <Stack.Screen 
         name="AvatarCreator" 
         component={AvatarCreatorScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Avatar Creator' }}
       />
       <Stack.Screen 
         name="AvatarShop" 
         component={AvatarShopScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Avatar Shop' }}
       />
       <Stack.Screen 
         name="CoinShop" 
         component={CoinShopScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Coin Shop' }}
       />
       <Stack.Screen 
         name="AnalyticsDashboard" 
         component={AnalyticsDashboardScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Analytics' }}
       />
       <Stack.Screen 
         name="BattlePass" 
         component={BattlePassScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Battle Pass' }}
       />
       <Stack.Screen 
         name="AdminEvents" 
@@ -202,7 +196,12 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="StarredPhrases" 
         component={StarredPhrasesScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Starred Phrases' }}
+      />
+      <Stack.Screen 
+        name="Referral" 
+        component={ReferralScreen}
+        options={{ title: 'Invite Friends' }}
       />
     </Stack.Navigator>
   );

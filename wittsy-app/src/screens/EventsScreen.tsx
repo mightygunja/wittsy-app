@@ -17,6 +17,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
+import { isUserAdmin } from '../utils/adminCheck';
 import { Event } from '../types/social';
 import {
   getActiveEvents,
@@ -28,8 +30,7 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
-import { SPACING } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { SPACING } from '../utils/constants';
 
 export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -293,14 +294,15 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Events & Tournaments</Text>
-          {(user?.email === 'mightygunja@gmail.com' || user?.email === 'noshir2@gmail.com') ? (
+          {isUserAdmin(user) && (
             <TouchableOpacity 
               style={styles.adminButton}
               onPress={() => navigation.navigate('AdminEvents')}
             >
               <Text style={styles.adminButtonText}>⚙️</Text>
             </TouchableOpacity>
-          ) : (
+          )}
+          {!isUserAdmin(user) && (
             <View style={styles.headerRight} />
           )}
         </View>

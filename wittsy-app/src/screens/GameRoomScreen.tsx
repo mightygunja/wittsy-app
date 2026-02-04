@@ -18,6 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { leaveRoom, startGame } from '../services/database';
+import { saveCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { gameTimerService } from '../services/gameTimer';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
@@ -39,14 +40,16 @@ import { rewards, REWARD_AMOUNTS } from '../services/rewardsService';
 import { incrementChallengeProgress } from '../services/challenges';
 import { battlePass } from '../services/battlePassService';
 import { GameEndSummary } from '../components/game/GameEndSummary';
-import { SPACING } from '../utils/constants';
+import { StarCelebration } from '../components/game/StarCelebration';
+import { SPACING, STAR_THRESHOLD } from '../utils/constants';
 import { updatePlayerRating, RatingUpdate } from '../services/eloRatingService';
 
 // Helper function to advance game phase
 const advancePhase = async (roomId: string) => {
   try {
+    const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'wittsy-51992';
     const response = await fetch(
-      `https://us-central1-wittsy-51992.cloudfunctions.net/advanceGamePhase`,
+      `https://us-central1-${projectId}.cloudfunctions.net/advanceGamePhase`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,6 +100,12 @@ const GameRoomScreen: React.FC = () => {
   const [room, setRoom] = useState<Room | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showStarCelebration, setShowStarCelebration] = useState(false);
+  const [starCelebrationData, setStarCelebrationData] = useState<{
+    username: string;
+    phrase: string;
+    voteCount: number;
+  } | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [phrase, setPhrase] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -320,14 +329,14 @@ const GameRoomScreen: React.FC = () => {
           console.log('🔄 Entering voting phase');
           setHasVoted(false);
         } else if (state.phase === 'results' && previousPhase !== 'results') {
-          console.log(' Entering results phase - calculating winner');
+          console.log('🏆 Entering results phase - calculating winner');
           if (!state.lastWinner && state.votes && state.submissions) {
             const voteCounts: { [userId: string]: number } = {};
             Object.values(state.votes).forEach((votedUserId: any) => {
               if (votedUserId) voteCounts[votedUserId] = (voteCounts[votedUserId] || 0) + 1;
             });
             let maxVotes = 0;
-            let winnerId = null;
+            let winnerId: string | null = null;
             Object.entries(voteCounts).forEach(([userId, count]) => {
               if (count > maxVotes) { maxVotes = count; winnerId = userId; }
             });
@@ -335,6 +344,20 @@ const GameRoomScreen: React.FC = () => {
               state.lastWinner = winnerId;
               state.lastWinningPhrase = state.submissions[winnerId];
               console.log('🏆 Winner:', winnerId, 'Phrase:', state.lastWinningPhrase, 'Votes:', maxVotes);
+              
+              // Check if winner earned a star (4+ votes)
+              if (maxVotes >= STAR_THRESHOLD) {
+                const winnerPlayer = room?.players.find(p => p.userId === winnerId);
+                if (winnerPlayer) {
+                  console.log('⭐ Star earned!', winnerPlayer.username, 'with', maxVotes, 'votes');
+                  setStarCelebrationData({
+                    username: winnerPlayer.username,
+                    phrase: state.submissions[winnerId],
+                    voteCount: maxVotes,
+                  });
+                  setShowStarCelebration(true);
+                }
+              }
               
               // Grant rewards to winner
               rewards.grantRoundWinRewards(winnerId, maxVotes).catch(err => 
@@ -550,6 +573,7 @@ const GameRoomScreen: React.FC = () => {
       // Stop the timer for this room
       gameTimerService.stopTimer(roomId);
       await leaveRoom(roomId, user.uid);
+      await clearCurrentRoom();
       navigation.goBack();
     } catch (error) {
       console.error('Error leaving room:', error);
@@ -557,12 +581,23 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
-  // Cleanup timer on unmount
+  // Save current room on mount and cleanup on unmount
   useEffect(() => {
+    if (user?.uid && room?.name) {
+      saveCurrentRoom(roomId, user.uid, room.name);
+    }
+    
     return () => {
       gameTimerService.stopTimer(roomId);
+      // Auto-leave room when component unmounts (app closes, user navigates away)
+      if (user?.uid) {
+        leaveRoom(roomId, user.uid).catch(err => 
+          console.error('Failed to auto-leave on unmount:', err)
+        );
+        clearCurrentRoom();
+      }
     };
-  }, [roomId]);
+  }, [roomId, user?.uid, room?.name]);
 
   // Handle hardware back button - leave room before going back
   useEffect(() => {
@@ -602,56 +637,100 @@ const GameRoomScreen: React.FC = () => {
       case 'prompt':
         return (
           <View style={styles.promptPhase}>
-            <Text style={styles.phaseTitle}>GET READY!</Text>
-            <Text style={styles.promptText}>{promptText}</Text>
-            <Text style={styles.roundNumber}>Round {gameState.currentRound}</Text>
+            <View style={styles.phaseTitleContainer}>
+              <Text style={styles.phaseTitle}>GET READY!</Text>
+              <Text style={styles.roundBadge}>Round {gameState.currentRound}</Text>
+            </View>
+            <View style={styles.promptDisplayContainer}>
+              <Text style={styles.promptDisplayLabel}>YOUR PROMPT</Text>
+              <Text style={styles.promptDisplayText}>{promptText}</Text>
+            </View>
+            <Text style={styles.phaseSubtitle}>Prepare your wittiest response!</Text>
           </View>
         );
 
       case 'submission':
         return (
-          <View style={styles.submissionPhase}>
-            <Text style={styles.promptText}>{promptText}</Text>
-            
-            <View style={styles.submissionInfo}>
-              <Text style={styles.infoText}>
-                {submissionCount}/{room?.players.length || 0} submitted
-              </Text>
-              {settings.gameplay.showTypingIndicators && typingUsers.length > 0 && (
-                <Text style={styles.typingText}>
-                  {typingUsers.length} {typingUsers.length === 1 ? 'player is' : 'players are'} typing...
-                </Text>
-              )}
-            </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.submissionPhase}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 140 : 100}
+          >
+            <ScrollView
+              contentContainerStyle={styles.submissionScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.promptContainer}>
+                <Text style={styles.promptLabel}>PROMPT</Text>
+                <Text style={styles.promptText}>{promptText}</Text>
+              </View>
+              
+              <View style={styles.submissionInfo}>
+                <View style={styles.progressIndicator}>
+                  <Text style={styles.progressText}>
+                    {submissionCount}/{room?.players.length || 0}
+                  </Text>
+                  <Text style={styles.progressLabel}>submitted</Text>
+                </View>
+                {settings.gameplay.showTypingIndicators && typingUsers.length > 0 && (
+                  <View style={styles.typingIndicator}>
+                    <Text style={styles.typingDot}>●</Text>
+                    <Text style={styles.typingText}>
+                      {typingUsers.length} typing...
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            {!hasSubmitted ? (
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.phraseInput}
-                  placeholder="Enter your witty phrase..."
-                  placeholderTextColor={COLORS.textSecondary}
-                  value={phrase}
-                  onChangeText={handlePhraseChange}
-                  multiline
-                  maxLength={200}
-                  autoFocus
-                />
-                <Text style={styles.charCount}>{phrase.length}/200</Text>
-                <Button
-                  title="SUBMIT PHRASE"
-                  onPress={handleSubmit}
-                  disabled={!phrase.trim()}
-                  size="md"
-                  style={styles.submitButton}
-                />
-              </View>
-            ) : (
-              <View style={styles.waitingContainer}>
-                <Text style={styles.waitingText}>✓ Phrase submitted!</Text>
-                <Text style={styles.waitingSubtext}>Waiting for other players...</Text>
-              </View>
-            )}
-          </View>
+              {!hasSubmitted ? (
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.phraseInput}
+                      placeholder="Type your witty response here..."
+                      placeholderTextColor={COLORS.textSecondary}
+                      value={phrase}
+                      onChangeText={handlePhraseChange}
+                      multiline
+                      maxLength={200}
+                      autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={false}
+                    />
+                    <View style={styles.charCountContainer}>
+                      <Text style={[
+                        styles.charCount,
+                        phrase.length > 180 && styles.charCountWarning,
+                        phrase.length === 200 && styles.charCountMax
+                      ]}>
+                        {phrase.length}/200
+                      </Text>
+                    </View>
+                  </View>
+                  <Button
+                    title={phrase.trim() ? "SUBMIT PHRASE" : "ENTER YOUR PHRASE"}
+                    onPress={handleSubmit}
+                    disabled={!phrase.trim()}
+                    size="lg"
+                    style={styles.submitButton}
+                  />
+                </View>
+              ) : (
+                <View style={styles.waitingContainer}>
+                  <View style={styles.successIcon}>
+                    <Text style={styles.successEmoji}>✓</Text>
+                  </View>
+                  <Text style={styles.waitingText}>Phrase Submitted!</Text>
+                  <Text style={styles.waitingSubtext}>Waiting for other players...</Text>
+                  <View style={styles.submittedPhrasePreview}>
+                    <Text style={styles.previewLabel}>Your phrase:</Text>
+                    <Text style={styles.previewText}>"{phrase}"</Text>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </KeyboardAvoidingView>
         );
 
       case 'waiting':
@@ -732,13 +811,22 @@ const GameRoomScreen: React.FC = () => {
                 })
                 .sort((a, b) => b.votes - a.votes)
                 .map(({ userId, phraseText, votes, username }) => (
-                  <View key={userId} style={styles.resultCard}>
+                  <View key={userId} style={[
+                    styles.resultCard,
+                    votes >= STAR_THRESHOLD && styles.starredResultCard
+                  ]}>
                     <Text style={styles.resultPhrase}>"{phraseText}"</Text>
                     <Text style={styles.resultAuthor}>by {username}</Text>
-                    <Text style={styles.resultVotes}>
-                      {votes} {votes === 1 ? 'vote' : 'votes'}
-                      {votes >= 6 && ' ⭐'}
-                    </Text>
+                    <View style={styles.resultVotesContainer}>
+                      <Text style={styles.resultVotes}>
+                        {votes} {votes === 1 ? 'vote' : 'votes'}
+                      </Text>
+                      {votes >= STAR_THRESHOLD && (
+                        <View style={styles.starBadge}>
+                          <Text style={styles.starBadgeText}>⭐ STARRED</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                 ))}
             </ScrollView>
@@ -858,11 +946,7 @@ const GameRoomScreen: React.FC = () => {
 
         {/* Active game */}
         {gameState && (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1 }}
-            keyboardVerticalOffset={100}
-          >
+          <View style={{ flex: 1 }}>
             <View style={{ flex: 1 }}>
               <ScrollView 
                 style={styles.gameContent}
@@ -914,7 +998,7 @@ const GameRoomScreen: React.FC = () => {
                 </View>
               )}
             </View>
-          </KeyboardAvoidingView>
+          </View>
         )}
 
         {/* Game finished */}
@@ -951,6 +1035,20 @@ const GameRoomScreen: React.FC = () => {
           ratingChanges={ratingChanges}
           currentUserId={user?.uid}
           onContinue={handleGameEndContinue}
+        />
+      )}
+
+      {/* Star Celebration Animation */}
+      {showStarCelebration && starCelebrationData && (
+        <StarCelebration
+          visible={showStarCelebration}
+          username={starCelebrationData.username}
+          phrase={starCelebrationData.phrase}
+          voteCount={starCelebrationData.voteCount}
+          onComplete={() => {
+            setShowStarCelebration(false);
+            setStarCelebrationData(null);
+          }}
         />
       )}
     </SafeAreaView>
@@ -1127,11 +1225,12 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     padding: 20,
   },
   phaseTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: COLORS.primary,
-    marginBottom: 16,
     textAlign: 'center',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   promptText: {
     fontSize: 20,
@@ -1145,7 +1244,33 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: COLORS.textSecondary,
   },
   submissionPhase: {
-    paddingVertical: 16,
+    flex: 1,
+  },
+  submissionScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  promptContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  promptLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+    letterSpacing: 1.5,
+    marginBottom: 8,
   },
   submissionInfo: {
     marginVertical: 16,
@@ -1195,8 +1320,32 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     textAlign: 'center',
   },
   waitingSubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: COLORS.textSecondary,
+    marginBottom: 24,
+  },
+  submittedPhrasePreview: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    maxWidth: '90%',
+  },
+  previewLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 6,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  previewText: {
+    fontSize: 15,
+    color: COLORS.text,
+    fontStyle: 'italic',
+    lineHeight: 22,
   },
   waitingPhase: {
     minHeight: 400,
@@ -1205,31 +1354,77 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     padding: 20,
   },
   votingPhase: {
-    paddingVertical: 8,
+    flex: 1,
+    paddingTop: 16,
   },
   votingHeader: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
-  voteInfo: {
+  promptReminderContainer: {
     backgroundColor: COLORS.surface,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
+    width: '100%',
+  },
+  promptReminderLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  promptReminderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    lineHeight: 22,
+  },
+  voteInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginBottom: 16,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    marginHorizontal: 20,
+  },
+  voteProgress: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  voteProgressText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  voteProgressLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  votedBadge: {
+    backgroundColor: COLORS.success,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   votedText: {
-    fontSize: 13,
-    color: COLORS.success,
+    fontSize: 12,
+    color: '#FFFFFF',
     fontWeight: '700',
-    marginTop: 6,
     letterSpacing: 0.5,
   },
   phrasesList: {
     flex: 1,
-    paddingHorizontal: 4,
+    paddingHorizontal: 16,
   },
   resultsPhase: {
     paddingVertical: 16,
@@ -1268,6 +1463,11 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
+  starredResultCard: {
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderColor: '#FFD700',
+    borderWidth: 2,
+  },
   resultPhrase: {
     fontSize: 14,
     color: COLORS.text,
@@ -1278,13 +1478,35 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 4,
   },
+  resultVotesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   resultVotes: {
     fontSize: 13,
     color: COLORS.primary,
     fontWeight: '600',
   },
+  starBadge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  starBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
   submitButton: {
-    height: 48,
+    height: 56,
+    borderRadius: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   chatContainer: {
     padding: 12,
