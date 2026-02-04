@@ -18,6 +18,7 @@ import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
+import { isGoogleSignInAvailable, getAppEnvironment } from '../utils/platform';
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -150,39 +151,50 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             style={styles.createButton}
           />
 
-          {/* Google Sign-In */}
-          <Button
-            title="🔐 Sign In with Google"
-            onPress={async () => {
-              setLoading(true);
-              try {
-                console.log('🔵 WelcomeScreen: Starting Google Sign-In...');
-                await signInWithGoogle();
-                console.log('✅ WelcomeScreen: Google Sign-In successful');
-              } catch (error: any) {
-                console.error('❌ WelcomeScreen: Google Sign-In error:', error);
-                
-                let errorMessage = 'An error occurred during sign-in';
-                
-                if (error.message) {
-                  errorMessage = error.message;
-                } else if (error.code) {
-                  errorMessage = `Error code: ${error.code}`;
+          {/* Google Sign-In - Only show on native builds */}
+          {isGoogleSignInAvailable() ? (
+            <Button
+              title="🔐 Sign In with Google"
+              onPress={async () => {
+                setLoading(true);
+                try {
+                  console.log('🔵 WelcomeScreen: Starting Google Sign-In...');
+                  await signInWithGoogle();
+                  console.log('✅ WelcomeScreen: Google Sign-In successful');
+                } catch (error: any) {
+                  console.error('❌ WelcomeScreen: Google Sign-In error:', error);
+                  
+                  let errorMessage = 'An error occurred during sign-in';
+                  
+                  if (error.message) {
+                    errorMessage = error.message;
+                  } else if (error.code) {
+                    errorMessage = `Error code: ${error.code}`;
+                  }
+                  
+                  Alert.alert(
+                    'Sign In Failed', 
+                    errorMessage,
+                    [{ text: 'OK' }]
+                  );
+                } finally {
+                  setLoading(false);
                 }
-                
-                Alert.alert(
-                  'Sign In Failed', 
-                  errorMessage,
-                  [{ text: 'OK' }]
-                );
-              } finally {
-                setLoading(false);
-              }
-            }}
-            variant="outline"
-            disabled={loading}
-            style={styles.googleButton}
-          />
+              }}
+              variant="outline"
+              disabled={loading}
+              style={styles.googleButton}
+            />
+          ) : (
+            <View style={styles.expoGoNotice}>
+              <Text style={[styles.expoGoText, { color: COLORS.textSecondary }]}>
+                ℹ️ Google Sign-In not available in {getAppEnvironment()}
+              </Text>
+              <Text style={[styles.expoGoSubtext, { color: COLORS.textSecondary }]}>
+                Use email sign-up or guest mode for testing
+              </Text>
+            </View>
+          )}
 
           {/* Tertiary: Sign In */}
           <TouchableOpacity
@@ -300,6 +312,26 @@ const styles = StyleSheet.create({
   googleButton: {
     height: 56,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  expoGoNotice: {
+    height: 56,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+  },
+  expoGoText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  expoGoSubtext: {
+    fontSize: 11,
+    textAlign: 'center',
   },
   signInButton: {
     padding: SPACING.md,

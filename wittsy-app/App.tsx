@@ -11,6 +11,7 @@ import { monetization } from './src/services/monetization';
 import { abTesting } from './src/services/abTesting';
 import { audioService } from './src/services/audioService';
 import { configureGoogleSignIn } from './src/services/auth';
+import { isExpoGo } from './src/utils/platform';
 import './src/utils/adminHelpers'; // Load admin helpers
 
 export default function App() {
@@ -38,8 +39,13 @@ export default function App() {
         // Initialize A/B testing
         await abTesting.initialize();
         
-        // Configure Google Sign-In
-        configureGoogleSignIn();
+        // Configure Google Sign-In (skip on Expo Go - not supported)
+        if (!isExpoGo()) {
+          configureGoogleSignIn();
+          console.log('✅ Google Sign-In configured (native build)');
+        } else {
+          console.log('⏭️ Skipping Google Sign-In configuration (Expo Go)');
+        }
         
         // Note: Battle Pass, seeding, and other auth-dependent services 
         // will initialize after user authentication in AuthContext
