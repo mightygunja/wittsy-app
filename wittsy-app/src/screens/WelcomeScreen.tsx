@@ -156,9 +156,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             onPress={async () => {
               setLoading(true);
               try {
+                console.log('🔵 WelcomeScreen: Starting Google Sign-In...');
                 await signInWithGoogle();
+                console.log('✅ WelcomeScreen: Google Sign-In successful');
               } catch (error: any) {
-                Alert.alert('Sign In Failed', error.message || 'An error occurred');
+                console.error('❌ WelcomeScreen: Google Sign-In error:', error);
+                
+                let errorMessage = 'An error occurred during sign-in';
+                
+                if (error.message) {
+                  errorMessage = error.message;
+                } else if (error.code) {
+                  errorMessage = `Error code: ${error.code}`;
+                }
+                
+                Alert.alert(
+                  'Sign In Failed', 
+                  errorMessage,
+                  [{ text: 'OK' }]
+                );
               } finally {
                 setLoading(false);
               }

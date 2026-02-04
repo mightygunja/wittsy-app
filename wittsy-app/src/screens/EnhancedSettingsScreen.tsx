@@ -148,7 +148,19 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
       key={category.id}
       variant="elevated"
       style={styles.settingCard}
-      onPress={() => category.action ? category.action() : navigation.navigate(category.screen)}
+      onPress={() => {
+        try {
+          if (category.action) {
+            category.action();
+          } else if (category.screen) {
+            console.log(`🔧 Navigating to: ${category.screen}`);
+            navigation.navigate(category.screen);
+          }
+        } catch (error) {
+          console.error(`❌ Settings navigation error for ${category.id}:`, error);
+          Alert.alert('Navigation Error', `Failed to open ${category.title}. Please try again.`);
+        }
+      }}
     >
       <View style={styles.settingContent}>
         <View style={styles.settingIcon}>

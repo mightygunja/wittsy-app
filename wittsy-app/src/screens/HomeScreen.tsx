@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, Dimensions, Platform, TouchableOpacity, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -129,6 +130,16 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
     
     try {
+      // Check AsyncStorage for today's claim status
+      const today = new Date().toDateString();
+      const lastClaimDate = await AsyncStorage.getItem(`dailyReward_${user.uid}_lastClaim`);
+      
+      if (lastClaimDate === today) {
+        console.log('Daily reward already claimed today (from AsyncStorage), skipping');
+        setDailyRewardClaimedThisSession(true);
+        return;
+      }
+      
       const status = await dailyRewardsService.canClaimToday(user.uid);
       if (status.canClaim && !status.alreadyClaimed) {
         // Show modal after a short delay for better UX
@@ -144,6 +155,15 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleDailyRewardClaimed = async (coins: number, streak: number) => {
     // Mark as claimed this session to prevent re-appearing
     setDailyRewardClaimedThisSession(true);
+    
+    // Store claim date in AsyncStorage
+    try {
+      const today = new Date().toDateString();
+      await AsyncStorage.setItem(`dailyReward_${user?.uid}_lastClaim`, today);
+      console.log('✅ Daily reward claim date saved to AsyncStorage');
+    } catch (error) {
+      console.error('Failed to save claim date to AsyncStorage:', error);
+    }
     
     // Close modal immediately
     setShowDailyReward(false);

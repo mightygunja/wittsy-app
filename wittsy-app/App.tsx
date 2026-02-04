@@ -10,6 +10,7 @@ import { analytics } from './src/services/analytics';
 import { monetization } from './src/services/monetization';
 import { abTesting } from './src/services/abTesting';
 import { audioService } from './src/services/audioService';
+import { configureGoogleSignIn } from './src/services/auth';
 import './src/utils/adminHelpers'; // Load admin helpers
 
 export default function App() {
