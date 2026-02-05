@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
 import { SPACING } from '../../utils/constants';
 import { createSettingsStyles } from '../../styles/settingsStyles';
-import { updateProfile, updateEmail } from 'firebase/auth';
+import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { firestore } from '../../services/firebase';
 
@@ -29,13 +29,8 @@ export const ProfileEditScreen: React.FC = () => {
   const styles = useMemo(() => createSettingsStyles(COLORS, SPACING), [COLORS]);
 
   const [username, setUsername] = useState(userProfile?.username || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [email] = useState(user?.email || '');
   const [saving, setSaving] = useState(false);
-
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
 
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {
     if (username === userProfile?.username) return true; // Same username is OK
@@ -56,11 +51,6 @@ export const ProfileEditScreen: React.FC = () => {
       return;
     }
 
-    if (email.trim() && !validateEmail(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-
     setSaving(true);
     try {
       // Check username availability
@@ -76,42 +66,17 @@ export const ProfileEditScreen: React.FC = () => {
         await updateProfile(user, { displayName: username });
       }
 
-      // Update Firebase Auth email if changed
-      if (email.trim() && email !== user.email) {
-        await updateEmail(user, email.trim());
-        console.log('✅ Email updated in Firebase Auth');
-      }
-
       // Update Firestore user document
       const userRef = doc(firestore, 'users', user.uid);
-      const updateData: any = {
+      await updateDoc(userRef, {
         username: username.trim(),
-      };
-      
-      if (email.trim() && email !== user.email) {
-        updateData.email = email.trim();
-      }
-
-      await updateDoc(userRef, updateData);
+      });
 
       Alert.alert('Success', 'Profile updated successfully!');
       navigation.goBack();
     } catch (error: any) {
       console.error('Failed to update profile:', error);
-      
-      // Handle specific Firebase Auth errors
-      if (error.code === 'auth/requires-recent-login') {
-        Alert.alert(
-          'Re-authentication Required',
-          'For security reasons, please sign out and sign back in before changing your email address.'
-        );
-      } else if (error.code === 'auth/email-already-in-use') {
-        Alert.alert('Error', 'This email address is already in use by another account.');
-      } else if (error.code === 'auth/invalid-email') {
-        Alert.alert('Error', 'Please enter a valid email address.');
-      } else {
-        Alert.alert('Error', error.message || 'Failed to update profile');
-      }
+      Alert.alert('Error', error.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -173,7 +138,7 @@ export const ProfileEditScreen: React.FC = () => {
             <TextInput
               style={{
                 fontSize: 16,
-                color: COLORS.text,
+                color: COLORS.textSecondary,
                 padding: SPACING.sm,
                 backgroundColor: COLORS.background,
                 borderRadius: 8,
@@ -181,15 +146,12 @@ export const ProfileEditScreen: React.FC = () => {
                 borderColor: COLORS.border,
               }}
               value={email}
-              onChangeText={setEmail}
-              placeholder="Email address"
+              editable={false}
+              placeholder="Email address (set during registration)"
               placeholderTextColor={COLORS.textSecondary}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
             />
             <Text style={[styles.settingDescription, { marginTop: SPACING.xs }]}>
-              You may need to re-authenticate to change your email
+              Email is set during account creation and cannot be changed
             </Text>
           </View>
         </View>
