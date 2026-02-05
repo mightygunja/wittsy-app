@@ -396,16 +396,18 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
             style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
             onPress={() => setActiveTab('stats')}
           >
-            <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>
-              📊 Stats
+            <Text style={styles.tabEmoji}>📊</Text>
+            <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]} numberOfLines={1}>
+              Stats
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'achievements' && styles.activeTab]}
             onPress={() => setActiveTab('achievements')}
           >
-            <Text style={[styles.tabText, activeTab === 'achievements' && styles.activeTabText]}>
-              🏆 Achievements
+            <Text style={styles.tabEmoji}>🏆</Text>
+            <Text style={[styles.tabText, activeTab === 'achievements' && styles.activeTabText]} numberOfLines={1}>
+              Achieve
             </Text>
             <View style={styles.tabBadge}>
               <Text style={styles.tabBadgeText}>{unlockedAchievements}/{achievements.length}</Text>
@@ -415,16 +417,18 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
             style={[styles.tab, activeTab === 'seasons' && styles.activeTab]}
             onPress={() => setActiveTab('seasons')}
           >
-            <Text style={[styles.tabText, activeTab === 'seasons' && styles.activeTabText]}>
-              📅 Seasons
+            <Text style={styles.tabEmoji}>📅</Text>
+            <Text style={[styles.tabText, activeTab === 'seasons' && styles.activeTabText]} numberOfLines={1}>
+              Seasons
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'history' && styles.activeTab]}
             onPress={() => setActiveTab('history')}
           >
-            <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
-              📜 History
+            <Text style={styles.tabEmoji}>📜</Text>
+            <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]} numberOfLines={1}>
+              History
             </Text>
           </TouchableOpacity>
         </View>
@@ -1004,7 +1008,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.md,
@@ -1016,9 +1020,14 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     ...SHADOWS.sm,
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  tabEmoji: {
+    fontSize: 16,
   },
   activeTabText: {
     color: '#FFFFFF',
