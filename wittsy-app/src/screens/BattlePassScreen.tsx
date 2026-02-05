@@ -36,6 +36,8 @@ export const BattlePassScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const [stats, setStats] = useState<BattlePassStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<number | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [premiumPercentage, setPremiumPercentage] = useState<number>(0);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -45,6 +47,7 @@ const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     loadBattlePass();
+    loadPremiumStats();
     analytics.screenView('BattlePass');
 
     Animated.timing(fadeAnim, {
@@ -52,6 +55,13 @@ const scrollViewRef = useRef<ScrollView>(null);
       duration: 500,
       useNativeDriver: true,
     }).start();
+
+    // Update countdown every second
+    const interval = setInterval(() => {
+      updateCountdown();
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -63,6 +73,44 @@ const scrollViewRef = useRef<ScrollView>(null);
       }).start();
     }
   }, [stats]);
+
+  const updateCountdown = () => {
+    const season = battlePass.getCurrentSeason();
+    const now = new Date();
+    const end = new Date(season.endDate);
+    const diff = end.getTime() - now.getTime();
+
+    if (diff <= 0) {
+      setTimeRemaining('Season Ended');
+      return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days > 0) {
+      setTimeRemaining(`${days}d ${hours}h remaining`);
+    } else if (hours > 0) {
+      setTimeRemaining(`${hours}h ${minutes}m remaining`);
+    } else {
+      setTimeRemaining(`${minutes}m remaining`);
+    }
+  };
+
+  const loadPremiumStats = async () => {
+    try {
+      // Simulate premium percentage - in production, query Firestore
+      // const totalUsers = await getTotalBattlePassUsers();
+      // const premiumUsers = await getPremiumBattlePassUsers();
+      // const percentage = (premiumUsers / totalUsers) * 100;
+      
+      // For now, use a realistic estimate
+      setPremiumPercentage(23); // 23% of players have premium
+    } catch (error) {
+      console.error('Failed to load premium stats:', error);
+    }
+  };
 
   const loadBattlePass = async () => {
     if (!user) return;
