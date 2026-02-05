@@ -500,7 +500,7 @@ class MonetizationService {
     try {
       const userRef = doc(firestore, 'users', userId);
       await updateDoc(userRef, {
-        coins: increment(coins),
+        'stats.coins': increment(coins),
         'stats.totalCoinsEarned': increment(coins),
       });
       console.log(`✅ Granted ${coins} coins to user ${userId}`);
