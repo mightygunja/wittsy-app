@@ -182,71 +182,183 @@ export const DEFAULT_SKIN_TONES = [
 ];
 
 export const DEFAULT_EYES = [
-  { id: 'eyes_normal', name: 'Normal', emoji: '👀' },
-  { id: 'eyes_happy', name: 'Happy', emoji: '😊' },
-  { id: 'eyes_wink', name: 'Wink', emoji: '😉' },
-  { id: 'eyes_cool', name: 'Cool', emoji: '😎', rarity: 'rare' as AvatarRarity },
-  { id: 'eyes_star', name: 'Star Eyes', emoji: '🤩', rarity: 'epic' as AvatarRarity },
-  { id: 'eyes_heart', name: 'Heart Eyes', emoji: '😍', rarity: 'epic' as AvatarRarity },
-  { id: 'eyes_laser', name: 'Laser Eyes', emoji: '👁️‍🗨️', rarity: 'legendary' as AvatarRarity },
-  { id: 'eyes_founder', name: 'Founder Eyes', emoji: '👁️', rarity: 'epic' as AvatarRarity },
+  // Common
+  { id: 'eyes_normal', name: 'Classic Look', emoji: '👀', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_happy', name: 'Joyful', emoji: '😊', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_wink', name: 'Playful Wink', emoji: '😉', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_closed', name: 'Peaceful', emoji: '😌', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_surprised', name: 'Shocked', emoji: '😲', rarity: 'common' as AvatarRarity },
+  // Rare
+  { id: 'eyes_cool', name: 'Cool Stare', emoji: '😎', rarity: 'rare' as AvatarRarity },
+  { id: 'eyes_determined', name: 'Determined', emoji: '😤', rarity: 'rare' as AvatarRarity },
+  { id: 'eyes_sleepy', name: 'Sleepy', emoji: '😴', rarity: 'rare' as AvatarRarity },
+  { id: 'eyes_angry', name: 'Fierce', emoji: '😠', rarity: 'rare' as AvatarRarity },
+  { id: 'eyes_crying', name: 'Tears of Joy', emoji: '😂', rarity: 'rare' as AvatarRarity },
+  // Epic
+  { id: 'eyes_star', name: 'Starstruck', emoji: '🤩', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_heart', name: 'Lovestruck', emoji: '😍', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_money', name: 'Money Eyes', emoji: '🤑', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_fire', name: 'Burning Passion', emoji: '🔥', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_rainbow', name: 'Rainbow Vision', emoji: '🌈', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_founder', name: 'Founder\'s Gaze', emoji: '�️', rarity: 'epic' as AvatarRarity },
+  // Legendary
+  { id: 'eyes_laser', name: 'Laser Vision', emoji: '👁️‍🗨️', rarity: 'legendary' as AvatarRarity },
+  { id: 'eyes_galaxy', name: 'Cosmic Eyes', emoji: '🌌', rarity: 'legendary' as AvatarRarity },
+  { id: 'eyes_lightning', name: 'Thunder Eyes', emoji: '⚡', rarity: 'legendary' as AvatarRarity },
+  { id: 'eyes_void', name: 'Void Stare', emoji: '🌑', rarity: 'legendary' as AvatarRarity },
 ];
 
 export const DEFAULT_MOUTHS = [
-  { id: 'mouth_smile', name: 'Smile', emoji: '😊' },
-  { id: 'mouth_grin', name: 'Grin', emoji: '😁' },
-  { id: 'mouth_laugh', name: 'Laugh', emoji: '😂' },
-  { id: 'mouth_smirk', name: 'Smirk', emoji: '😏', rarity: 'rare' as AvatarRarity },
-  { id: 'mouth_tongue', name: 'Tongue Out', emoji: '😛', rarity: 'rare' as AvatarRarity },
-  { id: 'mouth_vampire', name: 'Vampire', emoji: '🧛', rarity: 'epic' as AvatarRarity },
+  // Common
+  { id: 'mouth_smile', name: 'Friendly Smile', emoji: '😊', rarity: 'common' as AvatarRarity },
+  { id: 'mouth_grin', name: 'Big Grin', emoji: '😁', rarity: 'common' as AvatarRarity },
+  { id: 'mouth_laugh', name: 'Laughing', emoji: '😂', rarity: 'common' as AvatarRarity },
+  { id: 'mouth_neutral', name: 'Neutral', emoji: '😐', rarity: 'common' as AvatarRarity },
+  { id: 'mouth_kiss', name: 'Kiss', emoji: '😘', rarity: 'common' as AvatarRarity },
+  // Rare
+  { id: 'mouth_smirk', name: 'Confident Smirk', emoji: '😏', rarity: 'rare' as AvatarRarity },
+  { id: 'mouth_tongue', name: 'Cheeky', emoji: '😛', rarity: 'rare' as AvatarRarity },
+  { id: 'mouth_thinking', name: 'Pondering', emoji: '🤔', rarity: 'rare' as AvatarRarity },
+  { id: 'mouth_yawn', name: 'Yawning', emoji: '🥱', rarity: 'rare' as AvatarRarity },
+  { id: 'mouth_whistle', name: 'Whistling', emoji: '�', rarity: 'rare' as AvatarRarity },
+  // Epic
+  { id: 'mouth_vampire', name: 'Vampire Fangs', emoji: '🧛', rarity: 'epic' as AvatarRarity },
+  { id: 'mouth_zipper', name: 'Zipped', emoji: '🤐', rarity: 'epic' as AvatarRarity },
+  { id: 'mouth_robot', name: 'Robot Grill', emoji: '🤖', rarity: 'epic' as AvatarRarity },
+  { id: 'mouth_fire', name: 'Fire Breath', emoji: '🔥', rarity: 'epic' as AvatarRarity },
 ];
 
 export const DEFAULT_HAIR_STYLES = [
-  { id: 'hair_short', name: 'Short', emoji: '💇' },
-  { id: 'hair_long', name: 'Long', emoji: '💇‍♀️' },
-  { id: 'hair_curly', name: 'Curly', emoji: '👨‍🦱' },
-  { id: 'hair_bald', name: 'Bald', emoji: '👨‍🦲' },
-  { id: 'hair_mohawk', name: 'Mohawk', emoji: '🤘', rarity: 'rare' as AvatarRarity },
-  { id: 'hair_afro', name: 'Afro', emoji: '👨‍🦱', rarity: 'rare' as AvatarRarity },
-  { id: 'hair_rainbow', name: 'Rainbow', emoji: '🌈', rarity: 'epic' as AvatarRarity },
-  { id: 'hair_fire', name: 'Fire Hair', emoji: '🔥', rarity: 'legendary' as AvatarRarity },
-  { id: 'hair_short_blue', name: 'Blue Hair', emoji: '💇', rarity: 'rare' as AvatarRarity },
+  // Common
+  { id: 'hair_short', name: 'Classic Cut', emoji: '💇', rarity: 'common' as AvatarRarity },
+  { id: 'hair_long', name: 'Flowing Locks', emoji: '💇‍♀️', rarity: 'common' as AvatarRarity },
+  { id: 'hair_curly', name: 'Bouncy Curls', emoji: '👨‍🦱', rarity: 'common' as AvatarRarity },
+  { id: 'hair_bald', name: 'Smooth Dome', emoji: '👨‍🦲', rarity: 'common' as AvatarRarity },
+  { id: 'hair_pixie', name: 'Pixie Cut', emoji: '💇', rarity: 'common' as AvatarRarity },
+  { id: 'hair_bob', name: 'Bob Cut', emoji: '💇‍♀️', rarity: 'common' as AvatarRarity },
+  // Rare
+  { id: 'hair_mohawk', name: 'Punk Mohawk', emoji: '🤘', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_afro', name: 'Retro Afro', emoji: '👨‍🦱', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_short_blue', name: 'Electric Blue', emoji: '💇', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_pink', name: 'Bubblegum Pink', emoji: '💇', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_green', name: 'Toxic Green', emoji: '💇', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_purple', name: 'Royal Purple', emoji: '💇', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_spiky', name: 'Anime Spikes', emoji: '⚡', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_dreadlocks', name: 'Dreadlocks', emoji: '🎵', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_ponytail', name: 'High Ponytail', emoji: '💇‍♀️', rarity: 'rare' as AvatarRarity },
+  { id: 'hair_braids', name: 'Twin Braids', emoji: '💇‍♀️', rarity: 'rare' as AvatarRarity },
+  // Epic
+  { id: 'hair_rainbow', name: 'Rainbow Cascade', emoji: '🌈', rarity: 'epic' as AvatarRarity },
+  { id: 'hair_galaxy', name: 'Galaxy Hair', emoji: '🌌', rarity: 'epic' as AvatarRarity },
+  { id: 'hair_neon', name: 'Neon Glow', emoji: '💡', rarity: 'epic' as AvatarRarity },
+  { id: 'hair_cyber', name: 'Cyber Punk', emoji: '🤖', rarity: 'epic' as AvatarRarity },
+  { id: 'hair_ice', name: 'Frozen Spikes', emoji: '❄️', rarity: 'epic' as AvatarRarity },
+  { id: 'hair_lava', name: 'Molten Lava', emoji: '🌋', rarity: 'epic' as AvatarRarity },
+  // Legendary
+  { id: 'hair_fire', name: 'Inferno Blaze', emoji: '🔥', rarity: 'legendary' as AvatarRarity },
+  { id: 'hair_lightning', name: 'Thunder Strike', emoji: '⚡', rarity: 'legendary' as AvatarRarity },
+  { id: 'hair_phoenix', name: 'Phoenix Flames', emoji: '🔥', rarity: 'legendary' as AvatarRarity },
+  { id: 'hair_celestial', name: 'Celestial Aura', emoji: '✨', rarity: 'legendary' as AvatarRarity },
+  { id: 'hair_void', name: 'Void Walker', emoji: '🌑', rarity: 'legendary' as AvatarRarity },
+  // Exclusive
+  { id: 'hair_founder_gold', name: 'Founder\'s Glory', emoji: '�', rarity: 'exclusive' as AvatarRarity },
+  { id: 'hair_champion', name: 'Champion\'s Crown', emoji: '🏆', rarity: 'exclusive' as AvatarRarity },
 ];
 
 export const DEFAULT_ACCESSORIES = [
-  { id: 'acc_none', name: 'None', emoji: '🚫' },
-  { id: 'acc_glasses', name: 'Glasses', emoji: '👓', rarity: 'common' as AvatarRarity },
-  { id: 'acc_sunglasses', name: 'Sunglasses', emoji: '🕶️', rarity: 'rare' as AvatarRarity },
-  { id: 'acc_hat', name: 'Hat', emoji: '🎩', rarity: 'rare' as AvatarRarity },
-  { id: 'acc_crown', name: 'Crown', emoji: '👑', rarity: 'epic' as AvatarRarity },
-  { id: 'acc_halo', name: 'Halo', emoji: '😇', rarity: 'epic' as AvatarRarity },
-  { id: 'acc_horns', name: 'Horns', emoji: '😈', rarity: 'epic' as AvatarRarity },
-  { id: 'acc_wizard_hat', name: 'Wizard Hat', emoji: '🧙', rarity: 'legendary' as AvatarRarity },
-  { id: 'acc_founder_crown', name: 'Founder Crown', emoji: '👑', rarity: 'exclusive' as AvatarRarity },
+  // Common
+  { id: 'acc_none', name: 'None', emoji: '🚫', rarity: 'common' as AvatarRarity },
+  { id: 'acc_glasses', name: 'Smart Glasses', emoji: '👓', rarity: 'common' as AvatarRarity },
+  { id: 'acc_headphones', name: 'Headphones', emoji: '🎧', rarity: 'common' as AvatarRarity },
+  { id: 'acc_cap', name: 'Baseball Cap', emoji: '🧢', rarity: 'common' as AvatarRarity },
+  { id: 'acc_bandana', name: 'Bandana', emoji: '🎀', rarity: 'common' as AvatarRarity },
+  { id: 'acc_bow', name: 'Hair Bow', emoji: '🎀', rarity: 'common' as AvatarRarity },
+  // Rare
+  { id: 'acc_sunglasses', name: 'Cool Shades', emoji: '🕶️', rarity: 'rare' as AvatarRarity },
+  { id: 'acc_hat', name: 'Top Hat', emoji: '🎩', rarity: 'rare' as AvatarRarity },
+  { id: 'acc_beanie', name: 'Cozy Beanie', emoji: '🧢', rarity: 'rare' as AvatarRarity },
+  { id: 'acc_visor', name: 'Cyber Visor', emoji: '🕶️', rarity: 'rare' as AvatarRarity },
+  { id: 'acc_mask', name: 'Mystery Mask', emoji: '🎭', rarity: 'rare' as AvatarRarity },
+  { id: 'acc_earrings', name: 'Gold Earrings', emoji: '💍', rarity: 'rare' as AvatarRarity },
+  { id: 'acc_necklace', name: 'Chain Necklace', emoji: '📿', rarity: 'rare' as AvatarRarity },
+  { id: 'acc_scarf', name: 'Stylish Scarf', emoji: '🧣', rarity: 'rare' as AvatarRarity },
+  // Epic
+  { id: 'acc_crown', name: 'Royal Crown', emoji: '👑', rarity: 'epic' as AvatarRarity },
+  { id: 'acc_halo', name: 'Angel Halo', emoji: '😇', rarity: 'epic' as AvatarRarity },
+  { id: 'acc_horns', name: 'Devil Horns', emoji: '😈', rarity: 'epic' as AvatarRarity },
+  { id: 'acc_tiara', name: 'Diamond Tiara', emoji: '👸', rarity: 'epic' as AvatarRarity },
+  { id: 'acc_monocle', name: 'Golden Monocle', emoji: '🧐', rarity: 'epic' as AvatarRarity },
+  { id: 'acc_goggles', name: 'Steampunk Goggles', emoji: '🥽', rarity: 'epic' as AvatarRarity },
+  { id: 'acc_laurel', name: 'Victory Laurel', emoji: '🏆', rarity: 'epic' as AvatarRarity },
+  // Legendary
+  { id: 'acc_wizard_hat', name: 'Archmage Hat', emoji: '🧙', rarity: 'legendary' as AvatarRarity },
+  { id: 'acc_dragon_helm', name: 'Dragon Helm', emoji: '🐉', rarity: 'legendary' as AvatarRarity },
+  { id: 'acc_phoenix_crown', name: 'Phoenix Crown', emoji: '🔥', rarity: 'legendary' as AvatarRarity },
+  { id: 'acc_galaxy_visor', name: 'Galaxy Visor', emoji: '🌌', rarity: 'legendary' as AvatarRarity },
+  { id: 'acc_lightning_bolt', name: 'Lightning Bolt', emoji: '⚡', rarity: 'legendary' as AvatarRarity },
+  // Exclusive
+  { id: 'acc_founder_crown', name: 'Founder\'s Crown', emoji: '👑', rarity: 'exclusive' as AvatarRarity },
+  { id: 'acc_legend_halo', name: 'Legend\'s Halo', emoji: '✨', rarity: 'exclusive' as AvatarRarity },
+  { id: 'acc_ultimate_set', name: 'Ultimate Champion Set', emoji: '💫', rarity: 'exclusive' as AvatarRarity },
 ];
 
 export const DEFAULT_BACKGROUNDS = [
-  { id: 'bg_white', name: 'White', color: '#FFFFFF' },
-  { id: 'bg_purple', name: 'Purple', color: '#6C63FF' },
-  { id: 'bg_blue', name: 'Blue', color: '#4A90E2' },
-  { id: 'bg_green', name: 'Green', color: '#50E3C2' },
-  { id: 'bg_pink', name: 'Pink', color: '#FF6B9D' },
-  { id: 'bg_gradient_sunset', name: 'Sunset', gradient: ['#FF6B6B', '#FFD93D'], rarity: 'rare' as AvatarRarity },
-  { id: 'bg_gradient_ocean', name: 'Ocean', gradient: ['#667EEA', '#764BA2'], rarity: 'rare' as AvatarRarity },
-  { id: 'bg_gradient_fire', name: 'Fire', gradient: ['#FF512F', '#DD2476'], rarity: 'epic' as AvatarRarity },
-  { id: 'bg_animated_stars', name: 'Starry Night', animated: true, rarity: 'legendary' as AvatarRarity },
-  { id: 'bg_gradient_founder', name: 'Founder Gradient', gradient: ['#FFD700', '#FFA500'], rarity: 'epic' as AvatarRarity },
-  { id: 'bg_animated_founder', name: 'Animated Founder BG', animated: true, gradient: ['#FFD700', '#FFA500', '#FF6B6B'], rarity: 'legendary' as AvatarRarity },
+  // Common
+  { id: 'bg_white', name: 'Pure White', color: '#FFFFFF', rarity: 'common' as AvatarRarity },
+  { id: 'bg_purple', name: 'Royal Purple', color: '#6C63FF', rarity: 'common' as AvatarRarity },
+  { id: 'bg_blue', name: 'Sky Blue', color: '#4A90E2', rarity: 'common' as AvatarRarity },
+  { id: 'bg_green', name: 'Mint Green', color: '#50E3C2', rarity: 'common' as AvatarRarity },
+  { id: 'bg_pink', name: 'Bubblegum Pink', color: '#FF6B9D', rarity: 'common' as AvatarRarity },
+  { id: 'bg_red', name: 'Crimson Red', color: '#FF4757', rarity: 'common' as AvatarRarity },
+  { id: 'bg_orange', name: 'Sunset Orange', color: '#FFA502', rarity: 'common' as AvatarRarity },
+  { id: 'bg_black', name: 'Midnight Black', color: '#2F3542', rarity: 'common' as AvatarRarity },
+  // Rare
+  { id: 'bg_gradient_sunset', name: 'Golden Sunset', gradient: ['#FF6B6B', '#FFD93D'], rarity: 'rare' as AvatarRarity },
+  { id: 'bg_gradient_ocean', name: 'Deep Ocean', gradient: ['#667EEA', '#764BA2'], rarity: 'rare' as AvatarRarity },
+  { id: 'bg_gradient_forest', name: 'Emerald Forest', gradient: ['#11998E', '#38EF7D'], rarity: 'rare' as AvatarRarity },
+  { id: 'bg_gradient_candy', name: 'Candy Shop', gradient: ['#FC466B', '#3F5EFB'], rarity: 'rare' as AvatarRarity },
+  { id: 'bg_gradient_neon', name: 'Neon Lights', gradient: ['#FF00FF', '#00FFFF'], rarity: 'rare' as AvatarRarity },
+  // Epic
+  { id: 'bg_gradient_fire', name: 'Inferno Blaze', gradient: ['#FF512F', '#DD2476'], rarity: 'epic' as AvatarRarity },
+  { id: 'bg_gradient_ice', name: 'Frozen Tundra', gradient: ['#00C9FF', '#92FE9D'], rarity: 'epic' as AvatarRarity },
+  { id: 'bg_gradient_galaxy', name: 'Galaxy Nebula', gradient: ['#8E2DE2', '#4A00E0'], rarity: 'epic' as AvatarRarity },
+  { id: 'bg_gradient_aurora', name: 'Aurora Borealis', gradient: ['#00F260', '#0575E6'], rarity: 'epic' as AvatarRarity },
+  { id: 'bg_gradient_founder', name: 'Founder\'s Glory', gradient: ['#FFD700', '#FFA500'], rarity: 'epic' as AvatarRarity },
+  // Legendary
+  { id: 'bg_animated_stars', name: 'Cosmic Starfield', animated: true, rarity: 'legendary' as AvatarRarity },
+  { id: 'bg_animated_fire', name: 'Living Flames', animated: true, gradient: ['#FF512F', '#DD2476'], rarity: 'legendary' as AvatarRarity },
+  { id: 'bg_animated_lightning', name: 'Thunder Storm', animated: true, gradient: ['#FFD700', '#4A00E0'], rarity: 'legendary' as AvatarRarity },
+  { id: 'bg_animated_matrix', name: 'Matrix Code', animated: true, color: '#00FF00', rarity: 'legendary' as AvatarRarity },
+  { id: 'bg_animated_founder', name: 'Founder\'s Radiance', animated: true, gradient: ['#FFD700', '#FFA500', '#FF6B6B'], rarity: 'legendary' as AvatarRarity },
+  // Exclusive
+  { id: 'bg_champion', name: 'Champion\'s Arena', animated: true, gradient: ['#FFD700', '#FF6B6B', '#4A00E0'], rarity: 'exclusive' as AvatarRarity },
+  { id: 'bg_legend', name: 'Legend\'s Domain', animated: true, gradient: ['#E74C3C', '#8E44AD', '#3498DB'], rarity: 'exclusive' as AvatarRarity },
 ];
 
 export const DEFAULT_EFFECTS = [
-  { id: 'fx_none', name: 'None', emoji: '🚫' },
-  { id: 'fx_sparkles', name: 'Sparkles', emoji: '✨', rarity: 'rare' as AvatarRarity },
-  { id: 'fx_glow', name: 'Glow', emoji: '💫', rarity: 'rare' as AvatarRarity },
-  { id: 'fx_fire', name: 'Fire', emoji: '🔥', rarity: 'epic' as AvatarRarity },
-  { id: 'fx_lightning', name: 'Lightning', emoji: '⚡', rarity: 'epic' as AvatarRarity },
+  // Common
+  { id: 'fx_none', name: 'None', emoji: '🚫', rarity: 'common' as AvatarRarity },
+  // Rare
+  { id: 'fx_sparkles', name: 'Sparkle Trail', emoji: '✨', rarity: 'rare' as AvatarRarity },
+  { id: 'fx_glow', name: 'Soft Glow', emoji: '💫', rarity: 'rare' as AvatarRarity },
+  { id: 'fx_stars', name: 'Star Dust', emoji: '⭐', rarity: 'rare' as AvatarRarity },
+  { id: 'fx_hearts', name: 'Love Aura', emoji: '💕', rarity: 'rare' as AvatarRarity },
+  // Epic
+  { id: 'fx_fire', name: 'Flame Aura', emoji: '🔥', rarity: 'epic' as AvatarRarity },
+  { id: 'fx_lightning', name: 'Electric Surge', emoji: '⚡', rarity: 'epic' as AvatarRarity },
+  { id: 'fx_ice', name: 'Frost Aura', emoji: '❄️', rarity: 'epic' as AvatarRarity },
+  { id: 'fx_poison', name: 'Toxic Cloud', emoji: '☠️', rarity: 'epic' as AvatarRarity },
+  { id: 'fx_energy', name: 'Energy Shield', emoji: '🛡️', rarity: 'epic' as AvatarRarity },
+  // Legendary
   { id: 'fx_rainbow', name: 'Rainbow Aura', emoji: '🌈', rarity: 'legendary' as AvatarRarity },
-  { id: 'fx_founder_aura', name: 'Founder Aura', emoji: '✨', rarity: 'exclusive' as AvatarRarity },
+  { id: 'fx_galaxy', name: 'Cosmic Aura', emoji: '🌌', rarity: 'legendary' as AvatarRarity },
+  { id: 'fx_phoenix', name: 'Phoenix Wings', emoji: '🔥', rarity: 'legendary' as AvatarRarity },
+  { id: 'fx_dragon', name: 'Dragon Spirit', emoji: '🐉', rarity: 'legendary' as AvatarRarity },
+  { id: 'fx_void', name: 'Void Essence', emoji: '🌑', rarity: 'legendary' as AvatarRarity },
+  // Exclusive
+  { id: 'fx_founder_aura', name: 'Founder\'s Radiance', emoji: '✨', rarity: 'exclusive' as AvatarRarity },
+  { id: 'fx_champion', name: 'Champion\'s Glory', emoji: '🏆', rarity: 'exclusive' as AvatarRarity },
+  { id: 'fx_legend', name: 'Legendary Presence', emoji: '💫', rarity: 'exclusive' as AvatarRarity },
 ];
 
 // ==================== RARITY COLORS ====================
