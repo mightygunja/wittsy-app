@@ -19,6 +19,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.wittsy.app",
       "buildNumber": "3",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "Wittz needs access to your camera to take profile photos.",
         "NSPhotoLibraryUsageDescription": "Wittz needs access to your photo library to select profile photos.",
@@ -76,6 +77,7 @@
       "bundler": "metro"
     },
     "plugins": [
+      "@react-native-google-signin/google-signin",
       [
         "expo-notifications",
         {
