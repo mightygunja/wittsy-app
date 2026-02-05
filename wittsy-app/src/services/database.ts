@@ -24,6 +24,36 @@ import { avatarService } from './avatarService';
 // ==================== ROOM OPERATIONS ====================
 
 /**
+ * Check if user is already in an active ranked game
+ */
+const isUserInActiveRankedGame = async (userId: string): Promise<boolean> => {
+  try {
+    const q = query(
+      collection(firestore, 'rooms'),
+      where('status', 'in', ['waiting', 'active']),
+      where('isRanked', '==', true)
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    // Check if user is in any of these ranked rooms
+    for (const doc of snapshot.docs) {
+      const roomData = doc.data();
+      const players = roomData.players || [];
+      if (players.some((p: Player) => p.userId === userId)) {
+        console.log(`🚫 User ${userId} is already in active ranked game: ${doc.id}`);
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking user ranked game status:', error);
+    return false;
+  }
+};
+
+/**
  * Create a new game room
  */
 export const createRoom = async (
@@ -156,6 +186,14 @@ export const joinRoom = async (
   const roomData = roomDoc.data();
   const players = roomData.players || [];
   const scores = roomData.scores || {};
+  
+  // Prevent joining multiple ranked games simultaneously
+  if (roomData.isRanked) {
+    const alreadyInRankedGame = await isUserInActiveRankedGame(userId);
+    if (alreadyInRankedGame) {
+      throw new Error('You are already in an active ranked game. Please finish or leave that game before joining another ranked game.');
+    }
+  }
   
   // Check if any player has reached the join lock threshold
   const maxVotes = Math.max(...Object.values(scores).map((s: any) => s.totalVotes || 0));
