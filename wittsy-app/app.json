@@ -28,7 +28,7 @@
       "config": {
         "usesNonExemptEncryption": false,
         "googleSignIn": {
-          "reservedClientId": "com.googleusercontent.apps.1836a769-48db-4dc3-bffb-6487530c5daa"
+          "reservedClientId": "com.googleusercontent.apps.757129696124-cildtmm00qi49redkpq5jtkvdaua02at"
         }
       },
       "associatedDomains": [
@@ -89,7 +89,8 @@
         {
           "microphonePermission": "Allow Wittz to access your microphone for voice chat."
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {
