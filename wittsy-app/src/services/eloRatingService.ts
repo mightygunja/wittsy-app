@@ -351,9 +351,27 @@ export const updatePlayerRating = async (
       winnerUpdates.rankedRating = winnerUpdate.newRating;
       winnerUpdates.rankedGamesPlayed = increment(1);
       winnerUpdates.peakRankedRating = Math.max(winnerData.peakRankedRating || 0, winnerUpdate.newRating);
+      console.log(`🏆 Winner ranked rating update:`, {
+        userId: winnerId,
+        field: 'rankedRating',
+        oldRating: winnerUpdate.oldRating,
+        newRating: winnerUpdate.newRating,
+        change: winnerUpdate.ratingChange,
+        kFactor: winnerUpdate.kFactor,
+        isPlacement: winnerUpdate.isPlacement,
+        marginBonus: winnerUpdate.marginBonus,
+      });
     } else {
       winnerUpdates.casualRating = winnerUpdate.newRating;
       winnerUpdates.casualGamesPlayed = increment(1);
+      console.log(`🏆 Winner casual rating update:`, {
+        userId: winnerId,
+        field: 'casualRating',
+        oldRating: winnerUpdate.oldRating,
+        newRating: winnerUpdate.newRating,
+        change: winnerUpdate.ratingChange,
+        kFactor: winnerUpdate.kFactor,
+      });
     }
     
     // Always update general stats
@@ -362,6 +380,7 @@ export const updatePlayerRating = async (
     winnerUpdates.peakRating = Math.max(winnerData.peakRating, winnerUpdate.newRating);
     
     await updateDoc(winnerRef, winnerUpdates);
+    console.log(`✅ Winner Firestore update completed for user: ${winnerId}`);
     
     // Update loser's data with ranked/casual split (Recommendation 2)
     const loserRef = doc(firestore, 'users', loserId);
@@ -375,9 +394,26 @@ export const updatePlayerRating = async (
     if (isRanked) {
       loserUpdates.rankedRating = loserUpdate.newRating;
       loserUpdates.rankedGamesPlayed = increment(1);
+      console.log(`📉 Loser ranked rating update:`, {
+        userId: loserId,
+        field: 'rankedRating',
+        oldRating: loserUpdate.oldRating,
+        newRating: loserUpdate.newRating,
+        change: loserUpdate.ratingChange,
+        kFactor: loserUpdate.kFactor,
+        isPlacement: loserUpdate.isPlacement,
+      });
     } else {
       loserUpdates.casualRating = loserUpdate.newRating;
       loserUpdates.casualGamesPlayed = increment(1);
+      console.log(`📉 Loser casual rating update:`, {
+        userId: loserId,
+        field: 'casualRating',
+        oldRating: loserUpdate.oldRating,
+        newRating: loserUpdate.newRating,
+        change: loserUpdate.ratingChange,
+        kFactor: loserUpdate.kFactor,
+      });
     }
     
     // Always update general stats
@@ -385,6 +421,7 @@ export const updatePlayerRating = async (
     loserUpdates.gamesLost = increment(1);
     
     await updateDoc(loserRef, loserUpdates);
+    console.log(`✅ Loser Firestore update completed for user: ${loserId}`);
     
     // Record rating history with enhanced data
     await Promise.all([
@@ -583,6 +620,18 @@ export const updateMultiplayerRatings = async (
       }
       
       await updateDoc(playerRef, playerUpdates);
+      
+      console.log(`${isWinner ? '🏆' : '📉'} Multiplayer rating update:`, {
+        userId: playerId,
+        field: isRanked ? 'rankedRating' : 'casualRating',
+        oldRating: playerData.rating,
+        newRating,
+        change: ratingChange,
+        placement: sortedPlayers.indexOf(playerId) + 1,
+        totalPlayers: playerIds.length,
+        isWinner,
+        marginBonus: updates[playerId].marginBonus,
+      });
       
       // Record rating history with enhanced data
       await addDoc(collection(firestore, 'ratingHistory'), {

@@ -44,7 +44,7 @@ export const getGlobalLeaderboard = async (
   try {
     const q = query(
       collection(firestore, 'users'),
-      orderBy('rating', 'desc'),
+      orderBy('rankedRating', 'desc'),
       limit(limitCount)
     );
     
@@ -55,10 +55,10 @@ export const getGlobalLeaderboard = async (
         userId: doc.id,
         username: data.username,
         avatar: data.avatar,
-        rating: data.rating || 0,
+        rating: data.rankedRating || data.rating || 0,
         rank: data.rank || 'Bronze III',
         tier: data.tier || 'Bronze',
-        gamesPlayed: data.stats?.gamesPlayed || 0,
+        gamesPlayed: data.rankedGamesPlayed || data.stats?.gamesPlayed || 0,
         gamesWon: data.stats?.gamesWon || 0,
         winRate: data.stats?.gamesPlayed > 0 
           ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
@@ -87,7 +87,7 @@ export const getRegionalLeaderboard = async (
     const q = query(
       collection(firestore, 'users'),
       where('region', '==', region),
-      orderBy('rating', 'desc'),
+      orderBy('rankedRating', 'desc'),
       limit(limitCount)
     );
     
@@ -98,10 +98,10 @@ export const getRegionalLeaderboard = async (
         userId: doc.id,
         username: data.username,
         avatar: data.avatar,
-        rating: data.rating || 0,
+        rating: data.rankedRating || data.rating || 0,
         rank: data.rank || 'Bronze III',
         tier: data.tier || 'Bronze',
-        gamesPlayed: data.stats?.gamesPlayed || 0,
+        gamesPlayed: data.rankedGamesPlayed || data.stats?.gamesPlayed || 0,
         gamesWon: data.stats?.gamesWon || 0,
         winRate: data.stats?.gamesPlayed > 0 
           ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
@@ -149,10 +149,10 @@ export const getFriendsLeaderboard = async (
           userId: friendDoc.id,
           username: data.username,
           avatar: data.avatar,
-          rating: data.rating || 0,
+          rating: data.rankedRating || data.rating || 0,
           rank: data.rank || 'Bronze III',
           tier: data.tier || 'Bronze',
-          gamesPlayed: data.stats?.gamesPlayed || 0,
+          gamesPlayed: data.rankedGamesPlayed || data.stats?.gamesPlayed || 0,
           gamesWon: data.stats?.gamesWon || 0,
           winRate: data.stats?.gamesPlayed > 0 
             ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
@@ -168,10 +168,10 @@ export const getFriendsLeaderboard = async (
       userId: userDoc.id,
       username: currentUserData.username,
       avatar: currentUserData.avatar,
-      rating: currentUserData.rating || 0,
+      rating: currentUserData.rankedRating || currentUserData.rating || 0,
       rank: currentUserData.rank || 'Bronze III',
       tier: currentUserData.tier || 'Bronze',
-      gamesPlayed: currentUserData.stats?.gamesPlayed || 0,
+      gamesPlayed: currentUserData.rankedGamesPlayed || currentUserData.stats?.gamesPlayed || 0,
       gamesWon: currentUserData.stats?.gamesWon || 0,
       winRate: currentUserData.stats?.gamesPlayed > 0 
         ? Math.round((currentUserData.stats.gamesWon / currentUserData.stats.gamesPlayed) * 100) 
@@ -212,10 +212,10 @@ export const getHallOfFameLeaderboard = async (
         userId: doc.id,
         username: data.username,
         avatar: data.avatar,
-        rating: data.rating || 0,
+        rating: data.rankedRating || data.rating || 0,
         rank: data.rank || 'Bronze III',
         tier: data.tier || 'Bronze',
-        gamesPlayed: data.stats?.gamesPlayed || 0,
+        gamesPlayed: data.rankedGamesPlayed || data.stats?.gamesPlayed || 0,
         gamesWon: data.stats?.gamesWon || 0,
         winRate: data.stats?.gamesPlayed > 0 
           ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
@@ -251,10 +251,10 @@ export const getStarLeadersLeaderboard = async (
         userId: doc.id,
         username: data.username,
         avatar: data.avatar,
-        rating: data.rating || 0,
+        rating: data.rankedRating || data.rating || 0,
         rank: data.rank || 'Bronze III',
         tier: data.tier || 'Bronze',
-        gamesPlayed: data.stats?.gamesPlayed || 0,
+        gamesPlayed: data.rankedGamesPlayed || data.stats?.gamesPlayed || 0,
         gamesWon: data.stats?.gamesWon || 0,
         winRate: data.stats?.gamesPlayed > 0 
           ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
@@ -290,7 +290,7 @@ export const getWinStreakLeaderboard = async (
         userId: doc.id,
         username: data.username,
         avatar: data.avatar,
-        rating: data.rating || 0,
+        rating: data.rankedRating || data.rating || 0,
         rank: data.rank || 'Bronze III',
         tier: data.tier || 'Bronze',
         gamesPlayed: data.stats?.gamesPlayed || 0,
@@ -329,10 +329,10 @@ export const getMostGamesLeaderboard = async (
         userId: doc.id,
         username: data.username,
         avatar: data.avatar,
-        rating: data.rating || 0,
+        rating: data.rankedRating || data.rating || 0,
         rank: data.rank || 'Bronze III',
         tier: data.tier || 'Bronze',
-        gamesPlayed: data.stats?.gamesPlayed || 0,
+        gamesPlayed: data.rankedGamesPlayed || data.stats?.gamesPlayed || 0,
         gamesWon: data.stats?.gamesWon || 0,
         winRate: data.stats?.gamesPlayed > 0 
           ? Math.round((data.stats.gamesWon / data.stats.gamesPlayed) * 100) 
