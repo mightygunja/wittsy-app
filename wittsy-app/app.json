@@ -91,12 +91,6 @@
         {
           "microphonePermission": "Allow Wittz to access your microphone for voice chat."
         }
-      ],
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.757129696124-cildtmm00qi49redkpq5jtkvdaua02at"
-        }
       ]
     ],
     "extra": {
