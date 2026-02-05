@@ -29,8 +29,8 @@ try {
 // Product IDs
 export const COIN_PRODUCTS = {
   FIRST_TIME: Platform.select({
-    ios: 'com.wittz.coins.firsttime',
-    android: 'coins_firsttime',
+    ios: 'com.wittz.coins.starter',
+    android: 'coins_starter',
   }),
   SMALL: Platform.select({
     ios: 'com.wittz.coins.500',
