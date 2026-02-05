@@ -25,7 +25,7 @@ import { firestore } from '../../services/firebase';
 export const ProfileEditScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
   const navigation = useNavigation();
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, refreshUserProfile } = useAuth();
   const styles = useMemo(() => createSettingsStyles(COLORS, SPACING), [COLORS]);
 
   const [username, setUsername] = useState(userProfile?.username || '');
@@ -134,6 +134,9 @@ export const ProfileEditScreen: React.FC = () => {
       }
 
       await updateDoc(userRef, updateData);
+
+      // Refresh user profile to get latest data
+      await refreshUserProfile();
 
       if (!needsAccountUpgrade) {
         Alert.alert('Success', 'Profile updated successfully!');
