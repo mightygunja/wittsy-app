@@ -92,7 +92,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
       >
         {/* Logo/Title */}
         <View style={styles.logoContainer}>
-          <Text style={styles.emoji}>🎮</Text>
           <Text style={[styles.title, { color: COLORS.text }]}>Wittz</Text>
           <Text style={[styles.subtitle, { color: COLORS.textSecondary }]}>
             Battle of Wits
@@ -101,20 +100,17 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
 
         {/* Features */}
         <View style={styles.featuresContainer}>
-          <View style={styles.feature}>
-            <Text style={styles.featureIcon}>🎯</Text>
+          <View style={styles.featureCard}>
             <Text style={[styles.featureText, { color: COLORS.text }]}>
               Compete with friends
             </Text>
           </View>
-          <View style={styles.feature}>
-            <Text style={styles.featureIcon}>🏆</Text>
+          <View style={styles.featureCard}>
             <Text style={[styles.featureText, { color: COLORS.text }]}>
               Climb the leaderboard
             </Text>
           </View>
-          <View style={styles.feature}>
-            <Text style={styles.featureIcon}>💬</Text>
+          <View style={styles.featureCard}>
             <Text style={[styles.featureText, { color: COLORS.text }]}>
               Battle with creative phrases
             </Text>
@@ -136,7 +132,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                 end={{ x: 1, y: 0 }}
                 style={styles.playGradient}
               >
-                <Text style={styles.playIcon}>🎮</Text>
                 <Text style={styles.playText}>Play Now</Text>
                 <Text style={styles.playSubtext}>No signup required</Text>
               </LinearGradient>
@@ -153,8 +148,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
 
           {/* Apple Sign-In - Only show on iOS native builds */}
           {isAppleSignInAvailable() && (
-            <Button
-              title="🍎 Sign In with Apple"
+            <TouchableOpacity
+              style={styles.appleButton}
               onPress={async () => {
                 setLoading(true);
                 try {
@@ -181,16 +176,22 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                   setLoading(false);
                 }
               }}
-              variant="outline"
               disabled={loading}
-              style={styles.appleButton}
-            />
+              activeOpacity={0.8}
+            >
+              <View style={styles.socialButtonContent}>
+                <View style={styles.appleIcon}>
+                  <Text style={styles.appleIconText}></Text>
+                </View>
+                <Text style={[styles.socialButtonText, { color: '#FFFFFF' }]}>Sign in with Apple</Text>
+              </View>
+            </TouchableOpacity>
           )}
 
           {/* Google Sign-In - Only show on native builds */}
           {isGoogleSignInAvailable() ? (
-            <Button
-              title="🔐 Sign In with Google"
+            <TouchableOpacity
+              style={styles.googleButton}
               onPress={async () => {
                 setLoading(true);
                 try {
@@ -217,10 +218,16 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                   setLoading(false);
                 }
               }}
-              variant="outline"
               disabled={loading}
-              style={styles.googleButton}
-            />
+              activeOpacity={0.8}
+            >
+              <View style={styles.socialButtonContent}>
+                <View style={styles.googleIcon}>
+                  <Text style={styles.googleIconText}>G</Text>
+                </View>
+                <Text style={[styles.socialButtonText, { color: '#1F1F1F' }]}>Sign in with Google</Text>
+              </View>
+            </TouchableOpacity>
           ) : (
             <View style={styles.expoGoNotice}>
               <Text style={[styles.expoGoText, { color: COLORS.textSecondary }]}>
@@ -233,14 +240,17 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
           )}
 
           {/* Tertiary: Sign In */}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Login')}
-            style={styles.signInButton}
-          >
-            <Text style={[styles.signInText, { color: COLORS.primary }]}>
-              Already have an account? <Text style={styles.signInLink}>Sign In</Text>
+          <View style={styles.signInContainer}>
+            <Text style={[styles.signInText, { color: COLORS.textSecondary }]}>
+              Already have an account?
             </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              style={styles.signInButton}
+            >
+              <Text style={[styles.signInLink, { color: COLORS.primary }]}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Trust Indicators */}
@@ -272,39 +282,41 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: SPACING.xl * 2,
-  },
-  emoji: {
-    fontSize: 80,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.xl * 2.5,
   },
   title: {
-    fontSize: 56,
-    fontWeight: 'bold',
+    fontSize: 64,
+    fontWeight: '800',
     marginBottom: SPACING.xs,
     textAlign: 'center',
+    letterSpacing: -1,
   },
   subtitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     textAlign: 'center',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    opacity: 0.7,
   },
   featuresContainer: {
     marginBottom: SPACING.xl * 2,
+    gap: SPACING.sm,
   },
-  feature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
+  featureCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-  },
-  featureIcon: {
-    fontSize: 24,
-    marginRight: SPACING.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   featureText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    textAlign: 'center',
   },
   buttonsContainer: {
     gap: SPACING.md,
@@ -319,27 +331,23 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
   },
   playGradient: {
-    paddingVertical: SPACING.xl,
-    paddingHorizontal: SPACING.xl * 1.5,
+    paddingVertical: SPACING.lg + 2,
+    paddingHorizontal: SPACING.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playIcon: {
-    fontSize: 36,
-    marginBottom: SPACING.sm,
-  },
   playText: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: SPACING.xs,
-    letterSpacing: 0.5,
+    marginBottom: 4,
+    letterSpacing: 0.3,
     textAlign: 'center',
   },
   playSubtext: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontWeight: '600',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
     textAlign: 'center',
   },
   createButton: {
@@ -347,11 +355,54 @@ const styles = StyleSheet.create({
   },
   appleButton: {
     height: 56,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: '#000000',
+    borderRadius: RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   googleButton: {
     height: 56,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  socialButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appleIcon: {
+    width: 20,
+    height: 20,
+    marginRight: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appleIconText: {
+    fontSize: 20,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+    marginRight: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconText: {
+    fontSize: 16,
+    color: '#4285F4',
+    fontWeight: '700',
+  },
+  socialButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   expoGoNotice: {
     height: 56,
@@ -373,19 +424,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
   },
-  signInButton: {
-    padding: SPACING.md,
+  signInContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    gap: SPACING.xs,
   },
   signInText: {
     fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: '500',
+  },
+  signInButton: {
+    paddingVertical: 2,
   },
   signInLink: {
-    fontWeight: 'bold',
-    textDecorationLine: 'underline',
+    fontSize: 14,
+    fontWeight: '700',
   },
   trustContainer: {
     marginTop: SPACING.xl,
