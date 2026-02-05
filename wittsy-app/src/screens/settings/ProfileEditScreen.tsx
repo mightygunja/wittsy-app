@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
 import { SPACING } from '../../utils/constants';
 import { createSettingsStyles } from '../../styles/settingsStyles';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, linkWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { doc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { firestore } from '../../services/firebase';
 
@@ -30,11 +30,21 @@ export const ProfileEditScreen: React.FC = () => {
 
   const [username, setUsername] = useState(userProfile?.username || '');
   const [email, setEmail] = useState(userProfile?.email || user?.email || '');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Check if user is anonymous (guest)
+  const isAnonymous = user?.isAnonymous || false;
+  const needsAccountUpgrade = isAnonymous && !user?.email;
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 6;
   };
 
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {
@@ -56,9 +66,32 @@ export const ProfileEditScreen: React.FC = () => {
       return;
     }
 
-    if (email.trim() && !validateEmail(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
+    // If user is anonymous and trying to upgrade account, require email and password
+    if (needsAccountUpgrade) {
+      if (!email.trim()) {
+        Alert.alert('Error', 'Please enter an email address to upgrade your account');
+        return;
+      }
+
+      if (!validateEmail(email.trim())) {
+        Alert.alert('Error', 'Please enter a valid email address');
+        return;
+      }
+
+      if (!password.trim()) {
+        Alert.alert('Error', 'Please enter a password to secure your account');
+        return;
+      }
+
+      if (!validatePassword(password)) {
+        Alert.alert('Error', 'Password must be at least 6 characters');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        Alert.alert('Error', 'Passwords do not match');
+        return;
+      }
     }
 
     setSaving(true);
@@ -71,29 +104,57 @@ export const ProfileEditScreen: React.FC = () => {
         return;
       }
 
+      // If user is anonymous, link with email/password credential
+      if (needsAccountUpgrade && email.trim() && password.trim()) {
+        console.log('🔗 Linking anonymous account to email/password...');
+        const credential = EmailAuthProvider.credential(email.trim(), password);
+        await linkWithCredential(user, credential);
+        console.log('✅ Account successfully upgraded to email/password authentication');
+        
+        Alert.alert(
+          'Account Upgraded!',
+          'Your guest account has been upgraded. You can now sign in with your email and password on any device. All your stats and purchases are preserved!',
+          [{ text: 'OK' }]
+        );
+      }
+
       // Update Firebase Auth display name
       if (user.displayName !== username) {
         await updateProfile(user, { displayName: username });
       }
 
-      // Update Firestore user document (including email in Firestore only)
+      // Update Firestore user document
       const userRef = doc(firestore, 'users', user.uid);
       const updateData: any = {
         username: username.trim(),
       };
       
-      // Store email in Firestore for guest users or email updates
       if (email.trim()) {
         updateData.email = email.trim();
       }
 
       await updateDoc(userRef, updateData);
 
-      Alert.alert('Success', 'Profile updated successfully!');
+      if (!needsAccountUpgrade) {
+        Alert.alert('Success', 'Profile updated successfully!');
+      }
+      
       navigation.goBack();
     } catch (error: any) {
       console.error('Failed to update profile:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      
+      // Handle specific Firebase Auth errors
+      if (error.code === 'auth/email-already-in-use') {
+        Alert.alert('Error', 'This email address is already in use by another account.');
+      } else if (error.code === 'auth/invalid-email') {
+        Alert.alert('Error', 'Please enter a valid email address.');
+      } else if (error.code === 'auth/weak-password') {
+        Alert.alert('Error', 'Password is too weak. Please use at least 6 characters.');
+      } else if (error.code === 'auth/provider-already-linked') {
+        Alert.alert('Error', 'This account is already linked to an email address.');
+      } else {
+        Alert.alert('Error', error.message || 'Failed to update profile');
+      }
     } finally {
       setSaving(false);
     }
@@ -169,11 +230,65 @@ export const ProfileEditScreen: React.FC = () => {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              editable={needsAccountUpgrade}
             />
             <Text style={[styles.settingDescription, { marginTop: SPACING.xs }]}>
-              Add or update your email for account recovery
+              {needsAccountUpgrade 
+                ? 'Add email to upgrade your guest account and preserve purchases'
+                : 'Email address for account recovery'}
             </Text>
           </View>
+
+          {needsAccountUpgrade && (
+            <>
+              <View style={styles.settingCard}>
+                <Text style={[styles.settingLabel, { marginBottom: SPACING.xs }]}>Password</Text>
+                <TextInput
+                  style={{
+                    fontSize: 16,
+                    color: COLORS.text,
+                    padding: SPACING.sm,
+                    backgroundColor: COLORS.background,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                  }}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Create a password (min 6 characters)"
+                  placeholderTextColor={COLORS.textSecondary}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.settingCard}>
+                <Text style={[styles.settingLabel, { marginBottom: SPACING.xs }]}>Confirm Password</Text>
+                <TextInput
+                  style={{
+                    fontSize: 16,
+                    color: COLORS.text,
+                    padding: SPACING.sm,
+                    backgroundColor: COLORS.background,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                  }}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Re-enter your password"
+                  placeholderTextColor={COLORS.textSecondary}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Text style={[styles.settingDescription, { marginTop: SPACING.xs }]}>
+                  ⚠️ Guest Account: Add email & password to preserve your stats and purchases across devices
+                </Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Stats */}
@@ -230,7 +345,11 @@ export const ProfileEditScreen: React.FC = () => {
           disabled={saving}
         >
           <Text style={[styles.actionButtonText, { color: COLORS.text, fontWeight: 'bold' }]}>
-            {saving ? 'Saving...' : '💾 Save Changes'}
+            {saving 
+              ? 'Saving...' 
+              : needsAccountUpgrade 
+                ? '🔒 Upgrade Account' 
+                : '💾 Save Changes'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
