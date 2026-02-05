@@ -148,7 +148,7 @@ export const ProfileScreen: React.FC = () => {
           style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
           onPress={() => setActiveTab('stats')}
         >
-          <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>
+          <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]} numberOfLines={1}>
             Stats
           </Text>
         </TouchableOpacity>
@@ -156,15 +156,18 @@ export const ProfileScreen: React.FC = () => {
           style={[styles.tab, activeTab === 'achievements' && styles.activeTab]}
           onPress={() => setActiveTab('achievements')}
         >
-          <Text style={[styles.tabText, activeTab === 'achievements' && styles.activeTabText]}>
-            Achievements ({unlockedAchievements}/{achievements.length})
+          <Text style={[styles.tabText, activeTab === 'achievements' && styles.activeTabText]} numberOfLines={2}>
+            Achievements
+          </Text>
+          <Text style={[styles.tabText, activeTab === 'achievements' && styles.activeTabText, { fontSize: 10, marginTop: 2 }]} numberOfLines={1}>
+            {unlockedAchievements}/{achievements.length}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'history' && styles.activeTab]}
           onPress={() => setActiveTab('history')}
         >
-          <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
+          <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]} numberOfLines={1}>
             History
           </Text>
         </TouchableOpacity>
@@ -461,7 +464,9 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent'
   },
@@ -469,9 +474,10 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderBottomColor: COLORS.primary
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: COLORS.textSecondary
+    color: COLORS.textSecondary,
+    textAlign: 'center'
   },
   activeTabText: {
     color: COLORS.primary
