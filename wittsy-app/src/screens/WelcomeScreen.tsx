@@ -143,7 +143,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             title="Create Account"
             onPress={() => navigation.navigate('Register')}
             variant="outline"
+            fullWidth
             style={styles.createButton}
+            textStyle={styles.createButtonText}
           />
 
           {/* Apple Sign-In - Only show on iOS native builds */}
@@ -352,6 +354,10 @@ const styles = StyleSheet.create({
   },
   createButton: {
     height: 56,
+  },
+  createButtonText: {
+    textAlign: 'center',
+    width: '100%',
   },
   appleButton: {
     height: 56,
