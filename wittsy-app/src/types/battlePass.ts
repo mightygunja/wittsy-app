@@ -82,97 +82,155 @@ export const SEASON_1: BattlePassSeason = {
   xpPerLevel: 100,
   featured: true,
   rewards: [
-    // Level 1
+    // Level 1 - Welcome Rewards
     {
       level: 1,
-      free: { type: 'coins', amount: 50, icon: '🪙' },
-      premium: { type: 'coins', amount: 200, icon: '🪙' },
+      free: { type: 'coins', amount: 50, name: 'Starter Coins', icon: '🪙' },
+      premium: { type: 'coins', amount: 200, name: 'Premium Welcome Bonus', icon: '💰' },
     },
-    // Level 5
+    // Level 3
+    {
+      level: 3,
+      free: { type: 'avatar', itemId: 'eyes_happy', name: 'Joyful Eyes', icon: '😊', rarity: 'common' },
+      premium: { type: 'avatar', itemId: 'hair_spiky', name: 'Anime Spikes', icon: '⚡', rarity: 'rare' },
+    },
+    // Level 5 - First Major Reward
     {
       level: 5,
-      free: { type: 'avatar', itemId: 'hair_short_blue', name: 'Blue Hair', icon: '💇', rarity: 'rare' },
-      premium: { type: 'avatar', itemId: 'hair_fire', name: 'Fire Hair', icon: '🔥', rarity: 'legendary' },
+      free: { type: 'avatar', itemId: 'hair_short_blue', name: 'Electric Blue Hair', icon: '💇', rarity: 'rare' },
+      premium: { type: 'avatar', itemId: 'hair_fire', name: 'Inferno Blaze', icon: '🔥', rarity: 'legendary' },
     },
-    // Level 10
+    // Level 7
+    {
+      level: 7,
+      premium: { type: 'coins', amount: 300, name: 'Coin Boost', icon: '🪙' },
+    },
+    // Level 10 - Milestone
     {
       level: 10,
-      premium: { type: 'coins', amount: 500, icon: '🪙' },
+      free: { type: 'coins', amount: 100, name: 'Milestone Bonus', icon: '🎯' },
+      premium: { type: 'coins', amount: 500, name: 'Premium Milestone', icon: '💎' },
     },
-    // Level 15
+    // Level 12
+    {
+      level: 12,
+      premium: { type: 'avatar', itemId: 'acc_sunglasses', name: 'Cool Shades', icon: '🕶️', rarity: 'rare' },
+    },
+    // Level 15 - Exclusive Skin
     {
       level: 15,
-      free: { type: 'coins', amount: 100, icon: '🪙' },
-      premium: { type: 'avatar', itemId: 'skin_founder', name: 'Founder Skin', icon: '👤', rarity: 'exclusive' },
+      free: { type: 'avatar', itemId: 'bg_gradient_sunset', name: 'Golden Sunset', icon: '🌅', rarity: 'rare' },
+      premium: { type: 'avatar', itemId: 'skin_founder', name: 'Founder\'s Mark', icon: '👤', rarity: 'exclusive' },
     },
-    // Level 20
+    // Level 18
+    {
+      level: 18,
+      premium: { type: 'avatar', itemId: 'eyes_star', name: 'Starstruck', icon: '🤩', rarity: 'epic' },
+    },
+    // Level 20 - Premium Currency
     {
       level: 20,
-      premium: { type: 'premium', amount: 10, icon: '💎' },
+      free: { type: 'coins', amount: 150, name: 'Progress Reward', icon: '🪙' },
+      premium: { type: 'premium', amount: 10, name: 'Premium Gems', icon: '💎' },
     },
-    // Level 25
+    // Level 25 - Quarter Mark
     {
       level: 25,
-      free: { type: 'avatar', itemId: 'bg_gradient_founder', name: 'Founder BG', icon: '🎨', rarity: 'epic' },
-      premium: { type: 'avatar', itemId: 'bg_animated_founder', name: 'Animated Founder BG', icon: '✨', rarity: 'legendary' },
+      free: { type: 'avatar', itemId: 'bg_gradient_founder', name: 'Founder\'s Glory', icon: '🎨', rarity: 'epic' },
+      premium: { type: 'avatar', itemId: 'bg_animated_founder', name: 'Founder\'s Radiance', icon: '✨', rarity: 'legendary' },
+    },
+    // Level 28
+    {
+      level: 28,
+      premium: { type: 'avatar', itemId: 'hair_galaxy', name: 'Galaxy Hair', icon: '🌌', rarity: 'epic' },
     },
     // Level 30
     {
       level: 30,
-      premium: { type: 'coins', amount: 750, icon: '🪙' },
+      free: { type: 'coins', amount: 200, name: 'Dedication Bonus', icon: '🏅' },
+      premium: { type: 'coins', amount: 750, name: 'Elite Reward', icon: '💰' },
     },
-    // Level 35
+    // Level 35 - XP Boost
     {
       level: 35,
-      free: { type: 'coins', amount: 150, icon: '🪙' },
-      premium: { type: 'xp_boost', amount: 50, name: 'XP Boost 50%', icon: '⚡' },
+      free: { type: 'avatar', itemId: 'acc_crown', name: 'Royal Crown', icon: '👑', rarity: 'epic' },
+      premium: { type: 'xp_boost', amount: 50, name: 'Legendary XP Boost', icon: '⚡' },
     },
-    // Level 40
+    // Level 40 - Midpoint
     {
       level: 40,
-      premium: { type: 'avatar', itemId: 'eyes_founder', name: 'Founder Eyes', icon: '👁️', rarity: 'epic' },
+      free: { type: 'coins', amount: 250, name: 'Halfway Bonus', icon: '🎯' },
+      premium: { type: 'avatar', itemId: 'eyes_founder', name: 'Founder\'s Gaze', icon: '👁️', rarity: 'epic' },
     },
-    // Level 50
+    // Level 45
+    {
+      level: 45,
+      premium: { type: 'avatar', itemId: 'acc_phoenix_crown', name: 'Phoenix Crown', icon: '🔥', rarity: 'legendary' },
+    },
+    // Level 50 - Major Milestone
     {
       level: 50,
-      free: { type: 'title', itemId: 'dedicated', name: 'Dedicated', icon: '🏅' },
-      premium: { type: 'avatar', itemId: 'founder_set_1', name: 'Founder Set', icon: '👑', rarity: 'exclusive' },
+      free: { type: 'title', itemId: 'dedicated', name: 'The Dedicated', icon: '🏅' },
+      premium: { type: 'avatar', itemId: 'hair_phoenix', name: 'Phoenix Flames', icon: '🔥', rarity: 'legendary' },
+    },
+    // Level 55
+    {
+      level: 55,
+      premium: { type: 'coins', amount: 1000, name: 'Elite Cache', icon: '💰' },
     },
     // Level 60
     {
       level: 60,
-      premium: { type: 'coins', amount: 1000, icon: '🪙' },
+      free: { type: 'coins', amount: 300, name: 'Champion\'s Reward', icon: '🏆' },
+      premium: { type: 'avatar', itemId: 'bg_animated_lightning', name: 'Thunder Storm', icon: '⚡', rarity: 'legendary' },
+    },
+    // Level 65
+    {
+      level: 65,
+      premium: { type: 'avatar', itemId: 'fx_phoenix', name: 'Phoenix Wings', icon: '🔥', rarity: 'legendary' },
     },
     // Level 70
     {
       level: 70,
-      free: { type: 'coins', amount: 200, icon: '🪙' },
-      premium: { type: 'premium', amount: 25, icon: '💎' },
+      free: { type: 'coins', amount: 400, name: 'Mastery Bonus', icon: '💎' },
+      premium: { type: 'premium', amount: 25, name: 'Premium Treasure', icon: '💎' },
     },
-    // Level 75
+    // Level 75 - Legendary Aura
     {
       level: 75,
-      premium: { type: 'avatar', itemId: 'fx_founder_aura', name: 'Founder Aura', icon: '✨', rarity: 'legendary' },
+      free: { type: 'avatar', itemId: 'fx_sparkles', name: 'Sparkle Trail', icon: '✨', rarity: 'rare' },
+      premium: { type: 'avatar', itemId: 'fx_founder_aura', name: 'Founder\'s Radiance', icon: '✨', rarity: 'exclusive' },
     },
     // Level 80
     {
       level: 80,
-      premium: { type: 'coins', amount: 1500, icon: '🪙' },
+      free: { type: 'coins', amount: 500, name: 'Elite Cache', icon: '🪙' },
+      premium: { type: 'coins', amount: 1500, name: 'Legendary Hoard', icon: '💰' },
     },
-    // Level 90
+    // Level 85
+    {
+      level: 85,
+      premium: { type: 'avatar', itemId: 'eyes_galaxy', name: 'Cosmic Eyes', icon: '🌌', rarity: 'legendary' },
+    },
+    // Level 90 - Near Completion
     {
       level: 90,
-      free: { type: 'coins', amount: 500, icon: '🪙' },
-      premium: { type: 'avatar', itemId: 'acc_founder_crown', name: 'Founder Crown', icon: '👑', rarity: 'exclusive' },
+      free: { type: 'coins', amount: 750, name: 'Grand Reward', icon: '🏆' },
+      premium: { type: 'avatar', itemId: 'acc_founder_crown', name: 'Founder\'s Crown', icon: '👑', rarity: 'exclusive' },
     },
-    // Level 100
+    // Level 95
+    {
+      level: 95,
+      premium: { type: 'avatar', itemId: 'bg_champion', name: 'Champion\'s Arena', icon: '🏆', rarity: 'exclusive' },
+    },
+    // Level 100 - Ultimate Reward
     {
       level: 100,
-      free: { type: 'title', itemId: 'completionist', name: 'Completionist', icon: '🏆' },
+      free: { type: 'title', itemId: 'completionist', name: 'The Completionist', icon: '🏆' },
       premium: {
         type: 'avatar',
-        itemId: 'founder_ultimate_set',
-        name: 'Ultimate Founder Set',
+        itemId: 'acc_ultimate_set',
+        name: 'Ultimate Champion Set',
         icon: '💫',
         rarity: 'exclusive',
       },
