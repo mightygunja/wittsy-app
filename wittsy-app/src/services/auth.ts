@@ -8,7 +8,6 @@ import {
   User as FirebaseUser,
   GoogleAuthProvider,
   OAuthProvider,
-  FacebookAuthProvider,
   signInWithCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -358,20 +357,6 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
     }
     
     throw new Error(error.message || 'Failed to sign in with Apple');
-  }
-};
-
-// Sign in with Facebook
-export const signInWithFacebook = async (): Promise<FirebaseUser> => {
-  try {
-    console.log('📘 Starting Facebook Sign-In...');
-    
-    // Note: Facebook Sign-In requires expo-auth-session
-    // This is a placeholder - full implementation requires Facebook App ID
-    throw new Error('Facebook Sign-In not yet configured. Please add Facebook App ID to configuration.');
-  } catch (error: any) {
-    console.error('❌ Facebook Sign-In error:', error);
-    throw new Error(error.message || 'Failed to sign in with Facebook');
   }
 };
 
