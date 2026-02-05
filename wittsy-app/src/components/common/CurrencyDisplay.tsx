@@ -23,20 +23,28 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
       return;
     }
 
+    console.log('💰 CurrencyDisplay: Setting up real-time listener for user:', user.uid);
+
     // Real-time listener for user stats
     const userRef = doc(firestore, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setCoins(data?.stats?.coins || 0);
+        const newCoins = data?.stats?.coins || 0;
+        console.log('💰 CurrencyDisplay: Firestore update received, new coins:', newCoins);
+        console.log('💰 CurrencyDisplay: Previous coins:', coins);
+        setCoins(newCoins);
       }
       setLoading(false);
     }, (error) => {
-      console.error('Error loading currency:', error);
+      console.error('❌ CurrencyDisplay: Error loading currency:', error);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('💰 CurrencyDisplay: Cleaning up listener');
+      unsubscribe();
+    };
   }, [user?.uid]);
 
   if (!user) return null;
@@ -51,6 +59,7 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
 
   return (
     <TouchableOpacity 
+      key={`coins-${coins}`}
       style={styles.compactContainer}
       onPress={() => navigation.navigate('CoinShop' as never)}
       activeOpacity={0.7}
