@@ -29,8 +29,13 @@ export const ProfileEditScreen: React.FC = () => {
   const styles = useMemo(() => createSettingsStyles(COLORS, SPACING), [COLORS]);
 
   const [username, setUsername] = useState(userProfile?.username || '');
-  const [email] = useState(user?.email || '');
+  const [email, setEmail] = useState(userProfile?.email || user?.email || '');
   const [saving, setSaving] = useState(false);
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {
     if (username === userProfile?.username) return true; // Same username is OK
@@ -51,6 +56,11 @@ export const ProfileEditScreen: React.FC = () => {
       return;
     }
 
+    if (email.trim() && !validateEmail(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
     setSaving(true);
     try {
       // Check username availability
@@ -66,11 +76,18 @@ export const ProfileEditScreen: React.FC = () => {
         await updateProfile(user, { displayName: username });
       }
 
-      // Update Firestore user document
+      // Update Firestore user document (including email in Firestore only)
       const userRef = doc(firestore, 'users', user.uid);
-      await updateDoc(userRef, {
+      const updateData: any = {
         username: username.trim(),
-      });
+      };
+      
+      // Store email in Firestore for guest users or email updates
+      if (email.trim()) {
+        updateData.email = email.trim();
+      }
+
+      await updateDoc(userRef, updateData);
 
       Alert.alert('Success', 'Profile updated successfully!');
       navigation.goBack();
@@ -138,7 +155,7 @@ export const ProfileEditScreen: React.FC = () => {
             <TextInput
               style={{
                 fontSize: 16,
-                color: COLORS.textSecondary,
+                color: COLORS.text,
                 padding: SPACING.sm,
                 backgroundColor: COLORS.background,
                 borderRadius: 8,
@@ -146,12 +163,15 @@ export const ProfileEditScreen: React.FC = () => {
                 borderColor: COLORS.border,
               }}
               value={email}
-              editable={false}
-              placeholder="Email address (set during registration)"
+              onChangeText={setEmail}
+              placeholder="Enter your email address"
               placeholderTextColor={COLORS.textSecondary}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
             <Text style={[styles.settingDescription, { marginTop: SPACING.xs }]}>
-              Email is set during account creation and cannot be changed
+              Add or update your email for account recovery
             </Text>
           </View>
         </View>
