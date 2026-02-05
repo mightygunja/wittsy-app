@@ -18,7 +18,7 @@ import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
-import { isGoogleSignInAvailable, getAppEnvironment } from '../utils/platform';
+import { isGoogleSignInAvailable, isAppleSignInAvailable, getAppEnvironment } from '../utils/platform';
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -27,7 +27,7 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGuestStart }) => {
   const { colors: COLORS } = useTheme();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInWithApple } = useAuth();
   const [loading, setLoading] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -151,6 +151,42 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             style={styles.createButton}
           />
 
+          {/* Apple Sign-In - Only show on iOS native builds */}
+          {isAppleSignInAvailable() && (
+            <Button
+              title="🍎 Sign In with Apple"
+              onPress={async () => {
+                setLoading(true);
+                try {
+                  console.log('🍎 WelcomeScreen: Starting Apple Sign-In...');
+                  await signInWithApple();
+                  console.log('✅ WelcomeScreen: Apple Sign-In successful');
+                } catch (error: any) {
+                  console.error('❌ WelcomeScreen: Apple Sign-In error:', error);
+                  
+                  let errorMessage = 'An error occurred during sign-in';
+                  
+                  if (error.message) {
+                    errorMessage = error.message;
+                  } else if (error.code) {
+                    errorMessage = `Error code: ${error.code}`;
+                  }
+                  
+                  Alert.alert(
+                    'Sign In Failed', 
+                    errorMessage,
+                    [{ text: 'OK' }]
+                  );
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              variant="outline"
+              disabled={loading}
+              style={styles.appleButton}
+            />
+          )}
+
           {/* Google Sign-In - Only show on native builds */}
           {isGoogleSignInAvailable() ? (
             <Button
@@ -188,7 +224,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
           ) : (
             <View style={styles.expoGoNotice}>
               <Text style={[styles.expoGoText, { color: COLORS.textSecondary }]}>
-                ℹ️ Google Sign-In not available in {getAppEnvironment()}
+                ℹ️ Social Sign-In not available in {getAppEnvironment()}
               </Text>
               <Text style={[styles.expoGoSubtext, { color: COLORS.textSecondary }]}>
                 Use email sign-up or guest mode for testing
@@ -308,6 +344,10 @@ const styles = StyleSheet.create({
   },
   createButton: {
     height: 56,
+  },
+  appleButton: {
+    height: 56,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   googleButton: {
     height: 56,

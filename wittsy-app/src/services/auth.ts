@@ -7,6 +7,8 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
   GoogleAuthProvider,
+  OAuthProvider,
+  FacebookAuthProvider,
   signInWithCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -14,12 +16,20 @@ import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
 import { referralService } from './referralService';
 
-// Dynamic import for Expo Go compatibility
+// Dynamic imports for Expo Go compatibility
 let GoogleSignin: any = null;
+let AppleAuthentication: any = null;
+
 try {
   GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
 } catch (e) {
   console.log('⏭️ Skipping Google Sign-In import (Expo Go)');
+}
+
+try {
+  AppleAuthentication = require('expo-apple-authentication');
+} catch (e) {
+  console.log('⏭️ Skipping Apple Authentication import (Expo Go)');
 }
 
 // Helper to create default avatar
@@ -277,6 +287,91 @@ export const signInWithGoogle = async (): Promise<FirebaseUser> => {
     }
     
     throw new Error(error.message || 'Failed to sign in with Google');
+  }
+};
+
+// Sign in with Apple
+export const signInWithApple = async (): Promise<FirebaseUser> => {
+  try {
+    if (!AppleAuthentication) {
+      throw new Error('Apple Authentication not available');
+    }
+
+    console.log('🍎 Starting Apple Sign-In...');
+    
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+
+    console.log('✅ Got Apple credential');
+
+    // Create an Apple credential for Firebase
+    const { identityToken } = credential;
+    if (!identityToken) {
+      throw new Error('No identity token returned from Apple');
+    }
+
+    const provider = new OAuthProvider('apple.com');
+    const appleCredential = provider.credential({
+      idToken: identityToken,
+    });
+
+    // Sign in to Firebase with the Apple credential
+    const userCredential = await signInWithCredential(auth, appleCredential);
+    console.log('✅ Signed in to Firebase with Apple credential');
+
+    // Get or create user profile
+    const userProfile = await getOrCreateUserProfile(userCredential.user);
+
+    // Initialize referral data for new Apple sign-ins
+    if (userProfile) {
+      try {
+        const existingReferral = await referralService.getReferralData(userCredential.user.uid);
+        if (!existingReferral) {
+          await referralService.initializeReferralData(
+            userCredential.user.uid,
+            userProfile.username || 'Player'
+          );
+        }
+      } catch (error) {
+        console.error('⚠️ Failed to initialize referral data:', error);
+      }
+    }
+
+    // Update last active
+    await setDoc(
+      doc(firestore, 'users', userCredential.user.uid),
+      { lastActive: new Date().toISOString() },
+      { merge: true }
+    );
+
+    console.log('✅ Apple Sign-In complete');
+    return userCredential.user;
+  } catch (error: any) {
+    console.error('❌ Apple Sign-In error:', error);
+    
+    if (error.code === 'ERR_CANCELED') {
+      throw new Error('Sign-in was cancelled');
+    }
+    
+    throw new Error(error.message || 'Failed to sign in with Apple');
+  }
+};
+
+// Sign in with Facebook
+export const signInWithFacebook = async (): Promise<FirebaseUser> => {
+  try {
+    console.log('📘 Starting Facebook Sign-In...');
+    
+    // Note: Facebook Sign-In requires expo-auth-session
+    // This is a placeholder - full implementation requires Facebook App ID
+    throw new Error('Facebook Sign-In not yet configured. Please add Facebook App ID to configuration.');
+  } catch (error: any) {
+    console.error('❌ Facebook Sign-In error:', error);
+    throw new Error(error.message || 'Failed to sign in with Facebook');
   }
 };
 

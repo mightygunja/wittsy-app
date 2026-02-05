@@ -4,6 +4,7 @@
  */
 
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 /**
  * Check if the app is running in Expo Go
@@ -26,6 +27,14 @@ export const isStandaloneBuild = (): boolean => {
  */
 export const isGoogleSignInAvailable = (): boolean => {
   return !isExpoGo();
+};
+
+/**
+ * Check if Apple Sign-In is available
+ * Only available on iOS standalone builds, not in Expo Go
+ */
+export const isAppleSignInAvailable = (): boolean => {
+  return !isExpoGo() && Platform.OS === 'ios';
 };
 
 /**

@@ -25,6 +25,11 @@
         "NSMicrophoneUsageDescription": "Wittz needs access to your microphone for voice chat features.",
         "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events."
       },
+      "entitlements": {
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
+      },
       "config": {
         "usesNonExemptEncryption": false
       },
