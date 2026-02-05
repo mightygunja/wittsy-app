@@ -773,17 +773,25 @@ const GameRoomScreen: React.FC = () => {
         );
 
       case 'results':
-        console.log(' RESULTS PHASE - Winner:', gameState.lastWinner, 'Phrase:', gameState.lastWinningPhrase);
+        console.log('🏆 RESULTS PHASE - Winner:', gameState.lastWinner, 'Phrase:', gameState.lastWinningPhrase);
+        const winnerPlayer = room?.players.find(p => p.userId === gameState.lastWinner);
         return (
           <View style={styles.resultsPhase}>
             <Text style={styles.phaseTitle}>WINNER!</Text>
+            
+            {/* Winner Avatar - 2x size for showcase */}
+            {winnerPlayer?.avatarConfig && (
+              <View style={styles.winnerAvatarContainer}>
+                <AvatarDisplay config={winnerPlayer.avatarConfig} size={200} />
+              </View>
+            )}
             
             {gameState.lastWinningPhrase && (
               <View style={styles.winnerCard}>
                 <Text style={styles.winningPhrase}>"{gameState.lastWinningPhrase}"</Text>
                 {gameState.lastWinner && (
                   <Text style={styles.winnerName}>
-                    by {room?.players.find(p => p.userId === gameState.lastWinner)?.username || 'Unknown'}
+                    by {winnerPlayer?.username || 'Unknown'}
                   </Text>
                 )}
                 
@@ -1590,11 +1598,18 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   },
   resultsPhase: {
     paddingVertical: 16,
+    alignItems: 'center',
+  },
+  winnerAvatarContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   winnerCard: {
     backgroundColor: COLORS.gold,
     borderRadius: 12,
     padding: 16,
+    width: '100%',
     marginVertical: 12,
     alignItems: 'center',
   },
