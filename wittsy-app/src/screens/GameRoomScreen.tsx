@@ -17,6 +17,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
+import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
 import { leaveRoom, startGame } from '../services/database';
 import { saveCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { gameTimerService } from '../services/gameTimer';
