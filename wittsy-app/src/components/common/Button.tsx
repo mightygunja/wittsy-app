@@ -206,7 +206,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
     paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
+    height: '100%',
   },
   fullWidth: {
     width: '100%',
