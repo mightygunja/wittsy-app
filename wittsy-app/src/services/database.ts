@@ -230,7 +230,7 @@ export const joinRoom = async (
 
 /**
  * Leave a room
- * Only terminates room if it falls below MIN_PLAYERS_ACTIVE (3 players)
+ * Only terminates room when ALL players leave (0 players remaining)
  */
 export const leaveRoom = async (roomId: string, userId: string): Promise<void> => {
   const roomRef = doc(firestore, 'rooms', roomId);
@@ -242,44 +242,26 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
   const players = roomData.players || [];
   const updatedPlayers = players.filter((p: Player) => p.userId !== userId);
   
-  const MIN_PLAYERS_ACTIVE = 3;
-  
-  // If room falls below minimum players, terminate the game
-  if (updatedPlayers.length < MIN_PLAYERS_ACTIVE) {
-    // End the game and mark room as finished
-    if (roomData.status === 'active') {
-      await updateDoc(roomRef, {
-        status: 'finished',
-        endedAt: new Date().toISOString(),
-        players: updatedPlayers
-      });
-      console.log(`🏁 Room ${roomId} ended - fell below ${MIN_PLAYERS_ACTIVE} players`);
-    } else if (updatedPlayers.length === 0) {
-      // Delete room if completely empty
-      await deleteDoc(roomRef);
-      console.log(`🗑️ Room ${roomId} deleted - no players remaining`);
-    } else {
-      // Update players but keep room in waiting state
-      await updateDoc(roomRef, {
-        players: updatedPlayers,
-        hostId: updatedPlayers.length > 0 ? updatedPlayers[0].userId : roomData.hostId
-      });
-    }
+  // Only terminate room if ALL players have left
+  if (updatedPlayers.length === 0) {
+    // Delete room if completely empty
+    await deleteDoc(roomRef);
+    console.log(`🗑️ Room ${roomId} deleted - all players left`);
   } else {
-    // Room has enough players - continue game
+    // Room still has players - keep it active
     // If host leaves and there are other players, assign new host
-    if (roomData.hostId === userId && updatedPlayers.length > 0) {
+    if (roomData.hostId === userId) {
       await updateDoc(roomRef, {
         players: updatedPlayers,
         hostId: updatedPlayers[0].userId
       });
-      console.log(`👑 New host assigned in room ${roomId}: ${updatedPlayers[0].username}`);
+      console.log(`👑 Player left room ${roomId}. New host assigned: ${updatedPlayers[0].username}. ${updatedPlayers.length} players remaining - room continues`);
     } else {
       await updateDoc(roomRef, {
         players: updatedPlayers
       });
+      console.log(`✅ Player left room ${roomId}. ${updatedPlayers.length} players remaining - room continues`);
     }
-    console.log(`✅ Player left room ${roomId}. ${updatedPlayers.length} players remaining - game continues`);
   }
 };
 
