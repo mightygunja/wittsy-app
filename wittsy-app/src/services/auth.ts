@@ -202,9 +202,9 @@ export const signIn = async (email: string, password: string): Promise<FirebaseU
 export const configureGoogleSignIn = () => {
   try {
     GoogleSignin.configure({
-      webClientId: '1836a769-48db-4dc3-bffb-6487530c5daa.apps.googleusercontent.com',
+      webClientId: '757129696124-0idv372oukrados213f4cuok31fvce4l.apps.googleusercontent.com',
+      iosClientId: '757129696124-cildtmm00qi49redkpq5jtkvdaua02at.apps.googleusercontent.com',
       offlineAccess: true,
-      iosClientId: 'com.googleusercontent.apps.1836a769-48db-4dc3-bffb-6487530c5daa',
     });
     console.log('✅ Google Sign-In configured');
   } catch (error) {
