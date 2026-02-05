@@ -37,6 +37,8 @@ import {
   DEFAULT_HAIR_STYLES,
   DEFAULT_ACCESSORIES,
   DEFAULT_BACKGROUNDS,
+  RARITY_COLORS,
+  AvatarRarity,
 } from '../types/avatar';
 import { SkinBase, Eyes, Mouths, Hair, Accessories, SKIN_COLORS, HAIR_COLORS } from '../components/avatar/AvatarFeatures';
 
