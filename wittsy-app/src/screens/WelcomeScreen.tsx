@@ -381,6 +381,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    height: '100%',
+    width: '100%',
   },
   appleIcon: {
     width: 20,
