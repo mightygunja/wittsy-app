@@ -54,9 +54,9 @@ service cloud.firestore {
         // Prevent negative values
         request.resource.data.coins >= 0 &&
         request.resource.data.xp >= 0 &&
-        // Prevent username changes after creation
+        // Allow username updates if valid
         (!('username' in request.resource.data) || 
-         request.resource.data.username == resource.data.username);
+         isValidUsername(request.resource.data.username));
       allow delete: if false; // Users cannot delete their own accounts
     }
     
