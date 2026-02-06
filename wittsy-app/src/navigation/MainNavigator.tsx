@@ -204,7 +204,7 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="BattlePass" 
         component={BattlePassScreen}
-        options={{ title: 'Battle Pass' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="AdminEvents" 
