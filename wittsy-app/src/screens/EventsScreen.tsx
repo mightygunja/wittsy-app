@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';
 import { isUserAdmin } from '../utils/adminCheck';
 import { Event } from '../types/social';
 import {
@@ -282,32 +283,27 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     return 'th';
   };
 
-  return (
-    <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
+return (
+  <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <BackButton onPress={() => navigation.goBack()} />
+        <Text style={styles.headerTitle}>Events & Tournaments</Text>
+        {isUserAdmin(user) && (
+          <TouchableOpacity 
+            style={styles.adminButton}
+            onPress={() => navigation.navigate('AdminEvents')}
           >
-            <Text style={styles.backButtonText}>←</Text>
+            <Text style={styles.adminButtonText}>⚙️</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Events & Tournaments</Text>
-          {isUserAdmin(user) && (
-            <TouchableOpacity 
-              style={styles.adminButton}
-              onPress={() => navigation.navigate('AdminEvents')}
-            >
-              <Text style={styles.adminButtonText}>⚙️</Text>
-            </TouchableOpacity>
-          )}
-          {!isUserAdmin(user) && (
-            <View style={styles.headerRight} />
-          )}
-        </View>
+        )}
+        {!isUserAdmin(user) && (
+          <View style={styles.headerRight} />
+        )}
+      </View>
 
-        {/* Content */}
+      {/* Content */}
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           <ScrollView
             style={styles.scrollView}
