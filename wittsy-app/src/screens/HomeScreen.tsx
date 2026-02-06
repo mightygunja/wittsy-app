@@ -397,9 +397,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           ]}
         >
           <View style={styles.titleContainer}>
-            <Animated.View style={{ transform: [{ rotate: '-25deg' }], position: 'absolute', top: 8, left: '10%' }}>
-              <Text style={styles.battleOfTextInner}>Battle of</Text>
-            </Animated.View>
+            <Text style={styles.battleOfTextInner}>Battle of</Text>
             <Text style={styles.gameTitle}>Wittz</Text>
             <LinearGradient
               colors={[COLORS.primary, COLORS.primaryDark] as any}
@@ -858,6 +856,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontStyle: 'italic',
     color: COLORS.text,
     opacity: 0.85,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
   },
   gameTitle: {
     fontSize: 42,
