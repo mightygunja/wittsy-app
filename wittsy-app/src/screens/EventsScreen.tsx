@@ -309,41 +309,31 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         >
           {/* Featured Events */}
           {featuredEvents.length > 0 && (
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-            }
-          >
-            {/* Featured Events */}
-            {featuredEvents.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>⭐ Featured Events</Text>
-                {featuredEvents.map(event => renderEventCard(event, true))}
-              </View>
-            )}
-
-            {/* All Events */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📅 All Events</Text>
-              {allEvents.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateIcon}>🎪</Text>
-                  <Text style={styles.emptyStateTitle}>No Events Available</Text>
-                  <Text style={styles.emptyStateText}>
-                    Check back soon for upcoming events!
-                  </Text>
-                </View>
-              ) : (
-                allEvents.map(event => renderEventCard(event, false))
-              )}
+              <Text style={styles.sectionTitle}>⭐ Featured Events</Text>
+              {featuredEvents.map(event => renderEventCard(event, true))}
             </View>
-          </ScrollView>
-        </Animated.View>
-      </SafeAreaView>
-    </LinearGradient>
+          )}
+
+          {/* All Events */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📅 All Events</Text>
+            {allEvents.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>🎪</Text>
+                <Text style={styles.emptyStateTitle}>No Events Available</Text>
+                <Text style={styles.emptyStateText}>
+                  Check back soon for upcoming events!
+                </Text>
+              </View>
+            ) : (
+              allEvents.map(event => renderEventCard(event, false))
+            )}
+          </View>
+        </ScrollView>
+      </Animated.View>
+    </SafeAreaView>
+  </LinearGradient>
   );
 };
 
