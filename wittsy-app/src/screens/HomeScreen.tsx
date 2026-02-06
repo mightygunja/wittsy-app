@@ -38,6 +38,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [dailyRewardClaimedThisSession, setDailyRewardClaimedThisSession] = useState(false);
+  const dailyRewardCheckedRef = useRef(false);
   
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   
@@ -123,10 +124,18 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const checkDailyReward = async () => {
     if (!user) return;
     
+    // CRITICAL: Only check once per app session using ref
+    if (dailyRewardCheckedRef.current) {
+      return;
+    }
+    
     // Don't check again if already claimed this session OR if modal is already showing
     if (dailyRewardClaimedThisSession || showDailyReward) {
       return;
     }
+    
+    // Mark as checked immediately to prevent race conditions
+    dailyRewardCheckedRef.current = true;
     
     try {
       // Check AsyncStorage for today's claim status
@@ -142,7 +151,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       if (status.canClaim && !status.alreadyClaimed && !showDailyReward) {
         // Show modal after a short delay for better UX
         setTimeout(() => {
-          if (!showDailyReward) {
+          if (!showDailyReward && !dailyRewardClaimedThisSession) {
             setShowDailyReward(true);
           }
         }, 1000);
@@ -156,6 +165,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     // Close modal immediately and mark as claimed
     setShowDailyReward(false);
     setDailyRewardClaimedThisSession(true);
+    dailyRewardCheckedRef.current = true;
     
     // Store claim date in AsyncStorage
     try {
