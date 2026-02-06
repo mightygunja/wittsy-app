@@ -1015,7 +1015,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   secondaryCard: {
     width: 110,
-    height: 100,
+    height: 110,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
     marginRight: SPACING.sm,
@@ -1024,18 +1024,19 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.md,
+    padding: SPACING.sm,
   },
   secondaryIcon: {
-    fontSize: 40,
+    fontSize: 36,
     marginBottom: SPACING.xs,
+    textAlign: 'center',
   },
   secondaryTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm + 2,
+    fontSize: TYPOGRAPHY.fontSize.xs + 1,
     fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
-    flexShrink: 1,
+    lineHeight: 14,
   },
   section: {
     marginBottom: SPACING.lg,
