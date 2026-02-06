@@ -123,9 +123,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const checkDailyReward = async () => {
     if (!user) return;
     
-    // Don't check again if already claimed this session
-    if (dailyRewardClaimedThisSession) {
-      console.log('Daily reward already claimed this session, skipping check');
+    // Don't check again if already claimed this session OR if modal is already showing
+    if (dailyRewardClaimedThisSession || showDailyReward) {
       return;
     }
     
@@ -135,45 +134,41 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       const lastClaimDate = await AsyncStorage.getItem(`dailyReward_${user.uid}_lastClaim`);
       
       if (lastClaimDate === today) {
-        console.log('Daily reward already claimed today (from AsyncStorage), skipping');
         setDailyRewardClaimedThisSession(true);
         return;
       }
       
       const status = await dailyRewardsService.canClaimToday(user.uid);
-      if (status.canClaim && !status.alreadyClaimed) {
+      if (status.canClaim && !status.alreadyClaimed && !showDailyReward) {
         // Show modal after a short delay for better UX
         setTimeout(() => {
-          setShowDailyReward(true);
+          if (!showDailyReward) {
+            setShowDailyReward(true);
+          }
         }, 1000);
       }
     } catch (error) {
-      console.error('Failed to check daily reward:', error);
+      // Silently handle errors
     }
   };
 
   const handleDailyRewardClaimed = async (coins: number, streak: number) => {
-    // Mark as claimed this session to prevent re-appearing
+    // Close modal immediately and mark as claimed
+    setShowDailyReward(false);
     setDailyRewardClaimedThisSession(true);
     
     // Store claim date in AsyncStorage
     try {
       const today = new Date().toDateString();
       await AsyncStorage.setItem(`dailyReward_${user?.uid}_lastClaim`, today);
-      console.log('✅ Daily reward claim date saved to AsyncStorage');
     } catch (error) {
-      console.error('Failed to save claim date to AsyncStorage:', error);
+      console.error('Failed to save claim date:', error);
     }
-    
-    // Close modal immediately
-    setShowDailyReward(false);
     
     // Refresh user profile to update coin balance in real-time
     if (refreshUserProfile) {
       await refreshUserProfile();
     }
-    
-    console.log(`Daily reward claimed: ${coins} coins, ${streak} day streak`);
   };
 
   const loadActiveRooms = async () => {
