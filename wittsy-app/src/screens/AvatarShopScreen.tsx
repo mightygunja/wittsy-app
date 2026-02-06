@@ -424,6 +424,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
   },
   scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: SPACING.xl },
   content: { padding: SPACING.md },
   section: { marginBottom: SPACING.md },
   sectionTitle: {
@@ -485,6 +486,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     position: 'relative',
   },
   itemEmoji: { fontSize: 64 },
+  unlockedBadge: {
+    position: 'absolute',
+    top: SPACING.xs,
+    right: SPACING.xs,
+    backgroundColor: COLORS.success,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  unlockedText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.text,
+  },
   ownedBadge: {
     position: 'absolute',
     top: SPACING.xs,
