@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { avatarService } from '../services/avatarService';
+import { battlePass } from '../services/battlePassService';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { Card } from '../components/common/Card';
@@ -28,63 +29,18 @@ import {
   RARITY_COLORS,
   RARITY_GRADIENTS,
 } from '../types/avatar';
+import { RewardItem } from '../types/battlePass';
 
 const { width } = Dimensions.get('window');
 
-// Mock shop data - in production, this would come from Firestore
-const SHOP_ITEMS: AvatarItem[] = [
-  {
-    id: 'skin_alien',
-    category: 'skin',
-    name: 'Alien Skin',
-    description: 'Out of this world!',
-    rarity: 'epic',
-    unlockMethod: 'purchase',
-    price: { coins: 500 },
-    emoji: '👽',
-    color: '#90EE90',
-  },
-  {
-    id: 'eyes_laser',
-    category: 'eyes',
-    name: 'Laser Eyes',
-    description: 'Pierce through anything',
-    rarity: 'legendary',
-    unlockMethod: 'purchase',
-    price: { coins: 1000, premium: 5 },
-    emoji: '👁️‍🗨️',
-  },
-  {
-    id: 'hair_fire',
-    category: 'hair',
-    name: 'Fire Hair',
-    description: 'Blazing hot style',
-    rarity: 'legendary',
-    unlockMethod: 'purchase',
-    price: { coins: 1200 },
-    emoji: '🔥',
-  },
-  {
-    id: 'acc_crown',
-    category: 'accessories',
-    name: 'Royal Crown',
-    description: 'Fit for a king',
-    rarity: 'epic',
-    unlockMethod: 'purchase',
-    price: { coins: 750 },
-    emoji: '👑',
-  },
-  {
-    id: 'fx_rainbow',
-    category: 'effects',
-    name: 'Rainbow Aura',
-    description: 'Magical rainbow effect',
-    rarity: 'legendary',
-    unlockMethod: 'purchase',
-    price: { coins: 1500, premium: 10 },
-    emoji: '🌈',
-  },
-];
+// Coin prices based on rarity
+const RARITY_PRICES: Record<string, number> = {
+  common: 100,
+  rare: 300,
+  epic: 600,
+  legendary: 1000,
+  exclusive: 1500,
+};
 
 export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
   navigation,
@@ -96,20 +52,19 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
   const [userCoins, setUserCoins] = useState(0);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [shopItems, setShopItems] = useState<AvatarItem[]>([]);
 
-  
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
-const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadShopData();
-    analytics.screenView('AvatarShop');
-
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
     }).start();
+
+    loadShopData();
   }, []);
 
   const loadShopData = async () => {
@@ -117,12 +72,34 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
 
     try {
       const avatarData = await avatarService.getUserAvatar(user.uid);
-      if (avatarData) {
-        setUnlockedItems(avatarData.unlockedItems);
-      }
+      const unlocked = avatarData?.unlockedItems || [];
+      setUnlockedItems(unlocked);
 
       // Load user coins from userProfile
       setUserCoins(userProfile.coins || 0);
+
+      // Get all Battle Pass avatar rewards
+      const season = battlePass.getCurrentSeason();
+      const avatarRewards: AvatarItem[] = [];
+
+      season.rewards.forEach((reward) => {
+        // Add free track avatar items
+        if (reward.free?.type === 'avatar' && reward.free.itemId) {
+          const item = convertRewardToShopItem(reward.free, reward.level, false);
+          if (item && !unlocked.includes(item.id)) {
+            avatarRewards.push(item);
+          }
+        }
+        // Add premium track avatar items
+        if (reward.premium?.type === 'avatar' && reward.premium.itemId) {
+          const item = convertRewardToShopItem(reward.premium, reward.level, true);
+          if (item && !unlocked.includes(item.id)) {
+            avatarRewards.push(item);
+          }
+        }
+      });
+
+      setShopItems(avatarRewards);
     } catch (error) {
       console.error('Failed to load shop data:', error);
     } finally {
@@ -130,11 +107,28 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
     }
   };
 
+  const convertRewardToShopItem = (reward: RewardItem, level: number, isPremium: boolean): AvatarItem | null => {
+    if (!reward.itemId) return null;
+
+    const rarity = reward.rarity || 'common';
+    const price = RARITY_PRICES[rarity] || 100;
+
+    return {
+      id: reward.itemId,
+      category: reward.itemId.split('_')[0] as any, // e.g., 'eyes_happy' -> 'eyes'
+      name: reward.name || reward.itemId,
+      description: `Battle Pass Level ${level} ${isPremium ? '(Premium)' : '(Free)'} - Skip the grind!`,
+      rarity: rarity as AvatarRarity,
+      unlockMethod: 'purchase',
+      price: { coins: price },
+      emoji: reward.icon || '🎨',
+    };
+  };
+
   const handlePurchase = async (item: AvatarItem) => {
     if (!user) return;
 
     const coinPrice = item.price?.coins || 0;
-    const premiumPrice = item.price?.premium || 0;
 
     // Check if already unlocked
     if (unlockedItems.includes(item.id)) {
@@ -143,16 +137,12 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
     }
 
     // Check if user has enough coins
-    if (coinPrice > 0 && userCoins < coinPrice) {
+    if (userCoins < coinPrice) {
       Alert.alert(
         'Insufficient Coins',
         `You need ${coinPrice} coins but only have ${userCoins}.`,
         [
           { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Get Coins',
-            onPress: () => navigation.navigate('CoinShop'),
-          },
         ]
       );
       return;
@@ -161,35 +151,25 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
     // Show purchase confirmation
     Alert.alert(
       'Purchase Item',
-      `Buy "${item.name}" for ${coinPrice} coins${
-        premiumPrice > 0 ? ` or ${premiumPrice} premium currency` : ''
-      }?`,
+      `Buy "${item.name}" for ${coinPrice} coins?\n\nThis item can also be unlocked by leveling up in the Battle Pass.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Buy with Coins',
-          onPress: () => completePurchase(item, 'coins'),
+          text: `Buy for ${coinPrice} `,
+          onPress: () => completePurchase(item),
         },
-        ...(premiumPrice > 0
-          ? [
-              {
-                text: `Buy with Premium (${premiumPrice})`,
-                onPress: () => completePurchase(item, 'premium'),
-              },
-            ]
-          : []),
       ]
     );
   };
 
-  const completePurchase = async (item: AvatarItem, method: 'coins' | 'premium') => {
+  const completePurchase = async (item: AvatarItem) => {
     if (!user) return;
 
     setPurchasing(item.id);
     haptics.medium();
 
     try {
-      const price = method === 'coins' ? item.price?.coins || 0 : item.price?.premium || 0;
+      const price = item.price?.coins || 0;
 
       const success = await avatarService.purchaseItem(user.uid, item.id, price);
 
@@ -197,15 +177,18 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
         setUnlockedItems([...unlockedItems, item.id]);
         setUserCoins(userCoins - price);
         
+        // Remove purchased item from shop
+        setShopItems(shopItems.filter(i => i.id !== item.id));
+        
         haptics.success();
         
         Alert.alert(
-          '🎉 Purchase Successful!',
-          `You unlocked "${item.name}"! Go to Avatar Creator to use it.`,
+          ' Purchase Successful!',
+          `You unlocked "${item.name}"! Check it out in the Avatar Creator.`,
           [
             { text: 'OK' },
             {
-              text: 'Customize Now',
+              text: 'Go to Avatar Creator',
               onPress: () => navigation.navigate('AvatarCreator'),
             },
           ]
@@ -215,17 +198,16 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
           item_id: item.id,
           item_name: item.name,
           price,
-          method,
+          method: 'coins',
           rarity: item.rarity,
+          source: 'battle_pass_shop',
         });
-      } else {
-        haptics.error();
-        Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
+
+        await refreshUserProfile();
       }
-    } catch (error) {
-      console.error('Purchase failed:', error);
+    } catch (error: any) {
       haptics.error();
-      Alert.alert('Error', 'Failed to complete purchase.');
+      Alert.alert('Purchase Failed', error.message || 'Failed to purchase item');
     } finally {
       setPurchasing(null);
     }
@@ -255,53 +237,60 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
         {/* Shop Items */}
         <Animated.ScrollView
           style={[styles.scrollView, { opacity: fadeAnim }]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.content}>
-            {/* Featured Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>✨ Featured Items</Text>
-              <Text style={styles.sectionDescription}>
-                Limited time exclusive items
+          <Text style={styles.sectionTitle}>🎨 Battle Pass Items</Text>
+          <Text style={styles.sectionSubtitle}>
+            Skip the grind! Purchase Battle Pass items with coins
+          </Text>
+          
+          {shopItems.length === 0 ? (
+            <Card variant="glass" style={styles.emptyCard}>
+              <Text style={styles.emptyIcon}>🎉</Text>
+              <Text style={styles.emptyTitle}>All Unlocked!</Text>
+              <Text style={styles.emptyText}>
+                You've unlocked all available Battle Pass items. Check back next season for more!
               </Text>
-            </View>
-
-            {/* Items Grid */}
+              <Button
+                title="View Battle Pass"
+                onPress={() => navigation.navigate('BattlePass')}
+                variant="primary"
+                size="md"
+                style={styles.emptyButton}
+              />
+            </Card>
+          ) : (
             <View style={styles.itemsGrid}>
-              {SHOP_ITEMS.map((item) => {
+              {shopItems.map((item) => {
                 const isUnlocked = unlockedItems.includes(item.id);
                 const isPurchasing = purchasing === item.id;
+                const rarityColor = RARITY_COLORS[item.rarity];
+                const rarityGradient = RARITY_GRADIENTS[item.rarity];
 
                 return (
-                  <Card key={item.id} variant="elevated" style={styles.itemCard}>
+                  <Card key={item.id} variant="glass" style={styles.itemCard}>
                     <LinearGradient
-                      colors={getRarityGradient(item.rarity) as any}
+                      colors={rarityGradient as any}
                       style={styles.itemHeader}
                     >
                       <Text style={styles.itemEmoji}>{item.emoji}</Text>
                       {isUnlocked && (
-                        <View style={styles.ownedBadge}>
-                          <Text style={styles.ownedText}>✓ Owned</Text>
+                        <View style={styles.unlockedBadge}>
+                          <Text style={styles.unlockedText}>✓ Owned</Text>
                         </View>
                       )}
                     </LinearGradient>
 
                     <View style={styles.itemBody}>
-                      <View style={styles.itemInfo}>
-                        <Text style={styles.itemName}>{item.name}</Text>
-                        <Text style={styles.itemDescription}>{item.description}</Text>
-                        
-                        <View style={styles.rarityBadge}>
-                          <View
-                            style={[
-                              styles.rarityDot,
-                              { backgroundColor: RARITY_COLORS[item.rarity] },
-                            ]}
-                          />
-                          <Text style={styles.rarityText}>
-                            {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
-                          </Text>
-                        </View>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <Text style={styles.itemDescription}>{item.description}</Text>
+                      
+
+                      <View style={styles.rarityBadge}>
+                        <Text style={[styles.rarityText, { color: rarityColor }]}>
+                          {item.rarity}
+                        </Text>
                       </View>
 
                       {!isUnlocked && (
@@ -312,28 +301,15 @@ const fadeAnim = useRef(new Animated.Value(0)).current;
                               <Text style={styles.priceText}>{item.price.coins}</Text>
                             </View>
                           )}
-                          {item.price?.premium && (
-                            <View style={styles.priceRow}>
-                              <Text style={styles.priceIcon}>💎</Text>
-                              <Text style={styles.priceText}>{item.price.premium}</Text>
-                            </View>
-                          )}
                         </View>
                       )}
 
                       <Button
-                        title={
-                          isUnlocked
-                            ? 'Owned'
-                            : isPurchasing
-                            ? 'Purchasing...'
-                            : 'Purchase'
-                        }
+                        title={isUnlocked ? 'Owned' : isPurchasing ? 'Purchasing...' : 'Buy'}
                         onPress={() => handlePurchase(item)}
-                        variant={isUnlocked ? 'ghost' : 'primary'}
+                        variant={isUnlocked ? 'outline' : 'primary'}
                         size="sm"
                         disabled={isUnlocked || isPurchasing}
-                        loading={isPurchasing}
                         fullWidth
                       />
                     </View>
@@ -451,14 +427,45 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   content: { padding: SPACING.md },
   section: { marginBottom: SPACING.md },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
   },
   sectionDescription: {
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  emptyCard: {
+    padding: SPACING.xl,
+    alignItems: 'center',
+    marginHorizontal: SPACING.md,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: SPACING.md,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  emptyButton: {
+    minWidth: 200,
   },
   itemsGrid: {
     flexDirection: 'row',
