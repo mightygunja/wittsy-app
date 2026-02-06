@@ -195,13 +195,28 @@ export const getBrowsableRankedRooms = async (
         const hasSpace = room.players.length < room.settings.maxPlayers;
         const countdownNotFinished = !room.countdownStartedAt || 
           (Date.now() - new Date(room.countdownStartedAt).getTime()) < (room.countdownDuration || 30) * 1000;
-        return hasSpace && countdownNotFinished;
+        
+        // Calculate average ELO of players in room
+        const avgRoomElo = room.players.length > 0
+          ? room.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / room.players.length
+          : 1000;
+        
+        // Only show rooms within ±200 ELO range
+        const eloDiff = Math.abs(avgRoomElo - userElo);
+        const withinEloRange = eloDiff <= ELO_RANGE;
+        
+        if (!withinEloRange) {
+          console.log(`⏭️ Filtering out room ${room.roomId}: ELO diff ${eloDiff.toFixed(0)} (Room: ${avgRoomElo.toFixed(0)}, User: ${userElo})`);
+        }
+        
+        return hasSpace && countdownNotFinished && withinEloRange;
       })
       .sort((a, b) => {
         // Sort by player count (more players = more attractive)
         return b.players.length - a.players.length;
     });
   
+  console.log(`✅ Returning ${rooms.length} ELO-filtered ranked rooms`);
   return rooms;
   } catch (error) {
     console.error('❌ Error getting browsable ranked rooms:', error);
