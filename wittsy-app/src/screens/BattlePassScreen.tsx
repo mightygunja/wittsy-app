@@ -280,7 +280,7 @@ const scrollViewRef = useRef<ScrollView>(null);
   const renderRewardCard = (reward: BattlePassReward) => {
     if (!userBP || !reward) return null;
 
-    const isUnlocked = userBP.currentLevel >= reward.level;
+    const isLevelReached = userBP.currentLevel >= reward.level;
     const isClaimed = userBP.claimedRewards?.includes(reward.level) || false;
     const isCurrent = userBP.currentLevel === reward.level;
 
@@ -289,7 +289,12 @@ const scrollViewRef = useRef<ScrollView>(null);
     if (!displayReward || !displayReward.icon) return null;
 
     const isPremiumReward = userBP.isPremium && reward.premium;
-    const canClaim = isUnlocked && !isClaimed;
+    
+    // A reward is truly unlocked only if:
+    // 1. User has reached the level AND
+    // 2. User has claimed it (which unlocks the avatar item)
+    const isUnlocked = isLevelReached && isClaimed;
+    const canClaim = isLevelReached && !isClaimed;
     const needsUpgrade = !userBP.isPremium && reward.premium && !reward.free;
 
     return (
@@ -348,8 +353,8 @@ const scrollViewRef = useRef<ScrollView>(null);
             {canClaim && (
               <Text style={styles.claimPrompt}>Tap to Claim!</Text>
             )}
-            {!isUnlocked && !needsUpgrade && (
-              <Text style={styles.lockedText}>Locked</Text>
+            {!isLevelReached && !needsUpgrade && (
+              <Text style={styles.lockedText}>Level {reward.level}</Text>
             )}
           </View>
         </TouchableOpacity>
@@ -370,7 +375,7 @@ const scrollViewRef = useRef<ScrollView>(null);
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
