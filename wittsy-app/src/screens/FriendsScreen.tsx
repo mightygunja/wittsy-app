@@ -303,9 +303,6 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <ScreenHeader title="Friends" />
-
         {/* Tabs */}
         <View style={styles.tabs}>
           <TouchableOpacity
