@@ -274,9 +274,11 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
                 const isPurchasing = purchasing === item.id;
                 const rarityColor = RARITY_COLORS[item.rarity];
                 const rarityGradient = RARITY_GRADIENTS[item.rarity];
+                const canAfford = userCoins >= (item.price?.coins || 0);
+                const isDisabled = isUnlocked || isPurchasing || !canAfford;
 
                 return (
-                  <Card key={item.id} variant="glass" style={styles.itemCard}>
+                  <Card key={item.id} variant="glass" style={[styles.itemCard, !canAfford && !isUnlocked && styles.itemCardDisabled]}>
                     <LinearGradient
                       colors={rarityGradient as any}
                       style={styles.itemHeader}
@@ -290,14 +292,14 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
                     </LinearGradient>
 
                     <View style={styles.itemBody}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemDescription}>{item.description}</Text>
-                      
-
-                      <View style={styles.rarityBadge}>
-                        <Text style={[styles.rarityText, { color: rarityColor }]}>
-                          {item.rarity}
-                        </Text>
+                      <View style={styles.itemInfo}>
+                        <Text style={[styles.itemName, !canAfford && !isUnlocked && styles.textDisabled]}>{item.name}</Text>
+                        <View style={styles.rarityBadge}>
+                          <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
+                          <Text style={[styles.rarityText, { color: rarityColor }]}>
+                            {item.rarity.toUpperCase()}
+                          </Text>
+                        </View>
                       </View>
 
                       {!isUnlocked && (
@@ -305,18 +307,18 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
                           {item.price?.coins && (
                             <View style={styles.priceRow}>
                               <Text style={styles.priceIcon}>🪙</Text>
-                              <Text style={styles.priceText}>{item.price.coins}</Text>
+                              <Text style={[styles.priceText, !canAfford && styles.textDisabled]}>{item.price.coins}</Text>
                             </View>
                           )}
                         </View>
                       )}
 
                       <Button
-                        title={isUnlocked ? 'Owned' : isPurchasing ? 'Purchasing...' : 'Buy'}
+                        title={isUnlocked ? 'Owned' : isPurchasing ? 'Purchasing...' : !canAfford ? 'Not Enough Coins' : 'Buy Now'}
                         onPress={() => handlePurchase(item)}
                         variant={isUnlocked ? 'outline' : 'primary'}
                         size="sm"
-                        disabled={isUnlocked || isPurchasing}
+                        disabled={isDisabled}
                         fullWidth
                       />
                     </View>
@@ -381,11 +383,13 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
     borderRadius: RADIUS.lg,
     gap: 8,
+    transform: [{ scale: 1.15 }],
   },
   coinsIcon: { fontSize: 20 },
   coinsText: {
@@ -441,21 +445,27 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   itemsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
     gap: SPACING.md,
     marginBottom: SPACING.xl,
   },
   itemCard: {
-    width: (width - SPACING.md * 3) / 2,
+    width: (width - SPACING.md * 4) / 2,
     padding: 0,
     overflow: 'hidden',
+    marginBottom: SPACING.md,
+  },
+  itemCardDisabled: {
+    opacity: 0.5,
   },
   itemHeader: {
-    height: 120,
+    height: 100,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  itemEmoji: { fontSize: 64 },
+  itemEmoji: { fontSize: 48 },
   unlockedBadge: {
     position: 'absolute',
     top: SPACING.xs,
@@ -484,23 +494,30 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.text,
   },
-  itemBody: { padding: SPACING.sm },
-  itemInfo: { marginBottom: SPACING.sm },
+  itemBody: { 
+    padding: SPACING.md,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  itemInfo: { 
+    marginBottom: SPACING.sm,
+    minHeight: 60,
+  },
   itemName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 4,
-  },
-  itemDescription: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
     marginBottom: SPACING.xs,
+    lineHeight: 18,
+  },
+  textDisabled: {
+    opacity: 0.6,
   },
   rarityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginBottom: SPACING.sm,
   },
   rarityDot: {
     width: 8,
@@ -508,25 +525,34 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderRadius: 4,
   },
   rarityText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
     color: COLORS.textSecondary,
     textTransform: 'capitalize',
   },
   priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
     marginBottom: SPACING.sm,
-    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
-  priceIcon: { fontSize: 16 },
+  priceIcon: { fontSize: 18 },
   priceText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: '#FFD700',
   },
   bundleCard: {
     padding: 0,
