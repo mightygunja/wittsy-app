@@ -505,7 +505,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('StarredPhrases')}
             >
               <LinearGradient
-                colors={['#FFD700', '#FFA500']}
+                colors={['#FFB800', '#FF8C00']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>⭐</Text>
@@ -518,7 +518,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('AvatarCreator')}
             >
               <LinearGradient
-                colors={['#FF6B6B', '#EE5A6F']}
+                colors={['#E74C3C', '#C0392B']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎨</Text>
@@ -531,7 +531,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('BattlePass')}
             >
               <LinearGradient
-                colors={['#FFD700', '#FFA500']}
+                colors={['#9B59B6', '#8E44AD']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>⚔️</Text>
@@ -544,7 +544,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('PromptLibrary')}
             >
               <LinearGradient
-                colors={['#667EEA', '#764BA2']}
+                colors={['#5B7FDB', '#4A5FC1']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>📚</Text>
@@ -557,7 +557,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('Challenges')}
             >
               <LinearGradient
-                colors={['#F093FB', '#F5576C']}
+                colors={['#EC407A', '#D81B60']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎯</Text>
@@ -570,7 +570,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('Events')}
             >
               <LinearGradient
-                colors={['#4FACFE', '#00F2FE']}
+                colors={['#29B6F6', '#0288D1']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🏆</Text>
@@ -583,7 +583,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('Friends')}
             >
               <LinearGradient
-                colors={['#43E97B', '#38F9D7']}
+                colors={['#26A69A', '#00897B']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>👥</Text>
@@ -596,7 +596,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('CoinShop')}
             >
               <LinearGradient
-                colors={['#FFD700', '#FF8C00']}
+                colors={['#FFA726', '#F57C00']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>💰</Text>
@@ -609,7 +609,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('AvatarShop')}
             >
               <LinearGradient
-                colors={['#9D50BB', '#6E48AA']}
+                colors={['#AB47BC', '#8E24AA']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎨</Text>
@@ -624,7 +624,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 onPress={() => navigation.navigate('AdminConsole')}
               >
                 <LinearGradient
-                  colors={['#FF6B6B', '#C92A2A']}
+                  colors={['#EF5350', '#C62828']}
                   style={styles.secondaryGradient}
                 >
                   <Text style={styles.secondaryIcon}>⚙️</Text>
@@ -1022,8 +1022,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   secondaryTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontSize: TYPOGRAPHY.fontSize.sm + 2,
+    fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
   },
