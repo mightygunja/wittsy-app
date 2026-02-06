@@ -23,15 +23,16 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
       return;
     }
 
-    // Real-time listener for user stats
+    // Real-time listener for user stats with server timestamps
     const userRef = doc(firestore, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         const newCoins = data?.stats?.coins || 0;
+        // Force update even if value seems the same
         setCoins(newCoins);
+        setLoading(false);
       }
-      setLoading(false);
     }, (error) => {
       console.error('CurrencyDisplay error:', error);
       setLoading(false);
@@ -52,13 +53,12 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
 
   return (
     <TouchableOpacity 
-      key={`coins-${coins}`}
       style={styles.compactContainer}
       onPress={() => navigation.navigate('CoinShop' as never)}
       activeOpacity={0.7}
     >
       <Text style={styles.coinIcon}>🪙</Text>
-      <Text style={styles.coinValue}>{coins.toLocaleString()}</Text>
+      <Text key={coins} style={styles.coinValue}>{coins.toLocaleString()}</Text>
     </TouchableOpacity>
   );
 };

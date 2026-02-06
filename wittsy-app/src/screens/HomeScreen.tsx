@@ -175,12 +175,10 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       console.error('Failed to save claim date:', error);
     }
     
-    // Wait a moment for Firestore to propagate, then refresh
-    setTimeout(async () => {
-      if (refreshUserProfile) {
-        await refreshUserProfile();
-      }
-    }, 500);
+    // Force immediate refresh - Firestore listener should pick up the change
+    if (refreshUserProfile) {
+      await refreshUserProfile();
+    }
   };
 
   const loadActiveRooms = async () => {
