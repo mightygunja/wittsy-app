@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useTheme } from '../../hooks/useTheme';
+import { BackButton } from '../../components/common/BackButton';
 import { SPACING } from '../../utils/constants';
 import { createSettingsStyles } from '../../styles/settingsStyles';
 import { audioService } from '../../services/audioService';
@@ -66,9 +67,7 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Audio & Sound</Text>
         <View style={styles.headerRight} />
       </View>

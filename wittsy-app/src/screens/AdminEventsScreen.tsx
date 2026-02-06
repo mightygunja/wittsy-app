@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SPACING, TYPOGRAPHY } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';
 import { useAuth } from '../hooks/useAuth';
 import { isUserAdmin } from '../utils/adminCheck';;
 import { Card } from '../components/common/Card';
@@ -150,9 +151,7 @@ export const AdminEventsScreen: React.FC<{ navigation: any }> = ({ navigation })
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Admin Events</Text>
         <View style={styles.headerRight} />
       </View>

@@ -342,19 +342,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(168, 85, 247, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: '#A855F7',
-  },
   headerContent: {
     flex: 1,
   },

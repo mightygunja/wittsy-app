@@ -8,7 +8,8 @@ import { getBrowsableRankedRooms } from '../services/matchmaking';
 import { Button } from '../components/common/Button';
 import { Loading } from '../components/common/Loading';
 import { Room } from '../types';
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';;
 
 export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -127,12 +128,7 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
     <SafeAreaView style={styles.container}>
       {/* Header with tabs */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Live Rooms</Text>
         <View style={styles.headerRight} />
       </View>

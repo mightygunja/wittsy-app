@@ -19,7 +19,8 @@ import { analytics } from '../services/analytics';
 import { monetization } from '../services/monetization';
 import { Card } from '../components/common/Card';
 import { SPACING, RADIUS } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';;
 
 const { width } = Dimensions.get('window');
 
@@ -137,15 +138,7 @@ export const AnalyticsDashboardScreen: React.FC<{ navigation: any }> = ({ naviga
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => {
-              haptics.light();
-              navigation.goBack();
-            }}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.headerTitle}>Analytics</Text>
           <View style={styles.placeholder} />
         </View>

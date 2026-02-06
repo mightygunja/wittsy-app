@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';
 import { isUserAdmin } from '../utils/adminCheck';
 import {
   getPendingPromptSubmissions,
@@ -242,9 +243,7 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.headerTitle}>Approve Prompts</Text>
           <View style={styles.headerRight} />
         </View>

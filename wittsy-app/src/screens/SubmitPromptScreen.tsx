@@ -15,7 +15,8 @@ import { useAuth } from '../hooks/useAuth';
 import { submitPrompt, containsProfanity } from '../services/prompts';
 import { PromptCategory, PromptDifficulty } from '../types/prompts';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';;
 import { Button } from '../components/common/Button';
 
 const CATEGORIES: { id: PromptCategory; name: string; icon: string }[] = [
@@ -132,9 +133,7 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.title}>Submit a Prompt</Text>
           <Text style={styles.subtitle}>
             Share your creative prompts with the community

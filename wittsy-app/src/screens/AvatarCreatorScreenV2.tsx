@@ -27,7 +27,8 @@ import { avatarService } from '../services/avatarService';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { SPACING, RADIUS, SHADOWS } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';;
 import {
   AvatarConfig,
   AvatarCategory,
@@ -468,12 +469,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>Avatar Creator</Text>
             <Text style={styles.headerSubtitle}>Customize your look</Text>
