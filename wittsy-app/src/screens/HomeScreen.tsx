@@ -518,7 +518,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>⭐</Text>
-                <Text style={styles.secondaryTitle}>Starred Phrases</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Starred Phrases</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -531,7 +531,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎨</Text>
-                <Text style={styles.secondaryTitle}>Avatar Creator</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Creator</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -544,7 +544,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>⚔️</Text>
-                <Text style={styles.secondaryTitle}>Battle Pass</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Battle Pass</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -557,7 +557,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>📚</Text>
-                <Text style={styles.secondaryTitle}>Prompts</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Prompts</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -570,7 +570,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎯</Text>
-                <Text style={styles.secondaryTitle}>Challenges</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Challenges</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -583,7 +583,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🏆</Text>
-                <Text style={styles.secondaryTitle}>Events</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Events</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -596,7 +596,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>👥</Text>
-                <Text style={styles.secondaryTitle}>Friends</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Friends</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -609,7 +609,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>💰</Text>
-                <Text style={styles.secondaryTitle}>Coin Shop</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Coin Shop</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -622,7 +622,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎨</Text>
-                <Text style={styles.secondaryTitle}>Avatar Shop</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Shop</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -637,7 +637,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                   style={styles.secondaryGradient}
                 >
                   <Text style={styles.secondaryIcon}>⚙️</Text>
-                  <Text style={styles.secondaryTitle}>Admin</Text>
+                  <Text style={styles.secondaryTitle} numberOfLines={0}>Admin</Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -1014,8 +1014,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     gap: SPACING.sm,
   },
   secondaryCard: {
-    width: 110,
-    height: 110,
+    width: 120,
+    height: 120,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
     marginRight: SPACING.sm,
@@ -1032,11 +1032,12 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     textAlign: 'center',
   },
   secondaryTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xs + 1,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
-    lineHeight: 14,
+    lineHeight: 13,
+    flexWrap: 'wrap',
   },
   section: {
     marginBottom: SPACING.lg,
