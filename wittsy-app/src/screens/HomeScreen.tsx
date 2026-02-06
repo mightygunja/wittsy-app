@@ -1014,8 +1014,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     gap: SPACING.sm,
   },
   secondaryCard: {
-    width: 105,
-    height: 120,
+    width: 100,
+    height: 110,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
     marginRight: SPACING.sm,
