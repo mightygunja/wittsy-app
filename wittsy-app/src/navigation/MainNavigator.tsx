@@ -184,7 +184,7 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="AvatarCreator" 
         component={AvatarCreatorScreen}
-        options={{ title: 'Avatar Creator' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="AvatarShop" 
