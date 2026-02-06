@@ -317,44 +317,7 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
                 );
               })}
             </View>
-
-            {/* Bundles Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🎁 Special Bundles</Text>
-              <Text style={styles.sectionDescription}>
-                Save big with bundle deals
-              </Text>
-            </View>
-
-            <Card variant="glass" style={styles.bundleCard}>
-              <LinearGradient
-                colors={['#FF6B6B', '#FFD93D'] as any}
-                style={styles.bundleHeader}
-              >
-                <Text style={styles.bundleTitle}>Starter Pack</Text>
-                <Text style={styles.bundleDiscount}>50% OFF</Text>
-              </LinearGradient>
-              <View style={styles.bundleBody}>
-                <Text style={styles.bundleDescription}>
-                  Get 5 epic items for the price of 3!
-                </Text>
-                <View style={styles.bundlePrice}>
-                  <Text style={styles.bundleOriginalPrice}>3000</Text>
-                  <Text style={styles.bundleFinalPrice}>🪙 1500</Text>
-                </View>
-                <Button
-                  title="Buy Bundle"
-                  onPress={() => {
-                    haptics.medium();
-                    Alert.alert('Coming Soon', 'Bundles will be available soon!');
-                  }}
-                  variant="gold"
-                  size="md"
-                  fullWidth
-                />
-              </View>
-            </Card>
-          </View>
+          )}
         </Animated.ScrollView>
       </SafeAreaView>
     </LinearGradient>
