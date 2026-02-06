@@ -104,48 +104,58 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         setUnlockedItems(avatarData.unlockedItems);
         initializeDraggableFeatures(avatarData.config);
       } else {
-        // Create default avatar
+        // Create default avatar with only default unlocked items
         const defaultConfig: AvatarConfig = {
-          skin: DEFAULT_SKIN_TONES[0].id,
-          eyes: DEFAULT_EYES[0].id,
-          mouth: DEFAULT_MOUTHS[0].id,
-          hair: DEFAULT_HAIR_STYLES[0].id,
+          skin: 'skin_light',
+          eyes: 'eyes_normal',
+          mouth: 'mouth_smile',
+          hair: 'hair_short',
           accessories: [],
-          clothing: 'clothing_default',
-          background: DEFAULT_BACKGROUNDS[0].id,
+          clothing: 'clothing_casual',
+          background: 'bg_white',
           effects: [],
         };
         setConfig(defaultConfig);
-        setUnlockedItems([
-          ...DEFAULT_SKIN_TONES.map(i => i.id),
-          ...DEFAULT_EYES.map(i => i.id),
-          ...DEFAULT_MOUTHS.map(i => i.id),
-          ...DEFAULT_HAIR_STYLES.map(i => i.id),
-          ...DEFAULT_BACKGROUNDS.map(i => i.id),
-        ]);
+        // Use the same default unlocked items as avatarService
+        const defaultUnlocked = [
+          'skin_light', 'skin_medium_light', 'skin_medium', 'skin_medium_dark', 'skin_dark',
+          'eyes_normal', 'eyes_happy',
+          'mouth_smile', 'mouth_grin',
+          'hair_short', 'hair_long', 'hair_bald',
+          'acc_none', 'acc_glasses',
+          'bg_white', 'bg_purple', 'bg_blue',
+          'fx_none',
+          'clothing_casual',
+        ];
+        setUnlockedItems(defaultUnlocked);
         initializeDraggableFeatures(defaultConfig);
       }
     } catch (error) {
       console.error('Failed to load avatar:', error);
-      // Create default on error
+      // Create default on error with only default unlocked items
       const defaultConfig: AvatarConfig = {
-        skin: DEFAULT_SKIN_TONES[0].id,
-        eyes: DEFAULT_EYES[0].id,
-        mouth: DEFAULT_MOUTHS[0].id,
-        hair: DEFAULT_HAIR_STYLES[0].id,
+        skin: 'skin_light',
+        eyes: 'eyes_normal',
+        mouth: 'mouth_smile',
+        hair: 'hair_short',
         accessories: [],
-        clothing: 'clothing_default',
-        background: DEFAULT_BACKGROUNDS[0].id,
+        clothing: 'clothing_casual',
+        background: 'bg_white',
         effects: [],
       };
       setConfig(defaultConfig);
-      setUnlockedItems([
-        ...DEFAULT_SKIN_TONES.map(i => i.id),
-        ...DEFAULT_EYES.map(i => i.id),
-        ...DEFAULT_MOUTHS.map(i => i.id),
-        ...DEFAULT_HAIR_STYLES.map(i => i.id),
-        ...DEFAULT_BACKGROUNDS.map(i => i.id),
-      ]);
+      // Use the same default unlocked items as avatarService
+      const defaultUnlocked = [
+        'skin_light', 'skin_medium_light', 'skin_medium', 'skin_medium_dark', 'skin_dark',
+        'eyes_normal', 'eyes_happy',
+        'mouth_smile', 'mouth_grin',
+        'hair_short', 'hair_long', 'hair_bald',
+        'acc_none', 'acc_glasses',
+        'bg_white', 'bg_purple', 'bg_blue',
+        'fx_none',
+        'clothing_casual',
+      ];
+      setUnlockedItems(defaultUnlocked);
       initializeDraggableFeatures(defaultConfig);
     } finally {
       setLoading(false);
