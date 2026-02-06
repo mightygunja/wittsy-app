@@ -302,6 +302,14 @@ service cloud.firestore {
       allow write: if isSignedIn() && isOwner(userId);
     }
     
+    // Daily Rewards - users can read and write their own daily rewards
+    match /dailyRewards/{userId} {
+      allow read: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if false;
+    }
+    
     // ==================== NOTIFICATIONS ====================
     
     match /notifications/{notificationId} {
