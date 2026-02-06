@@ -23,28 +23,21 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
       return;
     }
 
-    console.log('💰 CurrencyDisplay: Setting up real-time listener for user:', user.uid);
-
     // Real-time listener for user stats
     const userRef = doc(firestore, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         const newCoins = data?.stats?.coins || 0;
-        console.log('💰 CurrencyDisplay: Firestore update received, new coins:', newCoins);
-        console.log('💰 CurrencyDisplay: Previous coins:', coins);
         setCoins(newCoins);
       }
       setLoading(false);
     }, (error) => {
-      console.error('❌ CurrencyDisplay: Error loading currency:', error);
+      console.error('CurrencyDisplay error:', error);
       setLoading(false);
     });
 
-    return () => {
-      console.log('💰 CurrencyDisplay: Cleaning up listener');
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [user?.uid]);
 
   if (!user) return null;

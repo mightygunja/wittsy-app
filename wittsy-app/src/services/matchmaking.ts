@@ -200,10 +200,9 @@ export const getBrowsableRankedRooms = async (
       .sort((a, b) => {
         // Sort by player count (more players = more attractive)
         return b.players.length - a.players.length;
-      });
-    
-    console.log(`✅ Found ${rooms.length} browsable ranked rooms`);
-    return rooms;
+    });
+  
+  return rooms;
   } catch (error) {
     console.error('❌ Error getting browsable ranked rooms:', error);
     return [];

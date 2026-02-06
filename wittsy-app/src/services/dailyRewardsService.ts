@@ -97,8 +97,11 @@ class DailyRewardsService {
 
       // Initialize if doesn't exist
       return await this.initializeDailyRewards(userId);
-    } catch (error) {
-      console.error('❌ Failed to get daily rewards data:', error);
+    } catch (error: any) {
+      // Silently handle permission errors - user may not have access yet
+      if (error?.code !== 'permission-denied') {
+        console.error('Daily rewards error:', error);
+      }
       return null;
     }
   }
