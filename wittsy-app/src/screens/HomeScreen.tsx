@@ -656,7 +656,14 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                       <TouchableOpacity
                         key={room.roomId}
                         style={styles.roomCard}
-                        onPress={() => handleJoinRoom(room.roomId)}
+                        onPress={() => {
+                          // If user is already in the room, navigate directly without trying to join
+                          if (isUserInRoom) {
+                            navigation.navigate('GameRoom', { roomId: room.roomId });
+                          } else {
+                            handleJoinRoom(room.roomId);
+                          }
+                        }}
                       >
                         <View style={styles.roomCardHeader}>
                           <View style={styles.roomCardTitleRow}>
