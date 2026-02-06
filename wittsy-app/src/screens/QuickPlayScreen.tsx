@@ -14,6 +14,7 @@ import { findAvailableRankedRoom, createRankedRoom } from '../services/matchmaki
 import { joinRoom } from '../services/database';
 import { SPACING } from '../utils/constants';
 import { createSettingsStyles } from '../styles/settingsStyles';
+import { BackButton } from '../components/common/BackButton';
 
 export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, userProfile } = useAuth();
@@ -123,12 +124,7 @@ export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Quick Play</Text>
         <View style={styles.headerRight} />
       </View>

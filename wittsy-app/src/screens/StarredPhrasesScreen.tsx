@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';
 import { getUserStarredPhrases, getCommunityStarredPhrases, StarredPhrase } from '../services/starredPhrases';
 import { SPACING, RADIUS, SHADOWS } from '../utils/constants';
 import { haptics } from '../services/haptics';
@@ -210,15 +211,7 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
           },
         ]}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            haptics.light();
-            navigation.goBack();
-          }}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         
         <View style={styles.headerContent}>
           <Text style={[styles.headerTitle, { color: COLORS.text }]}>⭐ Starred Phrases</Text>

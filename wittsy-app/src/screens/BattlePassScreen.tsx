@@ -20,6 +20,7 @@ import { useAuth } from '../hooks/useAuth';
 import { battlePass } from '../services/battlePassService';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
+import { BackButton } from '../components/common/BackButton';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants'
@@ -378,15 +379,7 @@ const scrollViewRef = useRef<ScrollView>(null);
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => {
-              haptics.light();
-              navigation.goBack();
-            }}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>{season.name}</Text>
             <Text style={styles.headerSubtitle}>

@@ -17,6 +17,7 @@ import { getPromptsByCategory, getPromptPacks, getUserPromptPreferences } from '
 import { Prompt, PromptPack, PromptCategory } from '../types/prompts';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';
 import { Loading } from '../components/common/Loading';
 
 const CATEGORIES: { id: PromptCategory; name: string; icon: string; color: string }[] = [
@@ -116,9 +117,7 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
       >
         {/* Header */}
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.title}>Prompt Library</Text>
           <Text style={styles.subtitle}>Explore {prompts.length}+ creative prompts</Text>
         </Animated.View>

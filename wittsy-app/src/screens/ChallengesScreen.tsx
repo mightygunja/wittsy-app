@@ -25,7 +25,8 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 // ProgressBar component inline
 import { SPACING } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
+import { BackButton } from '../components/common/BackButton';;
 
 type TabType = 'daily' | 'weekly' | 'seasonal' | 'skill' | 'social';
 
@@ -239,12 +240,7 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.headerTitle}>Challenges</Text>
           <View style={styles.headerRight} />
         </View>
