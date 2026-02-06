@@ -515,10 +515,23 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
             <TouchableOpacity 
               style={styles.secondaryCard}
-              onPress={() => navigation.navigate('BattlePass')}
+              onPress={() => navigation.navigate('AvatarCreator')}
             >
               <LinearGradient
                 colors={['#FF6B6B', '#EE5A6F']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🎨</Text>
+                <Text style={styles.secondaryTitle}>Avatar Creator</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('BattlePass')}
+            >
+              <LinearGradient
+                colors={['#FFD700', '#FFA500']}
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>⚔️</Text>
