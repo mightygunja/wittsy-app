@@ -503,7 +503,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
         {/* Secondary Features - Horizontal Scroll */}
         <Animated.View style={[styles.secondarySection, { opacity: fadeAnim }]}>
-          <Text style={styles.sectionTitle}>Explore</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>Explore</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
@@ -518,7 +518,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>⭐</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Starred Phrases</Text>
+                <Text style={styles.secondaryTitle}>Starred Phrases</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -531,7 +531,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎨</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Avatar Creator</Text>
+                <Text style={styles.secondaryTitle}>Avatar Creator</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -544,7 +544,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>⚔️</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Battle Pass</Text>
+                <Text style={styles.secondaryTitle}>Battle Pass</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -557,7 +557,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>📚</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Prompts</Text>
+                <Text style={styles.secondaryTitle}>Prompts</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -570,7 +570,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎯</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Challenges</Text>
+                <Text style={styles.secondaryTitle}>Challenges</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -583,7 +583,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🏆</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Events</Text>
+                <Text style={styles.secondaryTitle}>Events</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -596,7 +596,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>👥</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Friends</Text>
+                <Text style={styles.secondaryTitle}>Friends</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -609,7 +609,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>💰</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Coin Shop</Text>
+                <Text style={styles.secondaryTitle}>Coin Shop</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -622,7 +622,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={styles.secondaryGradient}
               >
                 <Text style={styles.secondaryIcon}>🎨</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={1}>Avatar Shop</Text>
+                <Text style={styles.secondaryTitle}>Avatar Shop</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -637,7 +637,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                   style={styles.secondaryGradient}
                 >
                   <Text style={styles.secondaryIcon}>⚙️</Text>
-                  <Text style={styles.secondaryTitle} numberOfLines={1}>Admin</Text>
+                  <Text style={styles.secondaryTitle}>Admin</Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -647,7 +647,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         {/* Current Room Games Section - appears below Explore when button clicked */}
         {selectedRoomType && (
           <Animated.View style={[styles.roomListSection, { opacity: fadeAnim }]}>
-            <Text style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>
               {selectedRoomType === 'ranked' ? 'Current Ranked Games' : 'Current Casual Games'}
             </Text>
             {loadingRooms ? (
@@ -933,7 +933,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   roomListSection: {
     marginBottom: SPACING.lg,
-    marginTop: SPACING.md,
   },
   roomList: {
     gap: SPACING.sm,
@@ -1008,14 +1007,14 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   secondarySection: {
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   secondaryScroll: {
     paddingRight: SPACING.md,
     gap: SPACING.sm,
   },
   secondaryCard: {
-    width: 100,
+    width: 110,
     height: 100,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
