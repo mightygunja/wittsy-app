@@ -214,7 +214,7 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="StarredPhrases" 
         component={StarredPhrasesScreen}
-        options={{ title: 'Starred Phrases' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="Referral" 
