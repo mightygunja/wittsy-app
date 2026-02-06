@@ -21,6 +21,7 @@ import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { CurrencyDisplay } from '../components/common/CurrencyDisplay';
 import { SPACING, RADIUS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
 import {
@@ -69,10 +70,10 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
 
   // Update coins whenever userProfile changes
   useEffect(() => {
-    if (userProfile?.coins !== undefined) {
-      setUserCoins(userProfile.coins);
+    if (userProfile?.stats?.coins !== undefined) {
+      setUserCoins(userProfile.stats.coins);
     }
-  }, [userProfile?.coins]);
+  }, [userProfile?.stats?.coins]);
 
   const loadShopData = async () => {
     if (!user || !userProfile) return;
@@ -83,7 +84,7 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
       setUnlockedItems(unlocked);
 
       // Load user coins from userProfile
-      setUserCoins(userProfile.coins || 0);
+      setUserCoins(userProfile.stats?.coins || 0);
 
       // Get all Battle Pass avatar rewards
       const season = battlePass.getCurrentSeason();
@@ -237,8 +238,7 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         {/* Coins Display */}
         <View style={styles.coinsDisplay}>
-          <Text style={styles.coinsIcon}>🪙</Text>
-          <Text style={styles.coinsText}>{userCoins} coins</Text>
+          <CurrencyDisplay variant="compact" />
         </View>
 
         {/* Shop Items */}
