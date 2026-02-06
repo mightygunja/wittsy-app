@@ -29,6 +29,7 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
       if (snapshot.exists()) {
         const data = snapshot.data();
         const newCoins = data?.stats?.coins || 0;
+        console.log(`💰 CurrencyDisplay UPDATE: ${coins} → ${newCoins}`);
         // Force update even if value seems the same
         setCoins(newCoins);
         setLoading(false);

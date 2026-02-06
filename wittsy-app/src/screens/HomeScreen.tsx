@@ -162,6 +162,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const handleDailyRewardClaimed = async (coins: number, streak: number) => {
+    console.log(`🎁 Daily reward claimed: ${coins} coins, streak ${streak}`);
+    
     // Close modal immediately and mark as claimed
     setShowDailyReward(false);
     setDailyRewardClaimedThisSession(true);
@@ -175,9 +177,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       console.error('Failed to save claim date:', error);
     }
     
+    console.log('🔄 Refreshing user profile...');
     // Force immediate refresh - Firestore listener should pick up the change
     if (refreshUserProfile) {
       await refreshUserProfile();
+      console.log('✅ User profile refreshed');
     }
   };
 

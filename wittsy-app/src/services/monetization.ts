@@ -499,12 +499,13 @@ class MonetizationService {
    */
   async grantCoinsToUser(userId: string, coins: number): Promise<void> {
     try {
+      console.log(`💰 GRANTING ${coins} coins to user ${userId}...`);
       const userRef = doc(firestore, 'users', userId);
       await updateDoc(userRef, {
         'stats.coins': increment(coins),
         'stats.totalCoinsEarned': increment(coins),
       });
-      console.log(`✅ Granted ${coins} coins to user ${userId}`);
+      console.log(`✅ GRANTED ${coins} coins to user ${userId} - Firestore updated`);
     } catch (error: any) {
       console.error('❌ Failed to grant coins:', error);
       throw error;
