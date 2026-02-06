@@ -171,9 +171,16 @@ class DailyRewardsService {
         return { success: false, error: 'No reward available' };
       }
 
-      const data = await this.getDailyRewardsData(userId);
+      let data = await this.getDailyRewardsData(userId);
       if (!data) {
-        return { success: false, error: 'User data not found' };
+        console.log('⚠️ Daily rewards data not found, attempting to initialize...');
+        try {
+          data = await this.initializeDailyRewards(userId);
+          console.log('✅ Daily rewards initialized during claim');
+        } catch (initError) {
+          console.error('❌ Failed to initialize during claim:', initError);
+          return { success: false, error: 'Failed to initialize user data' };
+        }
       }
 
       const today = this.getTodayDateString();
