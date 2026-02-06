@@ -201,26 +201,21 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
-      {/* Header */}
+      {/* Subtitle */}
       <Animated.View
         style={[
-          styles.header,
+          styles.subtitleContainer,
           {
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
           },
         ]}
       >
-        <BackButton onPress={() => navigation.goBack()} />
-        
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: COLORS.text }]}>⭐ Starred Phrases</Text>
-          <Text style={[styles.headerSubtitle, { color: COLORS.textSecondary }]}>
-            {viewMode === 'mine' 
-              ? 'Your best phrases that earned 4+ votes'
-              : 'Top phrases from the community'}
-          </Text>
-        </View>
+        <Text style={[styles.headerSubtitle, { color: COLORS.textSecondary }]}>
+          {viewMode === 'mine' 
+            ? 'Your best phrases that earned 4+ votes'
+            : 'Top phrases from the community'}
+        </Text>
       </Animated.View>
 
       {/* View Mode Tabs */}
@@ -336,22 +331,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  subtitleContainer: {
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    paddingVertical: SPACING.sm,
   },
   headerSubtitle: {
     fontSize: 14,
+    textAlign: 'center',
   },
   viewModeContainer: {
     flexDirection: 'row',

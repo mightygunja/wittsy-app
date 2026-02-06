@@ -376,44 +376,13 @@ const scrollViewRef = useRef<ScrollView>(null);
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <BackButton onPress={() => navigation.goBack()} />
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>{season.name}</Text>
-            <Text style={styles.headerSubtitle}>
-              {daysRemaining} days remaining
-            </Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.infoButton} 
-            onPress={() => {
-              haptics.light();
-              Alert.alert(
-                '⚔️ Battle Pass Info',
-                `Season: ${season.name}\n\n` +
-                `📅 ${daysRemaining} days remaining\n\n` +
-                `🎯 How to Level Up:\n` +
-                `• Play games: 10 XP\n` +
-                `• Win games: 25 XP\n` +
-                `• Daily challenges: 50 XP\n` +
-                `• Weekly challenges: 200 XP\n\n` +
-                `🎁 Rewards:\n` +
-                `• Free Track: 8 rewards\n` +
-                `• Premium Track: 17 rewards\n` +
-                `• 100 levels total\n\n` +
-                `💎 Premium Benefits:\n` +
-                `• Exclusive avatar items\n` +
-                `• More coins\n` +
-                `• Special effects\n` +
-                `• $30+ value for $${season.price}!`,
-                [{ text: 'Got it!' }]
-              );
-            }}
-          >
-            <Text style={styles.infoIcon}>ℹ️</Text>
-          </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        {/* Season Info */}
+        <View style={styles.seasonInfo}>
+          <Text style={styles.seasonTitle}>{season.name}</Text>
+          <Text style={styles.seasonSubtitle}>
+            {daysRemaining} days remaining
+          </Text>
         </View>
 
         {/* Stats Card */}
@@ -536,30 +505,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     fontWeight: '600',
   },
-  header: {
-    flexDirection: 'row',
+  seasonInfo: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
   },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: {
+  seasonTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
   },
-  headerSubtitle: {
+  seasonSubtitle: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    marginTop: 4,
   },
-  infoButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoIcon: { fontSize: 24 },
   statsCard: {
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.md,
