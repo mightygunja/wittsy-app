@@ -94,15 +94,21 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({
   };
 
   const handleClaim = async () => {
-    if (claiming || claimed) return;
+    if (claiming || claimed) {
+      console.log('⏭️ Claim blocked: claiming or already claimed');
+      return;
+    }
 
+    console.log('🎁 CLAIMING daily reward...');
     haptics.medium();
     setClaiming(true);
 
     try {
       const result = await dailyRewardsService.claimDailyReward(userId);
+      console.log('🎁 Claim result:', result);
 
       if (result.success && result.reward) {
+        console.log(`✅ Claim SUCCESS: ${result.reward.coins} coins, streak ${result.newStreak}`);
         setClaimed(true);
         haptics.success();
 
@@ -123,11 +129,12 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({
         // Notify parent (parent will handle closing and refreshing)
         onClaimed(result.reward.coins, result.newStreak || 0);
       } else {
+        console.log('❌ Claim FAILED:', result.error);
         haptics.error();
         animateOut();
       }
     } catch (error) {
-      console.error('Failed to claim reward:', error);
+      console.error('❌ Claim ERROR:', error);
       haptics.error();
       animateOut();
     } finally {

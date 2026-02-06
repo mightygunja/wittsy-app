@@ -16,7 +16,6 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
   const navigation = useNavigation();
   const [coins, setCoins] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [renderKey, setRenderKey] = useState(0);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -30,10 +29,9 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
       if (snapshot.exists()) {
         const data = snapshot.data();
         const newCoins = data?.stats?.coins || 0;
-        console.log(`💰 CurrencyDisplay UPDATE: ${coins} → ${newCoins}`);
-        // Force update even if value seems the same
+        console.log(`💰 CurrencyDisplay UPDATE: ${coins} → ${newCoins} (forcing update)`);
+        // Force state update to trigger re-render
         setCoins(newCoins);
-        setRenderKey(prev => prev + 1); // Force re-render
         setLoading(false);
       }
     }, (error) => {
@@ -54,16 +52,19 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
     );
   }
 
+  console.log(`🎨 RENDERING CurrencyDisplay with coins: ${coins}`);
+
   return (
-    <TouchableOpacity 
-      key={`currency-${renderKey}`}
-      style={styles.compactContainer}
-      onPress={() => navigation.navigate('CoinShop' as never)}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.coinIcon}>🪙</Text>
-      <Text style={styles.coinValue}>{coins.toLocaleString()}</Text>
-    </TouchableOpacity>
+    <View>
+      <TouchableOpacity 
+        style={styles.compactContainer}
+        onPress={() => navigation.navigate('CoinShop' as never)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.coinIcon}>🪙</Text>
+        <Text style={styles.coinValue}>{coins}</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
