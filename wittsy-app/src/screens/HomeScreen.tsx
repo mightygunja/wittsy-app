@@ -175,10 +175,12 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       console.error('Failed to save claim date:', error);
     }
     
-    // Refresh user profile to update coin balance in real-time
-    if (refreshUserProfile) {
-      await refreshUserProfile();
-    }
+    // Wait a moment for Firestore to propagate, then refresh
+    setTimeout(async () => {
+      if (refreshUserProfile) {
+        await refreshUserProfile();
+      }
+    }, 500);
   };
 
   const loadActiveRooms = async () => {
