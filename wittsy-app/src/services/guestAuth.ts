@@ -131,6 +131,15 @@ export const linkGuestToAccount = async (
       lastActive: new Date().toISOString(),
     });
     
+    // Initialize daily rewards if not already exists
+    try {
+      const { dailyRewardsService } = await import('./dailyRewardsService');
+      await dailyRewardsService.getDailyRewardsData(linkedUser.uid);
+      console.log('✅ Daily rewards initialized for converted account');
+    } catch (error) {
+      console.error('⚠️ Failed to initialize daily rewards during conversion:', error);
+    }
+    
     console.log('✅ Guest account linked to permanent account:', username);
     
     return linkedUser;
