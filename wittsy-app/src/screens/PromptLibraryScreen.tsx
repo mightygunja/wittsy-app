@@ -115,10 +115,8 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
         }
       >
-        {/* Header */}
-        <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-          <BackButton onPress={() => navigation.goBack()} />
-          <Text style={styles.title}>Prompt Library</Text>
+        {/* Subtitle */}
+        <Animated.View style={[styles.subtitleContainer, { opacity: fadeAnim }]}>
           <Text style={styles.subtitle}>Explore {prompts.length}+ creative prompts</Text>
         </Animated.View>
 
@@ -298,6 +296,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   header: {
     padding: SPACING.xl,
     paddingTop: SPACING.md,
+  },
+  subtitleContainer: {
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
   backButton: {
     marginBottom: SPACING.md,

@@ -784,8 +784,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   header: {
     marginBottom: SPACING.md,
-    marginTop: SPACING.lg,
-    paddingVertical: SPACING.md,
+    marginTop: SPACING.xs,
+    paddingVertical: SPACING.xs,
   },
   headerRow: {
     flexDirection: 'row',
@@ -838,7 +838,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.sm,
     position: 'relative',
-    paddingVertical: SPACING.sm,
+    paddingVertical: 0,
   },
   battleOfText: {
     fontSize: 28,
@@ -857,7 +857,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     opacity: 0.85,
     textAlign: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: 2,
   },
   gameTitle: {
     fontSize: 42,
@@ -1015,7 +1015,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   secondaryCard: {
     width: 100,
-    height: 110,
+    height: 100,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
     marginRight: SPACING.sm,

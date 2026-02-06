@@ -238,13 +238,6 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <BackButton onPress={() => navigation.goBack()} />
-          <Text style={styles.headerTitle}>Challenges</Text>
-          <View style={styles.headerRight} />
-        </View>
-
         {/* Tabs */}
         <ScrollView 
           horizontal 

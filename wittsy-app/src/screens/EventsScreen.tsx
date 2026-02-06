@@ -283,27 +283,32 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     return 'th';
   };
 
-return (
+  return (
   <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={styles.headerTitle}>Events & Tournaments</Text>
-        {isUserAdmin(user) && (
+      {/* Admin Button - Top Right */}
+      {isUserAdmin(user) && (
+        <View style={styles.adminButtonContainer}>
           <TouchableOpacity 
             style={styles.adminButton}
             onPress={() => navigation.navigate('AdminEvents')}
           >
             <Text style={styles.adminButtonText}>⚙️</Text>
           </TouchableOpacity>
-        )}
-        {!isUserAdmin(user) && (
-          <View style={styles.headerRight} />
-        )}
-      </View>
+        </View>
+      )}
 
       {/* Content */}
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          {/* Featured Events */}
+          {featuredEvents.length > 0 && (
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           <ScrollView
             style={styles.scrollView}
@@ -376,9 +381,17 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   headerRight: {
     width: 40,
   },
+  adminButtonContainer: {
+    position: 'absolute',
+    top: SPACING.md,
+    right: SPACING.md,
+    zIndex: 10,
+  },
   adminButton: {
     width: 40,
     height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
