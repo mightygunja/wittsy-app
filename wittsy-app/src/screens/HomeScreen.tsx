@@ -1014,7 +1014,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     gap: SPACING.sm,
   },
   secondaryCard: {
-    width: 120,
+    width: 105,
     height: 120,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
@@ -1032,11 +1032,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     textAlign: 'center',
   },
   secondaryTitle: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
-    lineHeight: 13,
+    lineHeight: 16,
     flexWrap: 'wrap',
   },
   section: {
