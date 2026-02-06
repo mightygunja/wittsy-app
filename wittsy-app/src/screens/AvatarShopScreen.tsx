@@ -67,6 +67,13 @@ export const AvatarShopScreen: React.FC<{ navigation: any; route: any }> = ({
     loadShopData();
   }, []);
 
+  // Update coins whenever userProfile changes
+  useEffect(() => {
+    if (userProfile?.coins !== undefined) {
+      setUserCoins(userProfile.coins);
+    }
+  }, [userProfile?.coins]);
+
   const loadShopData = async () => {
     if (!user || !userProfile) return;
 
