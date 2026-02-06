@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
+import { GoogleSignInButton } from '../components/auth/GoogleSignInButton';
 import { validateEmail, validatePassword } from '../utils/validation';
 import { SPACING } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
@@ -98,13 +99,10 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>or</Text>
             </View>
 
-            <Button
-              title="🔐 Sign In with Google"
+            <GoogleSignInButton
               onPress={handleGoogleSignIn}
-              variant="outline"
               disabled={loading}
-              size="lg"
-              style={styles.button}
+              loading={loading}
             />
 
             <View style={styles.footer}>

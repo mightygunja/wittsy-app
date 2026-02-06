@@ -19,6 +19,8 @@ import { SPACING, RADIUS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { isGoogleSignInAvailable, isAppleSignInAvailable, getAppEnvironment } from '../utils/platform';
+import { AppleSignInButton } from '../components/auth/AppleSignInButton';
+import { GoogleSignInButton } from '../components/auth/GoogleSignInButton';
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -150,8 +152,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
 
           {/* Apple Sign-In - Only show on iOS native builds */}
           {isAppleSignInAvailable() && (
-            <TouchableOpacity
-              style={styles.appleButton}
+            <AppleSignInButton
               onPress={async () => {
                 setLoading(true);
                 try {
@@ -179,21 +180,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                 }
               }}
               disabled={loading}
-              activeOpacity={0.8}
-            >
-              <View style={styles.socialButtonContent}>
-                <View style={styles.appleIcon}>
-                  <Text style={styles.appleIconText}></Text>
-                </View>
-                <Text style={[styles.socialButtonText, { color: '#FFFFFF' }]}>Sign in with Apple</Text>
-              </View>
-            </TouchableOpacity>
+              loading={loading}
+            />
           )}
 
           {/* Google Sign-In - Only show on native builds */}
           {isGoogleSignInAvailable() ? (
-            <TouchableOpacity
-              style={styles.googleButton}
+            <GoogleSignInButton
               onPress={async () => {
                 setLoading(true);
                 try {
@@ -221,15 +214,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                 }
               }}
               disabled={loading}
-              activeOpacity={0.8}
-            >
-              <View style={styles.socialButtonContent}>
-                <View style={styles.googleIcon}>
-                  <Text style={styles.googleIconText}>G</Text>
-                </View>
-                <Text style={[styles.socialButtonText, { color: '#1F1F1F' }]}>Sign in with Google</Text>
-              </View>
-            </TouchableOpacity>
+              loading={loading}
+            />
           ) : (
             <View style={styles.expoGoNotice}>
               <Text style={[styles.expoGoText, { color: COLORS.textSecondary }]}>
@@ -358,59 +344,6 @@ const styles = StyleSheet.create({
   createButtonText: {
     textAlign: 'center',
     width: '100%',
-  },
-  appleButton: {
-    height: 56,
-    backgroundColor: '#000000',
-    borderRadius: RADIUS.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  googleButton: {
-    height: 56,
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  socialButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
-    width: '100%',
-  },
-  appleIcon: {
-    width: 20,
-    height: 20,
-    marginRight: SPACING.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appleIconText: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  googleIcon: {
-    width: 20,
-    height: 20,
-    marginRight: SPACING.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleIconText: {
-    fontSize: 16,
-    color: '#4285F4',
-    fontWeight: '700',
-  },
-  socialButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   expoGoNotice: {
     height: 56,
