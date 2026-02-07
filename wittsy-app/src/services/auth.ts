@@ -8,7 +8,9 @@ import {
   User as FirebaseUser,
   GoogleAuthProvider,
   OAuthProvider,
-  signInWithCredential
+  signInWithCredential,
+  fetchSignInMethodsForEmail,
+  linkWithCredential,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
@@ -318,9 +320,44 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
       idToken: identityToken,
     });
 
-    // Sign in to Firebase with the Apple credential
-    const userCredential = await signInWithCredential(auth, appleCredential);
-    console.log('✅ Signed in to Firebase with Apple credential');
+    // Try to sign in with Apple credential
+    let userCredential;
+    try {
+      userCredential = await signInWithCredential(auth, appleCredential);
+      console.log('✅ Signed in to Firebase with Apple credential');
+    } catch (signInError: any) {
+      console.log('⚠️ Sign-in failed, checking for account linking...', signInError.code);
+      
+      // Check if this is an account-exists-with-different-credential error
+      if (signInError.code === 'auth/account-exists-with-different-credential') {
+        console.log('🔗 Account exists with different credential, attempting to link...');
+        
+        // Get the email from the Apple credential
+        const email = credential.email;
+        if (!email) {
+          throw new Error('No email provided by Apple. Cannot link accounts.');
+        }
+        
+        // Check what sign-in methods exist for this email
+        const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+        console.log(`📧 Existing sign-in methods for ${email}:`, signInMethods);
+        
+        // If user has email/password, they need to sign in first, then link
+        if (signInMethods.includes('password')) {
+          throw new Error(
+            'This email is already registered with a password. Please sign in with your email and password first, then link your Apple account in Settings.'
+          );
+        }
+        
+        // For other providers, we can't auto-link without user intervention
+        throw new Error(
+          `This email is already registered with ${signInMethods[0]}. Please sign in with that method first.`
+        );
+      }
+      
+      // Re-throw other errors
+      throw signInError;
+    }
 
     // Get or create user profile with retry logic
     let userProfile = null;
