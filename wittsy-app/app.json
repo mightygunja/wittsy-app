@@ -24,14 +24,7 @@
         "NSCameraUsageDescription": "Wittz needs access to your camera to take profile photos.",
         "NSPhotoLibraryUsageDescription": "Wittz needs access to your photo library to select profile photos.",
         "NSMicrophoneUsageDescription": "Wittz needs access to your microphone for voice chat features.",
-        "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events.",
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": [
-              "com.googleusercontent.apps.757129696124-cildtmm00qi49redkpq5jtkvdaua02at"
-            ]
-          }
-        ]
+        "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events."
       },
       "entitlements": {
         "com.apple.developer.applesignin": [
