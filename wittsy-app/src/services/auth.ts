@@ -216,13 +216,17 @@ export const signIn = async (email: string, password: string): Promise<FirebaseU
 };
 
 // Configure Google Sign-In (call this on app startup)
-export const configureGoogleSignIn = async () => {
+export const configureGoogleSignIn = () => {
+  if (!GoogleSignin) {
+    console.log('⏭️ Google Sign-In not available (Expo Go)');
+    return;
+  }
+  
   try {
     GoogleSignin.configure({
       webClientId: '757129696124-0idv372oukrados213f4cuok31fvce4l.apps.googleusercontent.com',
       iosClientId: '757129696124-cildtmm00qi49redkpq5jtkvdaua02at.apps.googleusercontent.com',
       offlineAccess: false,
-      forceCodeForRefreshToken: false,
     });
     console.log('✅ Google Sign-In configured');
   } catch (error) {
@@ -232,6 +236,10 @@ export const configureGoogleSignIn = async () => {
 
 // Sign in with Google
 export const signInWithGoogle = async (): Promise<FirebaseUser> => {
+  if (!GoogleSignin) {
+    throw new Error('Google Sign-In not available');
+  }
+
   try {
     console.log('🔵 Starting Google Sign-In...');
     
@@ -277,27 +285,28 @@ export const signInWithGoogle = async (): Promise<FirebaseUser> => {
     await getOrCreateUserProfile(userCredential.user);
     console.log('✅ User profile created/updated');
 
-      } catch (error) {
-        console.error('⚠️ Failed to initialize referral data:', error);
-      }
-    }
-    
     // Update last active
-    await setDoc(
-      doc(firestore, 'users', userCredential.user.uid),
-      { lastActive: new Date().toISOString() },
-      { merge: true }
-    );
-    
-    console.log('✅ Google Sign-In complete');
+    try {
+      await setDoc(
+        doc(firestore, 'users', userCredential.user.uid),
+        { lastActive: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch (updateError) {
+      console.error('⚠️ Failed to update last active:', updateError);
+    }
+
     return userCredential.user;
   } catch (error: any) {
     console.error('❌ Google Sign-In error:', error);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error message:', error.message);
     
+    // Provide user-friendly error messages
     if (error.code === 'SIGN_IN_CANCELLED' || error.code === '-5') {
-      throw new Error('Sign-in was cancelled');
+      throw new Error('Sign in was cancelled');
     } else if (error.code === 'IN_PROGRESS') {
-      throw new Error('Sign-in is already in progress');
+      throw new Error('Sign in already in progress');
     } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
       throw new Error('Google Play Services not available');
     }
