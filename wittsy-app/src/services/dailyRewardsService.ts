@@ -133,7 +133,10 @@ class DailyRewardsService {
       if (data.lastClaimDate) {
         if (this.isConsecutiveDay(data.lastClaimDate, today)) {
           // Consecutive day - continue streak
-          nextDay = (data.currentStreak % 7) + 1;
+          // If currentStreak is 2, next day is 3
+          const nextStreakDay = data.currentStreak + 1;
+          // Wrap around after day 7 (1-7 cycle)
+          nextDay = ((nextStreakDay - 1) % 7) + 1;
         } else {
           // Streak broken - reset to day 1
           nextDay = 1;
