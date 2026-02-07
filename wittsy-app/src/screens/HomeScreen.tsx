@@ -15,7 +15,7 @@ import { GameplayTutorial } from '../components/tutorial/GameplayTutorial';
 import { DailyRewardModal } from '../components/DailyRewardModal';
 import { dailyRewardsService } from '../services/dailyRewardsService';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
-import { getActiveRooms, createRoom, joinRoom, getUserActiveRoom } from '../services/database';
+import { getActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom } from '../services/database';
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 import { isUserAdmin } from '../utils/adminCheck';
@@ -31,6 +31,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [quickMatchLoading, setQuickMatchLoading] = useState(false);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userActiveRoom, setUserActiveRoom] = useState<any | null>(null);
+  const [userActiveCasualRoom, setUserActiveCasualRoom] = useState<any | null>(null);
   const [selectedRoomType, setSelectedRoomType] = useState<'ranked' | 'casual' | null>('ranked');
   const [rankedRooms, setRankedRooms] = useState<any[]>([]);
   const [casualRooms, setCasualRooms] = useState<any[]>([]);
@@ -93,8 +94,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     // Load active rooms on mount
     loadActiveRooms();
     
-    // Load user's active room
+    // Load user's active rooms
     loadUserActiveRoom();
+    loadUserActiveCasualRoom();
     
     // Load ranked rooms by default
     loadRankedRooms();
@@ -116,6 +118,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     useCallback(() => {
       loadActiveRooms();
       loadUserActiveRoom();
+      loadUserActiveCasualRoom();
       checkDailyReward();
       // Reload the selected room type if one is active
       if (selectedRoomType === 'ranked') {
@@ -204,9 +207,20 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     try {
       const room = await getUserActiveRoom(user.uid);
       setUserActiveRoom(room);
-      console.log('👤 User active room:', room ? room.roomId : 'none');
+      console.log('👤 User active ranked room:', room ? room.roomId : 'none');
     } catch (error) {
       console.error('Error loading user active room:', error);
+    }
+  };
+
+  const loadUserActiveCasualRoom = async () => {
+    if (!user?.uid) return;
+    try {
+      const room = await getUserActiveCasualRoom(user.uid);
+      setUserActiveCasualRoom(room);
+      console.log('👤 User active casual room:', room ? room.roomId : 'none');
+    } catch (error) {
+      console.error('Error loading user active casual room:', error);
     }
   };
 
@@ -682,6 +696,37 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 <View style={styles.roomCardFooter}>
                   <Text style={styles.roomCardStatus}>
                     {userActiveRoom.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Active Casual Game Section - shows if user is in an active casual room AND viewing casual games */}
+        {userActiveCasualRoom && selectedRoomType === 'casual' && (
+          <Animated.View style={[styles.activeGameSection, { opacity: fadeAnim }]}>
+            <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>
+              Active Casual Game
+            </Text>
+            <View style={styles.roomList}>
+              <TouchableOpacity
+                style={styles.activeGameCard}
+                onPress={() => navigation.navigate('GameRoom', { roomId: userActiveCasualRoom.roomId })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.roomCardHeader}>
+                  <View style={styles.roomCardTitleRow}>
+                    <Text style={styles.roomCardName}>{userActiveCasualRoom.name}</Text>
+                    <Badge text="ACTIVE" variant="success" size="sm" />
+                  </View>
+                  <Text style={styles.roomCardPlayers}>
+                    👥 {userActiveCasualRoom.players?.length || 0}/{userActiveCasualRoom.settings?.maxPlayers || 12}
+                  </Text>
+                </View>
+                <View style={styles.roomCardFooter}>
+                  <Text style={styles.roomCardStatus}>
+                    {userActiveCasualRoom.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
                   </Text>
                 </View>
               </TouchableOpacity>
