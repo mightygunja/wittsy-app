@@ -658,11 +658,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </ScrollView>
         </Animated.View>
 
-        {/* Active Game Section - shows if user is in an active room */}
+        {/* Active Ranked Game Section - shows if user is in an active ranked room */}
         {userActiveRoom && (
           <Animated.View style={[styles.activeGameSection, { opacity: fadeAnim }]}>
             <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>
-              🎮 Your Active Game
+              Active Ranked Game
             </Text>
             <TouchableOpacity
               style={styles.activeGameCard}
