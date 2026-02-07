@@ -664,34 +664,28 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>
               Active Ranked Game
             </Text>
-            <TouchableOpacity
-              style={styles.activeGameCard}
-              onPress={() => navigation.navigate('GameRoom', { roomId: userActiveRoom.roomId })}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#10B981', '#059669']}
-                style={styles.activeGameGradient}
+            <View style={styles.roomList}>
+              <TouchableOpacity
+                style={styles.activeGameCard}
+                onPress={() => navigation.navigate('GameRoom', { roomId: userActiveRoom.roomId })}
+                activeOpacity={0.8}
               >
-                <View style={styles.activeGameContent}>
-                  <View style={styles.activeGameHeader}>
-                    <Text style={styles.activeGameName}>{userActiveRoom.name}</Text>
+                <View style={styles.roomCardHeader}>
+                  <View style={styles.roomCardTitleRow}>
+                    <Text style={styles.roomCardName}>{userActiveRoom.name}</Text>
                     <Badge text="ACTIVE" variant="success" size="sm" />
                   </View>
-                  <View style={styles.activeGameInfo}>
-                    <Text style={styles.activeGamePlayers}>
-                      👥 {userActiveRoom.players?.length || 0}/{userActiveRoom.settings?.maxPlayers || 12} Players
-                    </Text>
-                    <Text style={styles.activeGameStatus}>
-                      {userActiveRoom.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
-                    </Text>
-                  </View>
-                  <View style={styles.activeGameAction}>
-                    <Text style={styles.activeGameActionText}>Tap to rejoin →</Text>
-                  </View>
+                  <Text style={styles.roomCardPlayers}>
+                    👥 {userActiveRoom.players?.length || 0}/{userActiveRoom.settings?.maxPlayers || 12}
+                  </Text>
                 </View>
-              </LinearGradient>
-            </TouchableOpacity>
+                <View style={styles.roomCardFooter}>
+                  <Text style={styles.roomCardStatus}>
+                    {userActiveRoom.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         )}
 
@@ -986,58 +980,14 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   activeGameSection: {
     marginBottom: SPACING.lg,
-    paddingHorizontal: SPACING.md,
   },
   activeGameCard: {
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  activeGameGradient: {
-    padding: SPACING.lg,
-  },
-  activeGameContent: {
-    gap: SPACING.sm,
-  },
-  activeGameHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  activeGameName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    flex: 1,
-  },
-  activeGameInfo: {
-    gap: SPACING.xs,
-  },
-  activeGamePlayers: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  activeGameStatus: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  activeGameAction: {
-    marginTop: SPACING.xs,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  activeGameActionText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    textAlign: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   roomListSection: {
     marginBottom: SPACING.lg,
