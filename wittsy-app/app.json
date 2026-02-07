@@ -84,7 +84,12 @@
       "bundler": "metro"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.757129696124-cildtmm00qi49redkpq5jtkvdaua02at"
+        }
+      ],
       [
         "expo-notifications",
         {
