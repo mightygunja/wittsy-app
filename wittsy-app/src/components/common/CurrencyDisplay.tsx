@@ -23,12 +23,12 @@ export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
       return;
     }
 
-    // Real-time listener for user stats with server timestamps
+    // Real-time listener for user coins
     const userRef = doc(firestore, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        const newCoins = data?.stats?.coins || 0;
+        const newCoins = data?.coins || 0;
         console.log(`💰 CurrencyDisplay UPDATE: ${coins} → ${newCoins} (forcing update)`);
         // Force state update to trigger re-render
         setCoins(newCoins);
