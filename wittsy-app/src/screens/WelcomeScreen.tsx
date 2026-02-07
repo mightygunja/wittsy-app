@@ -252,8 +252,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             />
           )}
 
-          {/* Google Sign-In - TEMPORARILY DISABLED due to crashes */}
-          {false && isGoogleSignInAvailable() ? (
+          {/* Google Sign-In */}
+          {isGoogleSignInAvailable() ? (
             <GoogleSignInButton
               onPress={async () => {
                 setLoading(true);

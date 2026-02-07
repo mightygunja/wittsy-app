@@ -216,16 +216,17 @@ export const signIn = async (email: string, password: string): Promise<FirebaseU
 };
 
 // Configure Google Sign-In (call this on app startup)
-export const configureGoogleSignIn = () => {
+export const configureGoogleSignIn = async () => {
   try {
     GoogleSignin.configure({
       webClientId: '757129696124-0idv372oukrados213f4cuok31fvce4l.apps.googleusercontent.com',
       iosClientId: '757129696124-cildtmm00qi49redkpq5jtkvdaua02at.apps.googleusercontent.com',
-      offlineAccess: true,
+      offlineAccess: false,
+      forceCodeForRefreshToken: false,
     });
     console.log('✅ Google Sign-In configured');
   } catch (error) {
-    console.error('Failed to configure Google Sign-In:', error);
+    console.error('❌ Failed to configure Google Sign-In:', error);
   }
 };
 
@@ -234,40 +235,48 @@ export const signInWithGoogle = async (): Promise<FirebaseUser> => {
   try {
     console.log('🔵 Starting Google Sign-In...');
     
-    // Check if device supports Google Play services (Android only)
+    // Check if device supports Google Play Services (Android only)
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      console.log('✅ Google Play Services available');
     } catch (playServicesError: any) {
-      // On iOS, this will fail but that's okay
-      if (playServicesError.code !== 'PLAY_SERVICES_NOT_AVAILABLE') {
-        throw playServicesError;
-      }
+      console.log('⚠️ Play Services check:', playServicesError.message);
+      // Continue anyway - might be iOS
     }
-    
-    // Get user info from Google
-    const userInfo = await GoogleSignin.signIn();
-    console.log('✅ Got Google user info');
-    
-    // Create a Google credential with the token
-    const googleCredential = GoogleAuthProvider.credential(userInfo.data?.idToken);
-    
-    // Sign in to Firebase with the Google credential
+
+    // Sign out first to ensure clean state
+    try {
+      await GoogleSignin.signOut();
+    } catch (signOutError) {
+      // Ignore signout errors
+    }
+
+    // Sign in with Google
+    console.log('🔵 Calling GoogleSignin.signIn()...');
+    const response = await GoogleSignin.signIn();
+    console.log('✅ Google Sign-In response received');
+
+    // Get ID token from response
+    const idToken = response.data?.idToken;
+    if (!idToken) {
+      console.error('❌ No ID token in response:', response);
+      throw new Error('No ID token received from Google');
+    }
+
+    console.log('✅ Got Google ID token');
+
+    // Create Firebase credential
+    const googleCredential = GoogleAuthProvider.credential(idToken);
+    console.log('✅ Google credential created for Firebase');
+
+    // Sign in to Firebase
     const userCredential = await signInWithCredential(auth, googleCredential);
-    console.log('✅ Signed in to Firebase with Google credential');
-    
-    // Get or create user profile
-    const userProfile = await getOrCreateUserProfile(userCredential.user);
-    
-    // Initialize referral data for new Google sign-ins
-    if (userProfile) {
-      try {
-        const existingReferral = await referralService.getReferralData(userCredential.user.uid);
-        if (!existingReferral) {
-          await referralService.initializeReferralData(
-            userCredential.user.uid, 
-            userProfile.username || 'Player'
-          );
-        }
+    console.log('✅ Signed in to Firebase with Google:', userCredential.user.email);
+
+    // Create or update user profile
+    await getOrCreateUserProfile(userCredential.user);
+    console.log('✅ User profile created/updated');
+
       } catch (error) {
         console.error('⚠️ Failed to initialize referral data:', error);
       }

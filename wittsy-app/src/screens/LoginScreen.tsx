@@ -95,7 +95,23 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               style={styles.button}
             />
 
-            {/* Google Sign-In temporarily disabled due to crashes */}
+            {/* Google Sign-In */}
+        {isGoogleSignInAvailable() && (
+          <GoogleSignInButton
+            onPress={async () => {
+              setLoading(true);
+              try {
+                await signInWithGoogle();
+              } catch (error: any) {
+                Alert.alert('Sign In Failed', error.message);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            loading={loading}
+          />
+        )}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Don't have an account? </Text>
