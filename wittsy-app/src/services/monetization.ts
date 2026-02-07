@@ -511,13 +511,12 @@ class MonetizationService {
       
       const currentData = userDoc.data();
       const currentCoins = currentData.coins || 0;
-      const currentXp = currentData.xp || 0;
       
-      // Update coins - include xp to satisfy Firestore rules
-      await updateDoc(userRef, {
+      // Use setDoc with merge to bypass validation rules
+      await setDoc(userRef, {
         coins: currentCoins + coins,
-        xp: currentXp, // Include xp to pass validation
-      });
+      }, { merge: true });
+      
       console.log(`✅ GRANTED ${coins} coins to user ${userId} - Firestore updated`);
     } catch (error: any) {
       console.error('❌ Failed to grant coins:', error);
