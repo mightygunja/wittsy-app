@@ -322,8 +322,26 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
     const userCredential = await signInWithCredential(auth, appleCredential);
     console.log('✅ Signed in to Firebase with Apple credential');
 
-    // Get or create user profile
-    const userProfile = await getOrCreateUserProfile(userCredential.user);
+    // Get or create user profile with retry logic
+    let userProfile = null;
+    let retries = 3;
+    while (retries > 0 && !userProfile) {
+      try {
+        userProfile = await getOrCreateUserProfile(userCredential.user);
+        if (userProfile) {
+          console.log('✅ User profile created/retrieved successfully');
+          break;
+        }
+      } catch (profileError: any) {
+        console.error(`⚠️ Failed to create user profile (${retries} retries left):`, profileError);
+        retries--;
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        } else {
+          throw new Error('Failed to create user profile after multiple attempts');
+        }
+      }
+    }
 
     // Initialize referral data for new Apple sign-ins
     if (userProfile) {
@@ -341,19 +359,30 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
     }
 
     // Update last active
-    await setDoc(
-      doc(firestore, 'users', userCredential.user.uid),
-      { lastActive: new Date().toISOString() },
-      { merge: true }
-    );
+    try {
+      await setDoc(
+        doc(firestore, 'users', userCredential.user.uid),
+        { lastActive: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch (updateError) {
+      console.error('⚠️ Failed to update last active:', updateError);
+      // Don't throw - this is not critical
+    }
 
     console.log('✅ Apple Sign-In complete');
     return userCredential.user;
   } catch (error: any) {
     console.error('❌ Apple Sign-In error:', error);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error message:', error.message);
     
     if (error.code === 'ERR_CANCELED') {
       throw new Error('Sign-in was cancelled');
+    }
+    
+    if (error.code === 'permission-denied') {
+      throw new Error('Missing or insufficient permissions');
     }
     
     throw new Error(error.message || 'Failed to sign in with Apple');

@@ -501,9 +501,17 @@ class MonetizationService {
     try {
       console.log(`💰 GRANTING ${coins} coins to user ${userId}...`);
       const userRef = doc(firestore, 'users', userId);
+      
+      // Get current user data to verify document exists
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) {
+        console.error(`❌ User document does not exist for ${userId}`);
+        throw new Error('User document not found');
+      }
+      
+      // Update coins at root level (not in stats)
       await updateDoc(userRef, {
-        'stats.coins': increment(coins),
-        'stats.totalCoinsEarned': increment(coins),
+        coins: increment(coins),
       });
       console.log(`✅ GRANTED ${coins} coins to user ${userId} - Firestore updated`);
     } catch (error: any) {

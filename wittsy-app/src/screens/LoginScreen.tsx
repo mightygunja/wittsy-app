@@ -95,15 +95,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               style={styles.button}
             />
 
-            <View style={{ marginVertical: 16, alignItems: 'center' }}>
-              <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>or</Text>
-            </View>
-
-            <GoogleSignInButton
-              onPress={handleGoogleSignIn}
-              disabled={loading}
-              loading={loading}
-            />
+            {/* Google Sign-In temporarily disabled due to crashes */}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Don't have an account? </Text>

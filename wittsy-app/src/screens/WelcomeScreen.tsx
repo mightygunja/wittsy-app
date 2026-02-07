@@ -184,8 +184,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
             />
           )}
 
-          {/* Google Sign-In - Only show on native builds */}
-          {isGoogleSignInAvailable() ? (
+          {/* Google Sign-In - TEMPORARILY DISABLED due to crashes */}
+          {false && isGoogleSignInAvailable() ? (
             <GoogleSignInButton
               onPress={async () => {
                 setLoading(true);
@@ -216,16 +216,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
               disabled={loading}
               loading={loading}
             />
-          ) : (
-            <View style={styles.expoGoNotice}>
-              <Text style={[styles.expoGoText, { color: COLORS.textSecondary }]}>
-                ℹ️ Social Sign-In not available in {getAppEnvironment()}
-              </Text>
-              <Text style={[styles.expoGoSubtext, { color: COLORS.textSecondary }]}>
-                Use email sign-up or guest mode for testing
-              </Text>
-            </View>
-          )}
+          ) : null}
 
           {/* Tertiary: Sign In */}
           <View style={styles.signInContainer}>
