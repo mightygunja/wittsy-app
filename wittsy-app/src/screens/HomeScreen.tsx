@@ -658,8 +658,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </ScrollView>
         </Animated.View>
 
-        {/* Active Ranked Game Section - shows if user is in an active ranked room */}
-        {userActiveRoom && (
+        {/* Active Ranked Game Section - shows if user is in an active ranked room AND not viewing casual games */}
+        {userActiveRoom && selectedRoomType !== 'casual' && (
           <Animated.View style={[styles.activeGameSection, { opacity: fadeAnim }]}>
             <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>
               Active Ranked Game
