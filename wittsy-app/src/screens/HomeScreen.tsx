@@ -186,10 +186,12 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
     
     console.log('🔄 Refreshing user profile...');
-    // Force immediate refresh - Firestore listener should pick up the change
+    // Force immediate refresh to update coin display
     if (refreshUserProfile) {
       await refreshUserProfile();
-      console.log('✅ User profile refreshed');
+      console.log('✅ User profile refreshed - coins should update');
+    } else {
+      console.error('⚠️ refreshUserProfile not available');
     }
   };
 
