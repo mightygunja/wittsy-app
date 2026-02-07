@@ -5,7 +5,7 @@
 
 import { Platform } from 'react-native';
 import { firestore } from './firebase';
-import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, increment, getDoc, setDoc } from 'firebase/firestore';
 import { analytics } from './analytics';
 import { errorTracking } from './errorTracking';
 import { isIAPAvailable } from '../utils/platform';
