@@ -54,6 +54,35 @@ const isUserInActiveRankedGame = async (userId: string): Promise<boolean> => {
 };
 
 /**
+ * Get user's active game room (if any)
+ * Returns the room where the user is currently a player
+ */
+export const getUserActiveRoom = async (userId: string): Promise<Room | null> => {
+  try {
+    const q = query(
+      collection(firestore, 'rooms'),
+      where('status', 'in', ['waiting', 'active'])
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    // Find the first room where user is a player
+    for (const doc of snapshot.docs) {
+      const roomData = doc.data();
+      const players = roomData.players || [];
+      if (players.some((p: Player) => p.userId === userId)) {
+        return { roomId: doc.id, ...roomData } as Room;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting user active room:', error);
+    return null;
+  }
+};
+
+/**
  * Create a new game room
  */
 export const createRoom = async (

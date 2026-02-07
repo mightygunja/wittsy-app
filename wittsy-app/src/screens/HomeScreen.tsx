@@ -15,7 +15,7 @@ import { GameplayTutorial } from '../components/tutorial/GameplayTutorial';
 import { DailyRewardModal } from '../components/DailyRewardModal';
 import { dailyRewardsService } from '../services/dailyRewardsService';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
-import { getActiveRooms, createRoom, joinRoom } from '../services/database';
+import { getActiveRooms, createRoom, joinRoom, getUserActiveRoom } from '../services/database';
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 import { isUserAdmin } from '../utils/adminCheck';
@@ -30,6 +30,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
   const [quickMatchLoading, setQuickMatchLoading] = useState(false);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
+  const [userActiveRoom, setUserActiveRoom] = useState<any | null>(null);
   const [selectedRoomType, setSelectedRoomType] = useState<'ranked' | 'casual' | null>('ranked');
   const [rankedRooms, setRankedRooms] = useState<any[]>([]);
   const [casualRooms, setCasualRooms] = useState<any[]>([]);
@@ -92,6 +93,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     // Load active rooms on mount
     loadActiveRooms();
     
+    // Load user's active room
+    loadUserActiveRoom();
+    
     // Load ranked rooms by default
     loadRankedRooms();
     
@@ -111,6 +115,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadActiveRooms();
+      loadUserActiveRoom();
       checkDailyReward();
       // Reload the selected room type if one is active
       if (selectedRoomType === 'ranked') {
@@ -191,6 +196,17 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setActiveRooms(rooms.slice(0, 5));
     } catch (error) {
       console.error('Error loading rooms:', error);
+    }
+  };
+
+  const loadUserActiveRoom = async () => {
+    if (!user?.uid) return;
+    try {
+      const room = await getUserActiveRoom(user.uid);
+      setUserActiveRoom(room);
+      console.log('👤 User active room:', room ? room.roomId : 'none');
+    } catch (error) {
+      console.error('Error loading user active room:', error);
     }
   };
 
@@ -642,6 +658,43 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </ScrollView>
         </Animated.View>
 
+        {/* Active Game Section - shows if user is in an active room */}
+        {userActiveRoom && (
+          <Animated.View style={[styles.activeGameSection, { opacity: fadeAnim }]}>
+            <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>
+              🎮 Your Active Game
+            </Text>
+            <TouchableOpacity
+              style={styles.activeGameCard}
+              onPress={() => navigation.navigate('GameRoom', { roomId: userActiveRoom.roomId })}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#10B981', '#059669']}
+                style={styles.activeGameGradient}
+              >
+                <View style={styles.activeGameContent}>
+                  <View style={styles.activeGameHeader}>
+                    <Text style={styles.activeGameName}>{userActiveRoom.name}</Text>
+                    <Badge text="ACTIVE" variant="success" size="sm" />
+                  </View>
+                  <View style={styles.activeGameInfo}>
+                    <Text style={styles.activeGamePlayers}>
+                      👥 {userActiveRoom.players?.length || 0}/{userActiveRoom.settings?.maxPlayers || 12} Players
+                    </Text>
+                    <Text style={styles.activeGameStatus}>
+                      {userActiveRoom.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
+                    </Text>
+                  </View>
+                  <View style={styles.activeGameAction}>
+                    <Text style={styles.activeGameActionText}>Tap to rejoin →</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
         {/* Current Room Games Section - appears below Explore when button clicked */}
         {selectedRoomType && (
           <Animated.View style={[styles.roomListSection, { opacity: fadeAnim }]}>
@@ -930,6 +983,61 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   mainActionCard: {
     flex: 1,
     minWidth: 110,
+  },
+  activeGameSection: {
+    marginBottom: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+  },
+  activeGameCard: {
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  activeGameGradient: {
+    padding: SPACING.lg,
+  },
+  activeGameContent: {
+    gap: SPACING.sm,
+  },
+  activeGameHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  activeGameName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  activeGameInfo: {
+    gap: SPACING.xs,
+  },
+  activeGamePlayers: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+  },
+  activeGameStatus: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+  },
+  activeGameAction: {
+    marginTop: SPACING.xs,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  activeGameActionText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   roomListSection: {
     marginBottom: SPACING.lg,
