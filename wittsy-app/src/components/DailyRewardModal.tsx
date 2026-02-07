@@ -112,22 +112,20 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({
         setClaimed(true);
         haptics.success();
 
-        // Animate coin burst
-        Animated.sequence([
-          Animated.timing(coinAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(coinAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-
-        // Notify parent (parent will handle closing and refreshing)
+        // Notify parent immediately (parent will handle closing and refreshing)
         onClaimed(result.reward.coins, result.newStreak || 0);
+
+        // Quick coin burst animation then close
+        Animated.timing(coinAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          // Close modal after brief animation
+          setTimeout(() => {
+            animateOut();
+          }, 200);
+        });
       } else {
         console.log('❌ Claim FAILED:', result.error);
         haptics.error();
