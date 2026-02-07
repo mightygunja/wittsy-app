@@ -41,6 +41,7 @@ export const MainNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       screenOptions={{
+        headerMode: 'float',
         headerStyle: {
           backgroundColor: '#6C63FF'
         },
