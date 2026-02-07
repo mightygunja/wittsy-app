@@ -196,7 +196,7 @@ export const signIn = async (email: string, password: string): Promise<FirebaseU
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     
-    // Update last active - don't fail sign-in if this fails
+    // Update last active - use merge to avoid overwriting other fields
     try {
       await setDoc(
         doc(firestore, 'users', userCredential.user.uid),

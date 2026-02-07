@@ -509,9 +509,14 @@ class MonetizationService {
         throw new Error('User document not found');
       }
       
-      // Update coins at root level (not in stats)
+      const currentData = userDoc.data();
+      const currentCoins = currentData.coins || 0;
+      const currentXp = currentData.xp || 0;
+      
+      // Update coins - include xp to satisfy Firestore rules
       await updateDoc(userRef, {
-        coins: increment(coins),
+        coins: currentCoins + coins,
+        xp: currentXp, // Include xp to pass validation
       });
       console.log(`✅ GRANTED ${coins} coins to user ${userId} - Firestore updated`);
     } catch (error: any) {
