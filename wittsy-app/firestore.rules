@@ -46,14 +46,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && 
         isOwner(userId) && 
         isValidUsername(request.resource.data.username) &&
-        request.resource.data.coins >= 0 &&
-        request.resource.data.xp >= 0 &&
+        (!('coins' in request.resource.data) || request.resource.data.coins >= 0) &&
+        (!('xp' in request.resource.data) || request.resource.data.xp >= 0) &&
         hasValidTimestamp();
       allow update: if isSignedIn() && 
         isOwner(userId) &&
-        // Prevent negative values
-        request.resource.data.coins >= 0 &&
-        request.resource.data.xp >= 0 &&
+        // Prevent negative values (only check if these fields are being updated)
+        (!('coins' in request.resource.data) || request.resource.data.coins >= 0) &&
+        (!('xp' in request.resource.data) || request.resource.data.xp >= 0) &&
         // Allow username updates if valid
         (!('username' in request.resource.data) || 
          isValidUsername(request.resource.data.username));

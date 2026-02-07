@@ -196,11 +196,17 @@ export const signIn = async (email: string, password: string): Promise<FirebaseU
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     
-    await setDoc(
-      doc(firestore, 'users', userCredential.user.uid),
-      { lastActive: new Date().toISOString() },
-      { merge: true }
-    );
+    // Update last active - don't fail sign-in if this fails
+    try {
+      await setDoc(
+        doc(firestore, 'users', userCredential.user.uid),
+        { lastActive: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch (updateError) {
+      console.error('⚠️ Failed to update last active (non-critical):', updateError);
+      // Don't throw - sign-in should still succeed
+    }
 
     return userCredential.user;
   } catch (error: any) {
