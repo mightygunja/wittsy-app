@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,8 @@ import { useAuth } from '../hooks/useAuth';
 import { isGoogleSignInAvailable, isAppleSignInAvailable, getAppEnvironment } from '../utils/platform';
 import { AppleSignInButton } from '../components/auth/AppleSignInButton';
 import { GoogleSignInButton } from '../components/auth/GoogleSignInButton';
+import { signInWithEmailAndPassword, linkWithCredential } from 'firebase/auth';
+import { auth } from '../services/firebase';
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -161,6 +164,56 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                   console.log('✅ WelcomeScreen: Apple Sign-In successful');
                 } catch (error: any) {
                   console.error('❌ WelcomeScreen: Apple Sign-In error:', error);
+                  
+                  // Check if this is an account linking request
+                  if (error.message === 'ACCOUNT_LINKING_REQUIRED') {
+                    console.log('🔗 Account linking required, prompting for password...');
+                    
+                    // Prompt user for their password to link accounts
+                    Alert.prompt(
+                      'Link Your Account',
+                      `This email (${error.email}) is already registered. Enter your password to link your Apple account:`,
+                      [
+                        {
+                          text: 'Cancel',
+                          style: 'cancel',
+                          onPress: () => setLoading(false),
+                        },
+                        {
+                          text: 'Link Account',
+                          onPress: async (password) => {
+                            try {
+                              // Sign in with email/password first
+                              const userCred = await signInWithEmailAndPassword(
+                                auth,
+                                error.email,
+                                password || ''
+                              );
+                              
+                              // Link the Apple credential to the existing account
+                              await linkWithCredential(userCred.user, error.pendingCredential);
+                              
+                              console.log('✅ Account linked successfully!');
+                              Alert.alert(
+                                'Success!',
+                                'Your Apple account has been linked. You can now sign in with Apple.'
+                              );
+                            } catch (linkError: any) {
+                              console.error('❌ Account linking failed:', linkError);
+                              Alert.alert(
+                                'Linking Failed',
+                                linkError.message || 'Failed to link accounts. Please check your password.'
+                              );
+                            } finally {
+                              setLoading(false);
+                            }
+                          },
+                        },
+                      ],
+                      'secure-text'
+                    );
+                    return; // Don't set loading to false yet
+                  }
                   
                   let errorMessage = 'An error occurred during sign-in';
                   

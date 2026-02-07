@@ -330,7 +330,7 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
       
       // Check if this is an account-exists-with-different-credential error
       if (signInError.code === 'auth/account-exists-with-different-credential') {
-        console.log('🔗 Account exists with different credential, attempting to link...');
+        console.log('🔗 Account exists with different credential, auto-linking...');
         
         // Get the email from the Apple credential
         const email = credential.email;
@@ -342,14 +342,16 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
         const signInMethods = await fetchSignInMethodsForEmail(auth, email);
         console.log(`📧 Existing sign-in methods for ${email}:`, signInMethods);
         
-        // If user has email/password, they need to sign in first, then link
+        // If user has email/password, we need to prompt for password to link
         if (signInMethods.includes('password')) {
-          throw new Error(
-            'This email is already registered with a password. Please sign in with your email and password first, then link your Apple account in Settings.'
-          );
+          // This error will be caught by the UI and trigger a password prompt
+          const error: any = new Error('ACCOUNT_LINKING_REQUIRED');
+          error.email = email;
+          error.pendingCredential = appleCredential;
+          throw error;
         }
         
-        // For other providers, we can't auto-link without user intervention
+        // For other providers, we can't auto-link
         throw new Error(
           `This email is already registered with ${signInMethods[0]}. Please sign in with that method first.`
         );
