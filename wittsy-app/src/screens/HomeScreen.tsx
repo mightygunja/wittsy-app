@@ -50,6 +50,20 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
+  // Shimmer animation - runs independently to prevent interruption
+  useEffect(() => {
+    const shimmerLoop = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    );
+    shimmerLoop.start();
+    
+    return () => shimmerLoop.stop();
+  }, []); // Empty dependency array - runs once and never stops
+
   useEffect(() => {
     // Entrance animations
     Animated.parallel([
@@ -80,15 +94,6 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
-
-    // Shimmer animation
-    Animated.loop(
-      Animated.timing(shimmerAnim, {
-        toValue: 1,
-        duration: 2000,
-        useNativeDriver: true,
-      })
     ).start();
 
     // Load active rooms on mount
