@@ -183,6 +183,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                           text: 'Link Account',
                           onPress: async (password) => {
                             try {
+                              console.log('🔐 Signing in with email/password to link account...');
+                              
                               // Sign in with email/password first
                               const userCred = await signInWithEmailAndPassword(
                                 auth,
@@ -190,20 +192,33 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                                 password || ''
                               );
                               
+                              console.log('✅ Signed in with email/password');
+                              console.log('🔗 Linking Apple credential...');
+                              
                               // Link the Apple credential to the existing account
                               await linkWithCredential(userCred.user, error.pendingCredential);
                               
-                              console.log('✅ Account linked successfully!');
+                              console.log('✅ Apple credential linked successfully!');
+                              
+                              // User is now signed in with their existing account
+                              // No need to create a new profile - it already exists
                               Alert.alert(
                                 'Success!',
-                                'Your Apple account has been linked. You can now sign in with Apple.'
+                                'Your Apple account has been linked. You can now sign in with Apple or email/password.'
                               );
                             } catch (linkError: any) {
                               console.error('❌ Account linking failed:', linkError);
-                              Alert.alert(
-                                'Linking Failed',
-                                linkError.message || 'Failed to link accounts. Please check your password.'
-                              );
+                              
+                              let errorMsg = 'Failed to link accounts. Please check your password.';
+                              if (linkError.code === 'auth/wrong-password') {
+                                errorMsg = 'Incorrect password. Please try again.';
+                              } else if (linkError.code === 'auth/too-many-requests') {
+                                errorMsg = 'Too many failed attempts. Please try again later.';
+                              } else if (linkError.message) {
+                                errorMsg = linkError.message;
+                              }
+                              
+                              Alert.alert('Linking Failed', errorMsg);
                             } finally {
                               setLoading(false);
                             }

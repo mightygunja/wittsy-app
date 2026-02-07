@@ -322,6 +322,8 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
 
     // Try to sign in with Apple credential
     let userCredential;
+    let isAccountLinking = false;
+    
     try {
       userCredential = await signInWithCredential(auth, appleCredential);
       console.log('✅ Signed in to Firebase with Apple credential');
@@ -330,7 +332,7 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
       
       // Check if this is an account-exists-with-different-credential error
       if (signInError.code === 'auth/account-exists-with-different-credential') {
-        console.log('🔗 Account exists with different credential, auto-linking...');
+        console.log('🔗 Account exists with different credential, triggering linking flow...');
         
         // Get the email from the Apple credential
         const email = credential.email;
@@ -345,6 +347,7 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
         // If user has email/password, we need to prompt for password to link
         if (signInMethods.includes('password')) {
           // This error will be caught by the UI and trigger a password prompt
+          // The UI will handle the linking, then the user will be signed in
           const error: any = new Error('ACCOUNT_LINKING_REQUIRED');
           error.email = email;
           error.pendingCredential = appleCredential;
