@@ -107,11 +107,7 @@
     },
     "owner": "mightygunja",
     "updates": {
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/1836a769-48db-4dc3-bffb-6487530c5daa"
-    },
-    "runtimeVersion": {
-      "policy": "sdkVersion"
+      "enabled": false
     }
   }
 }
