@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   Animated,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,8 +30,9 @@ import {
   RARITY_GRADIENTS,
 } from '../types/avatar';
 import { RewardItem } from '../types/battlePass';
+import { contentWidth, gridColumns, tabletHorizontalPadding } from '../utils/responsive';
 
-const { width } = Dimensions.get('window');
+const width = contentWidth;
 
 // Coin prices based on rarity
 const RARITY_PRICES: Record<string, number> = {
@@ -446,12 +446,12 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
     gap: SPACING.md,
     marginBottom: SPACING.xl,
   },
   itemCard: {
-    width: (width - SPACING.md * 4) / 2,
+    width: (width - SPACING.md * (gridColumns + 2)) / gridColumns,
     padding: 0,
     overflow: 'hidden',
     marginBottom: SPACING.md,

@@ -12,14 +12,14 @@ import {
   Modal,
   TouchableOpacity,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { COLORS, SPACING } from '../../utils/constants';
 import * as haptics from '../../utils/haptics';
+import { contentWidth } from '../../utils/responsive';
 
-const { width } = Dimensions.get('window');
+const width = contentWidth;
 
 interface TutorialStep {
   id: string;

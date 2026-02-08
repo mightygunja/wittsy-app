@@ -11,7 +11,6 @@ import {
   Modal,
   TouchableOpacity,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -19,8 +18,9 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../../services/firebase';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../utils/constants';
 import * as haptics from '../../utils/haptics';
+import { contentWidth } from '../../utils/responsive';
 
-const { width } = Dimensions.get('window');
+const width = contentWidth;
 
 export interface TutorialStep {
   id: string;

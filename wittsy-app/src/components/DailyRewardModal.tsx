@@ -11,7 +11,6 @@ import {
   Modal,
   TouchableOpacity,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -19,8 +18,7 @@ import { dailyRewardsService, DAILY_REWARDS } from '../services/dailyRewardsServ
 import { haptics } from '../services/haptics';
 import { SPACING, RADIUS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
-
-const { width } = Dimensions.get('window');
+import { modalWidth } from '../utils/responsive';
 
 interface DailyRewardModalProps {
   visible: boolean;
@@ -274,7 +272,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContainer: {
-    width: width - 40,
+    width: modalWidth,
     maxWidth: 400,
   },
   modalContent: {

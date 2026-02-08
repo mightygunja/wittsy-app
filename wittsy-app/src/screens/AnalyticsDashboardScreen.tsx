@@ -10,7 +10,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,8 +20,9 @@ import { Card } from '../components/common/Card';
 import { SPACING, RADIUS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
 import { BackButton } from '../components/common/BackButton';;
+import { contentWidth, tabletHorizontalPadding } from '../utils/responsive';
 
-const { width } = Dimensions.get('window');
+const width = contentWidth;
 
 interface KPI {
   label: string;
@@ -293,6 +293,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   kpisGrid: {
     flexDirection: 'row',

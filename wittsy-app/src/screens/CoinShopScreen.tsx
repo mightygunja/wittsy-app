@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   Animated,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,8 +21,9 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
+import { contentWidth, gridColumns, tabletHorizontalPadding } from '../utils/responsive';
 
-const { width } = Dimensions.get('window');
+const width = contentWidth;
 
 export const CoinShopScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
@@ -291,6 +291,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   productsGrid: {
     flexDirection: 'row',
@@ -299,7 +300,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   productCard: {
-    width: (width - SPACING.md * 3) / 2,
+    width: (width - SPACING.md * (gridColumns + 1)) / gridColumns,
     padding: 0,
     overflow: 'hidden',
     position: 'relative',

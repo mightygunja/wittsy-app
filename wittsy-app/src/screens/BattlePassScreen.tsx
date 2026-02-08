@@ -11,7 +11,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,8 +25,9 @@ import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
 import { UserBattlePass, BattlePassStats, BattlePassReward } from '../types/battlePass';
+import { contentWidth, tabletHorizontalPadding } from '../utils/responsive';
 
-const { width } = Dimensions.get('window');
+const width = contentWidth;
 const REWARD_CARD_WIDTH = 120;
 
 export const BattlePassScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -566,7 +566,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
     gap: SPACING.sm,
     marginBottom: SPACING.md,
   },

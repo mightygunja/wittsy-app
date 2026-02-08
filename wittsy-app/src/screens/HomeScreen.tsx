@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, Dimensions, Platform, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, Platform, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,7 +22,9 @@ import { isUserAdmin } from '../utils/adminCheck';
 import { getBrowsableRankedRooms } from '../services/matchmaking';
 import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES, MAX_PLAYERS } from '../utils/constants';
 
-const { width } = Dimensions.get('window');
+import { screenWidth, contentWidth, isTablet, tabletContentStyle, tabletHorizontalPadding } from '../utils/responsive';
+const width = contentWidth;
+
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, userProfile, refreshUserProfile } = useAuth();
@@ -366,7 +368,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const shimmerTranslate = shimmerAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [-width, width],
+    outputRange: [-screenWidth, screenWidth],
   });
 
   return (
@@ -870,7 +872,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    width: width * 0.3,
+    width: screenWidth * 0.3,
     backgroundColor: 'rgba(168, 85, 247, 0.1)',
     transform: [{ skewX: '-20deg' }],
   },
@@ -879,6 +881,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   content: {
     padding: SPACING.sm,
+    paddingHorizontal: SPACING.sm + tabletHorizontalPadding,
     paddingBottom: 200,
   },
   header: {

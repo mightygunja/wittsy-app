@@ -4,10 +4,12 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { screenWidth, screenHeight } from '../../utils/responsive';
 
-const { width, height } = Dimensions.get('window');
+const width = screenWidth;
+const height = screenHeight;
 
 interface StarCelebrationProps {
   visible: boolean;

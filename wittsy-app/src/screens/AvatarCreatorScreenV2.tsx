@@ -17,7 +17,6 @@ import {
   TouchableOpacity,
   Animated,
   PanResponder,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,9 +41,10 @@ import {
   AvatarRarity,
 } from '../types/avatar';
 import { SkinBase, Eyes, Mouths, Hair, Accessories, SKIN_COLORS, HAIR_COLORS } from '../components/avatar/AvatarFeatures';
+import { contentWidth, avatarDisplaySize, avatarGridColumns, tabletHorizontalPadding } from '../utils/responsive';
 
-const { width, height } = Dimensions.get('window');
-const AVATAR_SIZE = width * 0.7;
+const width = contentWidth;
+const AVATAR_SIZE = avatarDisplaySize;
 const CANVAS_SIZE = AVATAR_SIZE; // Store for position calculations
 
 // Map avatar item IDs to SVG style names
@@ -909,12 +909,12 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   itemsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.lg + tabletHorizontalPadding,
     paddingBottom: SPACING.xl,
     gap: SPACING.sm,
   },
   itemCard: {
-    width: (width - SPACING.lg * 2 - SPACING.sm * 3) / 4,
+    width: (width - SPACING.lg * 2 - SPACING.sm * (avatarGridColumns - 1)) / avatarGridColumns,
     aspectRatio: 1,
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
