@@ -6,6 +6,7 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { firestore } from './firebase';
 import { analytics } from './analytics';
@@ -75,7 +76,9 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
  */
 export const getFCMToken = async (): Promise<string | null> => {
   try {
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    const token = (await Notifications.getExpoPushTokenAsync({
+      projectId: Constants.expoConfig?.extra?.eas?.projectId,
+    })).data;
     console.log('Expo Push Token:', token);
     return token;
   } catch (error) {
