@@ -98,11 +98,7 @@ export default {
     },
     owner: "mightygunja",
     updates: {
-      fallbackToCacheTimeout: 0,
-      url: "https://u.expo.dev/your-project-id"
-    },
-    runtimeVersion: {
-      policy: "sdkVersion"
+      enabled: false
     }
   }
 };
