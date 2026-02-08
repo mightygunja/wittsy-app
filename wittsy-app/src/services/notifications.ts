@@ -100,13 +100,19 @@ class NotificationService {
         return null;
       }
 
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      if (!projectId) {
+        console.log('⏭️ No EAS projectId found, skipping push token registration');
+        return null;
+      }
+
       const token = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+        projectId,
       });
 
       return token.data;
-    } catch (error) {
-      console.error('Failed to get push token:', error);
+    } catch (error: any) {
+      console.log('⏭️ Push token registration skipped:', error?.message || error);
       return null;
     }
   }
