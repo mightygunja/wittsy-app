@@ -16,10 +16,15 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
 import { referralService } from './referralService';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
-
-// Dynamic import for Apple Authentication (Expo Go compatibility)
+// Dynamic imports for native modules (Expo Go compatibility)
+let GoogleSignin: any = null;
 let AppleAuthentication: any = null;
+
+try {
+  GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+} catch (e) {
+  console.log('⏭️ Skipping Google Sign-In import (Expo Go)');
+}
 
 try {
   AppleAuthentication = require('expo-apple-authentication');
@@ -211,6 +216,10 @@ export const signIn = async (email: string, password: string): Promise<FirebaseU
 
 // Configure Google Sign-In (call this on app startup)
 export const configureGoogleSignIn = () => {
+  if (!GoogleSignin) {
+    console.log('⏭️ Google Sign-In not available (Expo Go)');
+    return;
+  }
   try {
     GoogleSignin.configure({
       webClientId: '757129696124-0idv372oukrados213f4cuok31fvce4l.apps.googleusercontent.com',
@@ -225,6 +234,9 @@ export const configureGoogleSignIn = () => {
 
 // Sign in with Google
 export const signInWithGoogle = async (): Promise<FirebaseUser> => {
+  if (!GoogleSignin) {
+    throw new Error('Google Sign-In is not available in Expo Go. Use a development build.');
+  }
   try {
     console.log('🔵 Starting Google Sign-In...');
     
