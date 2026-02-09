@@ -22,7 +22,7 @@ import { isUserAdmin } from '../utils/adminCheck';
 import { getBrowsableRankedRooms } from '../services/matchmaking';
 import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES, MAX_PLAYERS } from '../utils/constants';
 
-import { screenWidth, contentWidth, isTablet, tabletContentStyle, tabletHorizontalPadding } from '../utils/responsive';
+import { screenWidth, contentWidth, isTablet, isLargeTablet, tabletContentStyle, tabletHorizontalPadding } from '../utils/responsive';
 const width = contentWidth;
 
 
@@ -1127,8 +1127,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     gap: SPACING.sm,
   },
   secondaryCard: {
-    width: 100,
-    height: 100,
+    width: isLargeTablet ? 140 : isTablet ? 120 : 100,
+    height: isLargeTablet ? 140 : isTablet ? 120 : 100,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
     marginRight: SPACING.sm,
@@ -1137,19 +1137,19 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.sm,
+    padding: isTablet ? SPACING.md : SPACING.sm,
   },
   secondaryIcon: {
-    fontSize: 36,
+    fontSize: isLargeTablet ? 44 : isTablet ? 40 : 36,
     marginBottom: SPACING.xs,
     textAlign: 'center',
   },
   secondaryTitle: {
-    fontSize: 13,
+    fontSize: isLargeTablet ? 15 : isTablet ? 14 : 13,
     fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: isLargeTablet ? 20 : isTablet ? 18 : 16,
     flexWrap: 'wrap',
   },
   section: {
