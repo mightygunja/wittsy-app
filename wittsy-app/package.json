@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "test": "jest",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "postinstall": "node scripts/patch-expo-cli.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
