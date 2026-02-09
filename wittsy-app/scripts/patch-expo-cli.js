@@ -32,8 +32,8 @@ const filesToPatch = [
   'RuntimeRedirectMiddleware.js',
 ];
 
-const SEARCH = `(0, _resolvePlatform.assertMissingRuntimePlatform)(platform)`;
-const REPLACE = `if (!platform) { platform = 'ios'; } // patched: fallback instead of throwing`;
+const ASSERT_SEARCH = `(0, _resolvePlatform.assertMissingRuntimePlatform)(platform)`;
+const ASSERT_REPLACE = `if (!platform) { platform = 'ios'; } // patched: fallback instead of throwing`;
 
 let patchCount = 0;
 
@@ -53,12 +53,19 @@ for (const file of filesToPatch) {
     continue;
   }
 
-  if (!content.includes(SEARCH)) {
+  if (!content.includes(ASSERT_SEARCH)) {
     console.log(`⚠️  ${file} does not contain expected code, skipping`);
     continue;
   }
 
-  content = content.replace(SEARCH, REPLACE);
+  // Change 'const platform' to 'let platform' so we can reassign it in the fallback
+  content = content.replace(
+    /const platform = \(0, _resolvePlatform\.parsePlatformHeader\)/g,
+    'let platform = (0, _resolvePlatform.parsePlatformHeader)'
+  );
+
+  // Replace the assert with a fallback
+  content = content.replace(ASSERT_SEARCH, ASSERT_REPLACE);
   fs.writeFileSync(filePath, content, 'utf8');
   console.log(`✅ Patched ${file}`);
   patchCount++;
