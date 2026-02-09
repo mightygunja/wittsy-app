@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Player } from '../../types';
 import { useTheme } from '../../hooks/useTheme';
 import { AvatarDisplay } from '../avatar/AvatarDisplay';
+import { isTablet, isLargeTablet } from '../../utils/responsive';
 
 interface PlayerListProps {
   players: Player[];
@@ -41,7 +42,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, cur
               <View style={styles.avatarContainer}>
                 {player.avatarConfig ? (
                   <View style={styles.avatar}>
-                    <AvatarDisplay config={player.avatarConfig} size={60} />
+                    <AvatarDisplay config={player.avatarConfig} size={isLargeTablet ? 80 : isTablet ? 70 : 60} />
                   </View>
                 ) : (
                   <View style={[
@@ -95,11 +96,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 12,
+    gap: isLargeTablet ? 20 : isTablet ? 16 : 12,
   },
   playerCard: {
     alignItems: 'center',
-    width: 80,
+    width: isLargeTablet ? 120 : isTablet ? 100 : 80,
     marginBottom: 12,
   },
   avatarContainer: {
@@ -107,9 +108,9 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginBottom: 8,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: isLargeTablet ? 80 : isTablet ? 70 : 60,
+    height: isLargeTablet ? 80 : isTablet ? 70 : 60,
+    borderRadius: isLargeTablet ? 40 : isTablet ? 35 : 30,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
@@ -138,7 +139,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderColor: COLORS.surface,
   },
   username: {
-    fontSize: 12,
+    fontSize: isLargeTablet ? 15 : isTablet ? 14 : 12,
     color: COLORS.text,
     textAlign: 'center',
     fontWeight: '500',
