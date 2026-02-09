@@ -18,6 +18,7 @@ import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
 import { BackButton } from '../components/common/BackButton';;
 import { Button } from '../components/common/Button';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 const CATEGORIES: { id: PromptCategory; name: string; icon: string }[] = [
   { id: 'general', name: 'General', icon: '💬' },
@@ -298,6 +299,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   header: {
     padding: SPACING.xl,
     paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.xl + tabletHorizontalPadding,
   },
   backButton: {
     marginBottom: SPACING.md,

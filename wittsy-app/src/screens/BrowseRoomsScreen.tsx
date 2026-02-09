@@ -10,6 +10,7 @@ import { Loading } from '../components/common/Loading';
 import { Room } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { BackButton } from '../components/common/BackButton';;
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -258,7 +259,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.primary || '#6C63FF',
   },
   listContent: {
-    padding: 12
+    padding: 12,
+    paddingHorizontal: 12 + tabletHorizontalPadding,
   },
   roomCard: {
     backgroundColor: '#FFFFFF',

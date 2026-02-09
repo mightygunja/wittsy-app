@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -65,6 +66,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   content: {
     flex: 1,
     padding: 24,
+    paddingHorizontal: 24 + tabletHorizontalPadding,
     justifyContent: 'center',
     alignItems: 'center'
   },

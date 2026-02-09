@@ -23,6 +23,7 @@ import { isUserAdmin } from '../utils/adminCheck';
 import { Badge } from '../components/common/Badge';
 import { SPACING } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -351,6 +352,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   scrollContent: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   settingCard: {
     marginBottom: SPACING.sm,

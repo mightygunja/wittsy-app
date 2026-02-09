@@ -17,6 +17,7 @@ import { getPromptsByCategory, getPromptPacks, getUserPromptPreferences } from '
 import { Prompt, PromptPack, PromptCategory } from '../types/prompts';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
+import { tabletHorizontalPadding } from '../utils/responsive';
 import { BackButton } from '../components/common/BackButton';
 import { Loading } from '../components/common/Loading';
 
@@ -296,9 +297,10 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   header: {
     padding: SPACING.xl,
     paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.xl + tabletHorizontalPadding,
   },
   subtitleContainer: {
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.xl + tabletHorizontalPadding,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
   },

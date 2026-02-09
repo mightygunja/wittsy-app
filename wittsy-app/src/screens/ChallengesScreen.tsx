@@ -27,6 +27,7 @@ import { Button } from '../components/common/Button';
 import { SPACING } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
 import { BackButton } from '../components/common/BackButton';;
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 type TabType = 'daily' | 'weekly' | 'seasonal' | 'skill' | 'social';
 
@@ -420,6 +421,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   scrollContent: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   challengeCard: {
     marginBottom: SPACING.sm,

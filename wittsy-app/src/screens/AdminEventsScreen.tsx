@@ -20,6 +20,7 @@ import { Button } from '../components/common/Button';
 import { getActiveEvents } from '../services/events';
 import { initializeSampleEvents } from '../services/sampleEvents';
 import { Event, EventType, EventStatus } from '../types/social';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const AdminEventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -356,6 +357,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   content: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   quickActions: {
     gap: SPACING.sm,

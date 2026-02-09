@@ -8,6 +8,7 @@ import { Input } from '../components/common/Input';
 import { validateRoomName } from '../utils/validation';
 import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -249,6 +250,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingHorizontal: 16 + tabletHorizontalPadding,
     paddingBottom: 24
   },
   title: {

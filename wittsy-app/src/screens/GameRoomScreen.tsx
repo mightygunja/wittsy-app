@@ -67,6 +67,7 @@ import Timer from '../components/game/Timer';
 import PhraseCard from '../components/game/PhraseCard';
 import ScoreBoard from '../components/game/ScoreBoard';
 import PlayerList from '../components/game/PlayerList';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 type RootStackParamList = {
   GameRoom: { roomId: string };
@@ -1188,7 +1189,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   },
   lobbyScrollContent: {
     flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.lg + tabletHorizontalPadding,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.lg,
   },

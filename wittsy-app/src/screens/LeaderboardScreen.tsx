@@ -13,6 +13,7 @@ import { getLeaderboard } from '../services/database';
 import { LeaderboardEntry } from '../types';
 import { useTheme } from '../hooks/useTheme';;
 import { formatNumber } from '../utils/helpers';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 type SortBy = 'rating' | 'wins' | 'stars';
 
@@ -25,7 +26,6 @@ export const LeaderboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [userRank, setUserRank] = useState<number | null>(null);
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
-
 
   useEffect(() => {
     loadLeaderboard();
@@ -346,7 +346,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-end',
-    paddingHorizontal: 16,
+    paddingHorizontal: 16 + tabletHorizontalPadding,
     paddingVertical: 32,
     gap: 12,
   },
@@ -415,7 +415,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.primary,
   },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 16 + tabletHorizontalPadding,
     paddingBottom: 24,
   },
   listHeader: {

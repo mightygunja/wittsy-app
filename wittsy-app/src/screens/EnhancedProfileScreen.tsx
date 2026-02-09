@@ -31,6 +31,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { useTheme } from '../hooks/useTheme';
 import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
 import { getRatingTier, getRatingColor } from '../services/eloRatingService';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { userProfile: currentUserProfile } = useAuth();
@@ -992,7 +993,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: '#FFFFFF',
   },
   content: {
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.lg + tabletHorizontalPadding,
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.xs,
   },

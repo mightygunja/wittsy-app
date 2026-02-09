@@ -6,6 +6,7 @@ import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { validateEmail, validatePassword, validateUsername } from '../utils/validation';
 import { useTheme } from '../hooks/useTheme';;
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -149,7 +150,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   scrollContent: {
     paddingVertical: 20,
-    paddingHorizontal: 20
+    paddingHorizontal: 20 + tabletHorizontalPadding
   },
   content: {
     width: '100%'

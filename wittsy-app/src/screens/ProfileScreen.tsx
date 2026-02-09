@@ -9,6 +9,7 @@ import { AchievementBadge } from '../components/profile/AchievementBadge';
 import { MatchHistoryItem } from '../components/profile/MatchHistoryItem';
 import { Achievement } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const ProfileScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
@@ -483,7 +484,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.primary
   },
   content: {
-    padding: 16
+    padding: 16,
+    paddingHorizontal: 16 + tabletHorizontalPadding
   },
   sectionTitle: {
     fontSize: 20,

@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNotifications } from '../hooks/useNotifications';
 import { useTheme } from '../hooks/useTheme';
 import { SPACING } from '../utils/constants';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -23,6 +24,7 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
     },
     content: {
       padding: SPACING.md,
+      paddingHorizontal: SPACING.md + tabletHorizontalPadding,
     },
     notificationCard: {
       backgroundColor: 'rgba(255, 255, 255, 0.1)',

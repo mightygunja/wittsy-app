@@ -25,6 +25,7 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const ReferralScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
@@ -307,6 +308,7 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   loadingText: {
     fontSize: 18,

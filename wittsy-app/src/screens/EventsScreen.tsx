@@ -32,6 +32,7 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { SPACING } from '../utils/constants';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -396,6 +397,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   scrollContent: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   section: {
     marginBottom: SPACING.lg,

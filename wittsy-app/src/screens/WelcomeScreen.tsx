@@ -19,6 +19,7 @@ import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
+import { tabletHorizontalPadding } from '../utils/responsive';
 import { isGoogleSignInAvailable, isAppleSignInAvailable, getAppEnvironment } from '../utils/platform';
 import { AppleSignInButton } from '../components/auth/AppleSignInButton';
 import { GoogleSignInButton } from '../components/auth/GoogleSignInButton';
@@ -325,7 +326,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.xl + tabletHorizontalPadding,
   },
   logoContainer: {
     alignItems: 'center',

@@ -28,6 +28,7 @@ import { getCurrentSeason, getSeasonLeaderboard, getDaysRemainingInSeason } from
 import { RANK_TIERS } from '../services/ranking';
 import { useTheme } from '../hooks/useTheme';
 import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 type TabType = 'global' | 'friends' | 'specialized' | 'season' | 'starred';
 
@@ -467,7 +468,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   specializedGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.lg + tabletHorizontalPadding,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
     justifyContent: 'space-between',

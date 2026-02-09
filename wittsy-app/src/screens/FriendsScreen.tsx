@@ -37,6 +37,7 @@ import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { SPACING } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 type TabType = 'friends' | 'requests' | 'search';
 
@@ -520,6 +521,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   tabContent: {
     padding: SPACING.md,
+    paddingHorizontal: SPACING.md + tabletHorizontalPadding,
   },
   section: {
     marginBottom: SPACING.lg,

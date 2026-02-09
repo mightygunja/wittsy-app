@@ -8,6 +8,7 @@ import { GoogleSignInButton } from '../components/auth/GoogleSignInButton';
 import { validateEmail, validatePassword } from '../utils/validation';
 import { SPACING } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -149,7 +150,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingVertical: 40,
-    paddingHorizontal: 24
+    paddingHorizontal: 24 + tabletHorizontalPadding
   },
   content: {
     width: '100%',

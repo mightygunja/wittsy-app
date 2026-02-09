@@ -22,6 +22,7 @@ import { BackButton } from '../components/common/BackButton';
 import { getUserStarredPhrases, getCommunityStarredPhrases, StarredPhrase } from '../services/starredPhrases';
 import { SPACING, RADIUS, SHADOWS } from '../utils/constants';
 import { haptics } from '../services/haptics';
+import { tabletHorizontalPadding } from '../utils/responsive';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
 
 type ViewMode = 'mine' | 'community';
@@ -393,6 +394,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg + tabletHorizontalPadding,
   },
   phraseCard: {
     marginBottom: SPACING.lg,

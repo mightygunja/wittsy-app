@@ -4,6 +4,7 @@
  */
 
 import { StyleSheet } from 'react-native';
+import { tabletHorizontalPadding, isTablet, isLargeTablet } from '../utils/responsive';
 
 export const createSettingsStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   // Container
@@ -54,6 +55,7 @@ export const createSettingsStyles = (COLORS: any, SPACING: any) => StyleSheet.cr
   scrollContent: {
     padding: SPACING.lg,
     paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.lg + tabletHorizontalPadding,
   },
   
   // Sections

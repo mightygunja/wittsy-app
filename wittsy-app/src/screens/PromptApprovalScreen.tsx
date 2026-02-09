@@ -25,6 +25,7 @@ import { PromptSubmission, PromptDifficulty } from '../types/prompts';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { SPACING, RADIUS } from '../utils/constants';
+import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
@@ -73,6 +74,7 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
     scrollView: { flex: 1 },
     content: {
       padding: SPACING.md,
+      paddingHorizontal: SPACING.md + tabletHorizontalPadding,
     },
     statsContainer: {
       flexDirection: 'row',
