@@ -1,15 +1,15 @@
 /**
- * Generate a proper 2732x2732 PNG splash screen for iPad/iPhone.
- * Draws the Wittz "W" speech-bubble logo and text from scratch
- * so there are no white-background artifacts from icon.png.
+ * Generate splash screens for iPhone and iPad.
+ * - splash.png: 2732x2732 square (works for all phones via contain)
+ * - splash-tablet.png: 2048x2732 portrait iPad (12.9" iPad Pro native res)
+ * Draws the Wittz "W" speech-bubble logo and text from scratch.
  */
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 
-const SIZE = 2732;
 const BG_COLOR = '#6C63FF';
-const OUTPUT = path.join(__dirname, '..', 'assets', 'splash.png');
+const ASSETS = path.join(__dirname, '..', 'assets');
 
 function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -25,18 +25,17 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function generate() {
-  const canvas = createCanvas(SIZE, SIZE);
-  const ctx = canvas.getContext('2d');
+function drawSplash(width, height, outputName) {
+  var canvas = createCanvas(width, height);
+  var ctx = canvas.getContext('2d');
 
   // Fill background with the brand purple
   ctx.fillStyle = BG_COLOR;
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  ctx.fillRect(0, 0, width, height);
 
   // --- Draw the W speech-bubble logo ---
-  // Center point of the canvas, offset up for text below
-  var cx = SIZE / 2;
-  var cy = SIZE / 2 - 120;
+  var cx = width / 2;
+  var cy = height / 2 - 120;
 
   // Draw a darker purple rounded-rect "card" behind the W
   var cardSize = 500;
@@ -87,11 +86,16 @@ function generate() {
   ctx.fillText('Wittz', cx, cy + cardSize / 2 + 100);
 
   // Save as PNG
+  var outputPath = path.join(ASSETS, outputName);
   var buffer = canvas.toBuffer('image/png');
-  fs.writeFileSync(OUTPUT, buffer);
-  console.log('Splash screen generated: ' + OUTPUT);
-  console.log('Size: ' + SIZE + 'x' + SIZE + ' PNG');
-  console.log('File size: ' + (buffer.length / 1024).toFixed(0) + ' KB');
+  fs.writeFileSync(outputPath, buffer);
+  console.log('Generated: ' + outputName + ' (' + width + 'x' + height + ', ' + (buffer.length / 1024).toFixed(0) + ' KB)');
 }
 
-generate();
+// Phone splash: 2732x2732 square
+drawSplash(2732, 2732, 'splash.png');
+
+// Tablet splash: 2048x2732 portrait (iPad Pro 12.9" native resolution)
+drawSplash(2048, 2732, 'splash-tablet.png');
+
+console.log('Done!');
