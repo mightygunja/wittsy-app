@@ -19,12 +19,6 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.wittsy.app",
       buildNumber: "3",
-      splash: {
-        image: "./assets/splash.png",
-        tabletImage: "./assets/splash-tablet.png",
-        resizeMode: "contain",
-        backgroundColor: "#6C63FF"
-      },
       infoPlist: {
         NSCameraUsageDescription: "Wittz needs access to your camera to take profile photos.",
         NSPhotoLibraryUsageDescription: "Wittz needs access to your photo library to select profile photos.",
@@ -77,6 +71,14 @@ export default {
       bundler: "metro"
     },
     plugins: [
+      [
+        "expo-splash-screen",
+        {
+          backgroundColor: "#6C63FF",
+          image: "./assets/splash-icon.png",
+          imageWidth: 200
+        }
+      ],
       [
         "expo-notifications",
         {
