@@ -1,13 +1,11 @@
 import React, { useMemo } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useTheme } from '../../hooks/useTheme';;
 
 export const Loading: React.FC = () => {
-  const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(), []);
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color={COLORS.primary} />
+      <ActivityIndicator size="large" color="#FFFFFF" />
     </View>
   );
 };
@@ -17,7 +15,7 @@ const createStyles = () => StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#6C63FF'
   }
 });
 
