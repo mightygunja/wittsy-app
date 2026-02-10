@@ -23,10 +23,11 @@ export const isStandaloneBuild = (): boolean => {
 
 /**
  * Check if Google Sign-In is available
- * Only available in standalone builds, not in Expo Go
+ * DISABLED: Google Sign-In removed from production due to native module issues.
+ * Users can sign in via Apple, Email/Password, or Guest instead.
  */
 export const isGoogleSignInAvailable = (): boolean => {
-  return !isExpoGo();
+  return false;
 };
 
 /**

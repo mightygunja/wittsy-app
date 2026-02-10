@@ -17,14 +17,9 @@ import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
 import { referralService } from './referralService';
 // Dynamic imports for native modules (Expo Go compatibility)
+// Google Sign-In is DISABLED in production - do not load the native module
 let GoogleSignin: any = null;
 let AppleAuthentication: any = null;
-
-try {
-  GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
-} catch (e) {
-  console.log('⏭️ Skipping Google Sign-In import (Expo Go)');
-}
 
 try {
   AppleAuthentication = require('expo-apple-authentication');
