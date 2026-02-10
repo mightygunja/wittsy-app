@@ -110,7 +110,7 @@ export const Badge: React.FC<BadgeProps> = ({
         
         <View style={styles.contentContainer}>
           {icon && <View style={styles.icon}>{icon}</View>}
-          <Text style={[styles.text, sizeStyles.text, textStyle]}>
+          <Text style={[styles.text, sizeStyles.text, (variant === 'gold' || variant === 'rank') && styles.textDark, textStyle]}>
             {text}
           </Text>
         </View>
@@ -165,6 +165,9 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   textLg: {
     fontSize: TYPOGRAPHY.fontSize.base,
+  },
+  textDark: {
+    color: '#451A03',
   },
   icon: {
     justifyContent: 'center',

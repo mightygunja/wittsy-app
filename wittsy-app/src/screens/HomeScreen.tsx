@@ -926,9 +926,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   userInfoCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: SPACING.sm,
-    marginTop: SPACING.xs,
     paddingVertical: SPACING.xs,
   },
   usernameCompact: {
