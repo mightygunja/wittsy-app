@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
-import { GoogleSignInButton } from '../components/auth/GoogleSignInButton';
 import { validateEmail, validatePassword } from '../utils/validation';
 import { SPACING } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
@@ -12,7 +11,7 @@ import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,16 +38,6 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      await signInWithGoogle();
-    } catch (error: any) {
-      Alert.alert('Login Failed', error.message || 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
 
@@ -95,24 +84,6 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               size="lg"
               style={styles.button}
             />
-
-            {/* Google Sign-In */}
-        {isGoogleSignInAvailable() && (
-          <GoogleSignInButton
-            onPress={async () => {
-              setLoading(true);
-              try {
-                await signInWithGoogle();
-              } catch (error: any) {
-                Alert.alert('Sign In Failed', error.message);
-              } finally {
-                setLoading(false);
-              }
-            }}
-            disabled={loading}
-            loading={loading}
-          />
-        )}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Don't have an account? </Text>
