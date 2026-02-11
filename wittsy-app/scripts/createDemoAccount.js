@@ -17,15 +17,33 @@
  */
 
 const admin = require('firebase-admin');
+const path = require('path');
+const fs = require('fs');
 
-// Initialize Firebase Admin
-// Option 1: Use service account key file
-// const serviceAccount = require('./serviceAccountKey.json');
-// admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+// Initialize Firebase Admin with service account key
+// To get a service account key:
+//   1. Go to Firebase Console → Project Settings → Service Accounts
+//   2. Click "Generate new private key"
+//   3. Save the JSON file as scripts/serviceAccountKey.json
 
-// Option 2: Use default credentials (if running on GCP or with GOOGLE_APPLICATION_CREDENTIALS set)
+const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+
+if (!fs.existsSync(keyPath)) {
+  console.error('❌ Service account key not found at:', keyPath);
+  console.error('');
+  console.error('To create one:');
+  console.error('  1. Go to https://console.firebase.google.com/project/wittsy-51992/settings/serviceaccounts/adminsdk');
+  console.error('  2. Click "Generate new private key"');
+  console.error('  3. Save the downloaded JSON file as:');
+  console.error('     scripts/serviceAccountKey.json');
+  console.error('');
+  console.error('⚠️  NEVER commit this file to git! It is already in .gitignore.');
+  process.exit(1);
+}
+
+const serviceAccount = require(keyPath);
 admin.initializeApp({
-  projectId: 'wittsy-51992',
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const auth = admin.auth();

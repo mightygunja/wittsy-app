@@ -3,6 +3,10 @@
 .env.local
 .env.*.local
 
+# Firebase Admin SDK service account key (NEVER commit this)
+serviceAccountKey.json
+scripts/serviceAccountKey.json
+
 # Dependencies
 node_modules/
 npm-debug.log*
