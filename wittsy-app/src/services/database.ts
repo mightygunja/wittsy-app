@@ -329,7 +329,9 @@ export const joinRoom = async (
 
 /**
  * Leave a room
- * Only terminates room when ALL players leave (0 players remaining)
+ * - Waiting rooms: deleted only when completely empty (0 players)
+ * - Active (in-progress) games: end the game when fewer than 3 players remain
+ * - Finished games: just remove the player, delete if empty
  */
 export const leaveRoom = async (roomId: string, userId: string): Promise<void> => {
   const roomRef = doc(firestore, 'rooms', roomId);
@@ -340,28 +342,39 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
   const roomData = roomDoc.data();
   const players = roomData.players || [];
   const updatedPlayers = players.filter((p: Player) => p.userId !== userId);
+  const roomStatus = roomData.status; // 'waiting', 'active', or 'finished'
   
-  // Only terminate room if ALL players have left
+  console.log(`🚪 Player ${userId} leaving room ${roomId}. Status: ${roomStatus}. Players: ${players.length} → ${updatedPlayers.length}`);
+  
+  // Build the update payload
+  const updateData: any = { players: updatedPlayers };
+  
+  // If host leaves and there are other players, assign new host
+  if (roomData.hostId === userId && updatedPlayers.length > 0) {
+    updateData.hostId = updatedPlayers[0].userId;
+    console.log(`👑 New host assigned: ${updatedPlayers[0].username}`);
+  }
+  
   if (updatedPlayers.length === 0) {
-    // Delete room if completely empty
+    // Room is completely empty - delete it regardless of status
     await deleteDoc(roomRef);
     console.log(`🗑️ Room ${roomId} deleted - all players left`);
-  } else {
-    // Room still has players - keep it active
-    // If host leaves and there are other players, assign new host
-    if (roomData.hostId === userId) {
-      await updateDoc(roomRef, {
-        players: updatedPlayers,
-        hostId: updatedPlayers[0].userId
-      });
-      console.log(`👑 Player left room ${roomId}. New host assigned: ${updatedPlayers[0].username}. ${updatedPlayers.length} players remaining - room continues`);
-    } else {
-      await updateDoc(roomRef, {
-        players: updatedPlayers
-      });
-      console.log(`✅ Player left room ${roomId}. ${updatedPlayers.length} players remaining - room continues`);
-    }
+    return;
   }
+  
+  if (roomStatus === 'active' && updatedPlayers.length < 3) {
+    // Active game with fewer than 3 players remaining - end the game
+    updateData.status = 'finished';
+    updateData.endedAt = new Date().toISOString();
+    updateData.endReason = 'insufficient_players';
+    await updateDoc(roomRef, updateData);
+    console.log(`🏁 Room ${roomId} ended - fewer than 3 players remaining (${updatedPlayers.length}). Game cannot continue.`);
+    return;
+  }
+  
+  // Otherwise just remove the player and keep the room going
+  await updateDoc(roomRef, updateData);
+  console.log(`✅ Player left room ${roomId}. ${updatedPlayers.length} players remaining - room continues`);
 };
 
 /**
