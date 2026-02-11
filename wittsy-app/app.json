@@ -21,8 +21,6 @@
       "buildNumber": "4",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Wittz needs access to your camera to take profile photos.",
-        "NSPhotoLibraryUsageDescription": "Wittz needs access to your photo library to select profile photos.",
         "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events."
       },
       "entitlements": {
@@ -46,9 +44,6 @@
       "package": "com.wittsy.app",
       "versionCode": 1,
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "VIBRATE",
         "POST_NOTIFICATIONS"
       ],
