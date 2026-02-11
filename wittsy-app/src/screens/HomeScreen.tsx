@@ -699,7 +699,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <Badge text="ACTIVE" variant="success" size="sm" />
                   </View>
                   <Text style={styles.roomCardPlayers}>
-                    👥 {userActiveRoom.players?.filter((p: any) => p.isConnected !== false).length || 0}/{userActiveRoom.settings?.maxPlayers || 12}
+                    👥 {userActiveRoom.players?.length || 0}/{userActiveRoom.settings?.maxPlayers || 12}
                   </Text>
                 </View>
                 <View style={styles.roomCardFooter}>
@@ -730,7 +730,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <Badge text="ACTIVE" variant="success" size="sm" />
                   </View>
                   <Text style={styles.roomCardPlayers}>
-                    👥 {userActiveCasualRoom.players?.filter((p: any) => p.isConnected !== false).length || 0}/{userActiveCasualRoom.settings?.maxPlayers || 12}
+                    👥 {userActiveCasualRoom.players?.length || 0}/{userActiveCasualRoom.settings?.maxPlayers || 12}
                   </Text>
                 </View>
                 <View style={styles.roomCardFooter}>
@@ -794,7 +794,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                             )}
                           </View>
                           <Text style={styles.roomCardPlayers}>
-                            👥 {room.players?.filter((p: any) => p.isConnected !== false).length || 0}/{room.settings.maxPlayers}
+                            👥 {room.players?.length || 0}/{room.settings.maxPlayers}
                           </Text>
                         </View>
                         <View style={styles.roomCardFooter}>

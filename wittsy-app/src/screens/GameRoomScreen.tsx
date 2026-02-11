@@ -18,7 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
-import { leaveRoom, startGame, joinRoom } from '../services/database';
+import { leaveRoom, startGame } from '../services/database';
 import { saveCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { gameTimerService } from '../services/gameTimer';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -583,21 +583,6 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
-  // Auto-reconnect disconnected player (run once when room data first loads)
-  const hasReconnected = useRef(false);
-  useEffect(() => {
-    if (!user?.uid || !room?.players || hasReconnected.current) return;
-    
-    const currentPlayer = room.players.find(p => p.userId === user.uid);
-    if (currentPlayer && currentPlayer.isConnected === false) {
-      hasReconnected.current = true;
-      console.log('🔄 Auto-reconnecting disconnected player...');
-      joinRoom(roomId, user.uid, currentPlayer.username).catch(err => {
-        console.error('Failed to auto-reconnect:', err);
-      });
-    }
-  }, [roomId, user?.uid, room?.players]);
-
   // Save current room on mount
   useEffect(() => {
     if (user?.uid && room?.name) {

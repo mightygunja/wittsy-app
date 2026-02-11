@@ -36,11 +36,11 @@ const isUserInActiveRankedGame = async (userId: string): Promise<boolean> => {
     
     const snapshot = await getDocs(q);
     
-    // Check if user is actively connected in any of these ranked rooms
+    // Check if user is in any of these ranked rooms
     for (const doc of snapshot.docs) {
       const roomData = doc.data();
       const players = roomData.players || [];
-      if (players.some((p: Player) => p.userId === userId && p.isConnected !== false)) {
+      if (players.some((p: Player) => p.userId === userId)) {
         console.log(`🚫 User ${userId} is already in active ranked game: ${doc.id}`);
         return true;
       }
@@ -248,18 +248,8 @@ export const joinRoom = async (
   const players = roomData.players || [];
   const scores = roomData.scores || {};
   
-  // Check if user is already in the room (must be checked FIRST for reconnection)
-  const existingPlayer = players.find((p: Player) => p.userId === userId);
-  if (existingPlayer) {
-    if (existingPlayer.isConnected === false) {
-      // Player is reconnecting to an active game - mark them as connected again
-      const reconnectedPlayers = players.map((p: Player) =>
-        p.userId === userId ? { ...p, isConnected: true } : p
-      );
-      await updateDoc(roomRef, { players: reconnectedPlayers });
-      console.log(`🔄 Player ${username} reconnected to room ${roomId}`);
-      return;
-    }
+  // Check if user is already in the room
+  if (players.find((p: Player) => p.userId === userId)) {
     console.warn('⚠️ User already in room, skipping join');
     throw new Error('Already in room');
   }
@@ -340,10 +330,9 @@ export const joinRoom = async (
 
 /**
  * Leave a room
- * - Waiting rooms: remove player, delete room if empty
- * - Active (in-progress) games: mark player as disconnected (don't remove).
- *   This lets them see the room and rejoin. End game if <3 connected players remain.
- * - Finished games: remove player, delete room if empty
+ * - Fully removes the player from the room
+ * - Deletes the room if no players remain
+ * - Ends active games if fewer than 3 players remain
  */
 export const leaveRoom = async (roomId: string, userId: string): Promise<void> => {
   const roomRef = doc(firestore, 'rooms', roomId);
@@ -357,37 +346,7 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
   
   console.log(`🚪 Player ${userId} leaving room ${roomId}. Status: ${roomStatus}. Players: ${players.length}`);
   
-  if (roomStatus === 'active') {
-    // ACTIVE GAME: mark player as disconnected instead of removing them
-    const updatedPlayers = players.map((p: Player) =>
-      p.userId === userId ? { ...p, isConnected: false } : p
-    );
-    const connectedPlayers = updatedPlayers.filter((p: Player) => p.isConnected !== false);
-    
-    const updateData: any = { players: updatedPlayers };
-    
-    // If host disconnects, assign new host from connected players
-    if (roomData.hostId === userId && connectedPlayers.length > 0) {
-      updateData.hostId = connectedPlayers[0].userId;
-      console.log(`👑 New host assigned: ${connectedPlayers[0].username}`);
-    }
-    
-    if (connectedPlayers.length < 3) {
-      // Fewer than 3 connected players - end the game
-      updateData.status = 'finished';
-      updateData.endedAt = new Date().toISOString();
-      updateData.endReason = 'insufficient_players';
-      await updateDoc(roomRef, updateData);
-      console.log(`🏁 Room ${roomId} ended - fewer than 3 connected players (${connectedPlayers.length}). Game cannot continue.`);
-      return;
-    }
-    
-    await updateDoc(roomRef, updateData);
-    console.log(`✅ Player disconnected from active room ${roomId}. ${connectedPlayers.length} connected players remaining - game continues`);
-    return;
-  }
-  
-  // WAITING or FINISHED: fully remove the player
+  // Remove the player from the room
   const updatedPlayers = players.filter((p: Player) => p.userId !== userId);
   
   if (updatedPlayers.length === 0) {
@@ -402,6 +361,16 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
   if (roomData.hostId === userId) {
     updateData.hostId = updatedPlayers[0].userId;
     console.log(`👑 New host assigned: ${updatedPlayers[0].username}`);
+  }
+  
+  // Active game with fewer than 3 players remaining - end the game
+  if (roomStatus === 'active' && updatedPlayers.length < 3) {
+    updateData.status = 'finished';
+    updateData.endedAt = new Date().toISOString();
+    updateData.endReason = 'insufficient_players';
+    await updateDoc(roomRef, updateData);
+    console.log(`🏁 Room ${roomId} ended - fewer than 3 players remaining (${updatedPlayers.length}). Game cannot continue.`);
+    return;
   }
   
   await updateDoc(roomRef, updateData);
