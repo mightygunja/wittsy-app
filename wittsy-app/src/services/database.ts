@@ -248,6 +248,22 @@ export const joinRoom = async (
   const players = roomData.players || [];
   const scores = roomData.scores || {};
   
+  // Check if user is already in the room (must be checked FIRST for reconnection)
+  const existingPlayer = players.find((p: Player) => p.userId === userId);
+  if (existingPlayer) {
+    if (existingPlayer.isConnected === false) {
+      // Player is reconnecting to an active game - mark them as connected again
+      const reconnectedPlayers = players.map((p: Player) =>
+        p.userId === userId ? { ...p, isConnected: true } : p
+      );
+      await updateDoc(roomRef, { players: reconnectedPlayers });
+      console.log(`🔄 Player ${username} reconnected to room ${roomId}`);
+      return;
+    }
+    console.warn('⚠️ User already in room, skipping join');
+    throw new Error('Already in room');
+  }
+  
   // Prevent joining multiple ranked games simultaneously
   if (roomData.isRanked) {
     const alreadyInRankedGame = await isUserInActiveRankedGame(userId);
@@ -276,22 +292,6 @@ export const joinRoom = async (
   
   if (players.length >= roomData.settings.maxPlayers) {
     throw new Error('Room is full');
-  }
-  
-  // Check if user is already in the room
-  const existingPlayer = players.find((p: Player) => p.userId === userId);
-  if (existingPlayer) {
-    if (existingPlayer.isConnected === false) {
-      // Player is reconnecting to an active game - mark them as connected again
-      const reconnectedPlayers = players.map((p: Player) =>
-        p.userId === userId ? { ...p, isConnected: true } : p
-      );
-      await updateDoc(roomRef, { players: reconnectedPlayers });
-      console.log(`🔄 Player ${username} reconnected to room ${roomId}`);
-      return;
-    }
-    console.warn('⚠️ User already in room, skipping join');
-    throw new Error('Already in room');
   }
   
   // Load user's avatar config
