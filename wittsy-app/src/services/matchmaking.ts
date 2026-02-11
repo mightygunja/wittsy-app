@@ -18,6 +18,7 @@ import { firestore } from './firebase';
 import { Room, RoomSettings } from '../types';
 import { generateUniqueRoomName } from '../utils/roomNameGenerator';
 import { getCurrentSeason } from './seasons';
+import { avatarService } from './avatarService';
 
 const ELO_RANGE = 200; // ±200 ELO for matchmaking
 
@@ -128,10 +129,21 @@ export const createRankedRoom = async (
     const roomName = generateUniqueRoomName(existingNames);
     console.log(`📝 Generated room name: "${roomName}"`);
     
+    // Load host's avatar config
+    const hostAvatar = await avatarService.getUserAvatar(userId);
+    
     const roomData = {
       name: roomName,
       hostId: userId,
-      players: [],
+      players: [{
+        userId,
+        username,
+        isReady: false,
+        isConnected: true,
+        joinedAt: new Date().toISOString(),
+        avatar: null,
+        avatarConfig: hostAvatar?.config || undefined,
+      }],
       spectators: [],
       status: 'waiting' as const,
       isRanked: true,
@@ -140,7 +152,7 @@ export const createRankedRoom = async (
       seasonName: currentSeason?.name || null,
       currentRound: 0,
       currentPrompt: null,
-      scores: {},
+      scores: { [userId]: { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] } },
       gameState: 'lobby' as const,
       settings: {
         maxPlayers: 12,

@@ -61,43 +61,12 @@ export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           navigation.navigate('GameRoom', { roomId: room.roomId });
         }
       } else {
-        // No room found - AUTO-CREATE new ranked room
+        // No room found - AUTO-CREATE new ranked room (host is already added as a player)
         console.log('⚠️ No rooms available - creating new ranked room');
         setStatusMessage('Creating new game...');
         
         const roomId = await createRankedRoom(user.uid, userProfile.username);
         console.log(`✨ Created new ranked room: ${roomId}`);
-        
-        // Wait for Firestore to propagate the new room
-        setStatusMessage('Preparing game room...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        setStatusMessage('Joining your new game...');
-        
-        // Retry logic for joining room
-        let joinAttempts = 0;
-        const maxAttempts = 3;
-        let joined = false;
-        
-        while (joinAttempts < maxAttempts && !joined) {
-          try {
-            await joinRoom(roomId, user.uid, userProfile.username);
-            joined = true;
-            console.log('✅ Successfully joined new ranked room');
-          } catch (error: any) {
-            joinAttempts++;
-            if (error.message === 'Room not found' && joinAttempts < maxAttempts) {
-              console.log(`⏳ Room not ready yet, retrying... (${joinAttempts}/${maxAttempts})`);
-              await new Promise(resolve => setTimeout(resolve, 500));
-            } else {
-              throw error;
-            }
-          }
-        }
-        
-        if (!joined) {
-          throw new Error('Failed to join newly created room');
-        }
         
         navigation.navigate('GameRoom', { roomId });
       }

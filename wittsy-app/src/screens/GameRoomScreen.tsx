@@ -544,8 +544,9 @@ const GameRoomScreen: React.FC = () => {
     // Allow auto-start for ranked games, otherwise require host
     if (!room.isRanked && room.hostId !== user?.uid) return;
 
-    if (room.players.length < 1) {
-      Alert.alert('Error', 'Need at least 1 player to start');
+    const minPlayers = room.settings?.minPlayers || 3;
+    if (room.players.length < minPlayers) {
+      Alert.alert('Error', `Need at least ${minPlayers} players to start`);
       return;
     }
 
@@ -557,8 +558,8 @@ const GameRoomScreen: React.FC = () => {
     }
   };
 
-  // Handle leave room
-  const handleLeaveRoom = async () => {
+  // Actually perform the leave
+  const performLeaveRoom = async () => {
     if (!user?.uid) return;
 
     try {
@@ -580,6 +581,24 @@ const GameRoomScreen: React.FC = () => {
     } catch (error) {
       console.error('Error leaving room:', error);
       Alert.alert('Error', 'Failed to leave room');
+    }
+  };
+
+  // Handle leave room - confirm if active ranked game
+  const handleLeaveRoom = () => {
+    if (!user?.uid) return;
+
+    if (room?.isRanked && room?.status === 'active') {
+      Alert.alert(
+        'Leave Ranked Game?',
+        'Leaving an active ranked game may affect your rating. Are you sure you want to leave?',
+        [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: performLeaveRoom },
+        ]
+      );
+    } else {
+      performLeaveRoom();
     }
   };
   

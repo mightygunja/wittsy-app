@@ -236,7 +236,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const loadRankedRooms = async () => {
     setLoadingRooms(true);
     try {
-      const userElo = 1000;
+      const userElo = userProfile?.rating || 1000;
       const rooms = await getBrowsableRankedRooms(userElo);
       setRankedRooms(rooms);
     } catch (error) {
