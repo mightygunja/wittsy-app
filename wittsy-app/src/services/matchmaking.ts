@@ -184,7 +184,7 @@ export const getBrowsableRankedRooms = async (
     const q = query(
       collection(firestore, 'rooms'),
       where('isRanked', '==', true),
-      where('status', '==', 'waiting')
+      where('status', 'in', ['waiting', 'active'])
     );
 
     const snapshot = await getDocs(q);
@@ -192,6 +192,12 @@ export const getBrowsableRankedRooms = async (
     const rooms = snapshot.docs
       .map(doc => ({ roomId: doc.id, ...doc.data() } as Room))
       .filter(room => {
+        // Active (in-progress) games are always shown so players can rejoin
+        if (room.status === 'active') {
+          return true;
+        }
+        
+        // For waiting rooms, apply space/countdown/ELO filters
         const hasSpace = room.players.length < room.settings.maxPlayers;
         const countdownNotFinished = !room.countdownStartedAt || 
           (Date.now() - new Date(room.countdownStartedAt).getTime()) < (room.countdownDuration || 30) * 1000;
