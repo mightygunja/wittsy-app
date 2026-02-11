@@ -583,19 +583,25 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
-  // Save current room on mount and auto-reconnect if disconnected
+  // Auto-reconnect disconnected player (run once when room data first loads)
+  const hasReconnected = useRef(false);
+  useEffect(() => {
+    if (!user?.uid || !room?.players || hasReconnected.current) return;
+    
+    const currentPlayer = room.players.find(p => p.userId === user.uid);
+    if (currentPlayer && currentPlayer.isConnected === false) {
+      hasReconnected.current = true;
+      console.log('🔄 Auto-reconnecting disconnected player...');
+      joinRoom(roomId, user.uid, currentPlayer.username).catch(err => {
+        console.error('Failed to auto-reconnect:', err);
+      });
+    }
+  }, [roomId, user?.uid, room?.players]);
+
+  // Save current room on mount
   useEffect(() => {
     if (user?.uid && room?.name) {
       saveCurrentRoom(roomId, user.uid, room.name);
-      
-      // Check if player is in the room but disconnected - auto-reconnect
-      const currentPlayer = room.players?.find(p => p.userId === user.uid);
-      if (currentPlayer && currentPlayer.isConnected === false) {
-        console.log('🔄 Auto-reconnecting disconnected player...');
-        joinRoom(roomId, user.uid, currentPlayer.username).catch(err => {
-          console.error('Failed to auto-reconnect:', err);
-        });
-      }
     }
     
     return () => {
