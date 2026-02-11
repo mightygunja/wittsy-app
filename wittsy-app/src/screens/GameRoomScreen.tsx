@@ -1048,7 +1048,7 @@ const GameRoomScreen: React.FC = () => {
               <View style={styles.lobbyActionSection}>
                 <View style={styles.waitingCard}>
                   <Text style={styles.waitingIcon}>⏳</Text>
-                  <Text style={styles.waitingText}>Waiting for host to start the game...</Text>
+                  <Text style={styles.waitingCardText}>Waiting for host to start the game...</Text>
                 </View>
               </View>
             )}
@@ -1425,7 +1425,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     fontSize: 48,
     marginBottom: SPACING.md,
   },
-  waitingText: {
+  waitingCardText: {
     fontSize: 16,
     color: COLORS.textSecondary,
     textAlign: 'center',
@@ -1790,6 +1790,117 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginTop: 24,
+  },
+  // Prompt phase styles
+  phaseTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  roundBadge: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
+    backgroundColor: `${COLORS.primary}20`,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  promptDisplayContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    width: '100%',
+  },
+  promptDisplayLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+    letterSpacing: 1.5,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  promptDisplayText: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: COLORS.text,
+    textAlign: 'center',
+    lineHeight: 30,
+  },
+  phaseSubtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  // Submission phase - progress & typing
+  progressIndicator: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  progressText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  progressLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  typingDot: {
+    fontSize: 8,
+    color: COLORS.primary,
+  },
+  // Submission input wrapper & char count
+  inputWrapper: {
+    position: 'relative',
+  },
+  charCountContainer: {
+    alignItems: 'flex-end',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  charCountWarning: {
+    color: '#F59E0B',
+  },
+  charCountMax: {
+    color: COLORS.error,
+    fontWeight: '700',
+  },
+  // Submission success state
+  successIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  successEmoji: {
+    fontSize: 32,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
 });
 
