@@ -32,6 +32,7 @@ interface GameEndSummaryProps {
     winner: RatingUpdate;
     loser: RatingUpdate;
   } | null;
+  multiplayerRatingChanges?: Record<string, RatingUpdate> | null;
   currentUserId?: string;
   onContinue: () => void;
 }
@@ -41,6 +42,7 @@ export const GameEndSummary: React.FC<GameEndSummaryProps> = ({
   rewards,
   finalScores,
   ratingChanges,
+  multiplayerRatingChanges,
   currentUserId,
   onContinue,
 }) => {
@@ -134,49 +136,65 @@ export const GameEndSummary: React.FC<GameEndSummaryProps> = ({
               </View>
             </View>
 
-            {/* Rating Changes (1v1 only) */}
-            {ratingChanges && currentUserId && (
-              <View style={styles.ratingSection}>
-                <Text style={styles.sectionTitle}>Rating Update</Text>
-                {(() => {
-                  const isWinner = finalScores[0]?.userId === currentUserId;
-                  const userRating = isWinner ? ratingChanges.winner : ratingChanges.loser;
-                  const ratingChange = userRating.ratingChange;
-                  const isPositive = ratingChange > 0;
-                  
-                  return (
-                    <View style={styles.ratingCard}>
-                      <View style={styles.ratingHeader}>
-                        <Text style={styles.ratingEmoji}>
-                          {isPositive ? '📈' : '📉'}
-                        </Text>
-                        <View style={styles.ratingInfo}>
-                          <Text style={styles.ratingLabel}>Your Rating</Text>
-                          <View style={styles.ratingChange}>
-                            <Text style={styles.oldRating}>{userRating.oldRating}</Text>
-                            <Text style={styles.ratingArrow}>→</Text>
-                            <Text style={[styles.newRating, { color: getRatingColor(userRating.newRating) }]}>
-                              {userRating.newRating}
-                            </Text>
-                            <Text style={[styles.ratingDelta, isPositive ? styles.ratingPositive : styles.ratingNegative]}>
-                              ({isPositive ? '+' : ''}{ratingChange})
-                            </Text>
-                          </View>
-                          <Text style={[styles.ratingTier, { color: getRatingColor(userRating.newRating) }]}>
-                            {getRatingTier(userRating.newRating)} Tier
+            {/* Rating Changes - supports both 1v1 and multiplayer */}
+            {currentUserId && (() => {
+              // Determine the current user's rating update
+              let userRating: RatingUpdate | null = null;
+              
+              if (ratingChanges) {
+                // 1v1 game
+                const isWinner = finalScores.sort((a, b) => b.score - a.score)[0]?.userId === currentUserId;
+                userRating = isWinner ? ratingChanges.winner : ratingChanges.loser;
+              } else if (multiplayerRatingChanges && multiplayerRatingChanges[currentUserId]) {
+                // Multiplayer game
+                userRating = multiplayerRatingChanges[currentUserId];
+              }
+              
+              if (!userRating) return null;
+              
+              const ratingChange = userRating.ratingChange;
+              const isPositive = ratingChange > 0;
+              
+              return (
+                <View style={styles.ratingSection}>
+                  <Text style={styles.sectionTitle}>Rating Update</Text>
+                  <View style={styles.ratingCard}>
+                    <View style={styles.ratingHeader}>
+                      <Text style={styles.ratingEmoji}>
+                        {isPositive ? '📈' : ratingChange === 0 ? '➡️' : '📉'}
+                      </Text>
+                      <View style={styles.ratingInfo}>
+                        <Text style={styles.ratingLabel}>Your Rating</Text>
+                        <View style={styles.ratingChange}>
+                          <Text style={styles.oldRating}>{userRating.oldRating}</Text>
+                          <Text style={styles.ratingArrow}>→</Text>
+                          <Text style={[styles.newRating, { color: getRatingColor(userRating.newRating) }]}>
+                            {userRating.newRating}
+                          </Text>
+                          <Text style={[styles.ratingDelta, isPositive ? styles.ratingPositive : styles.ratingNegative]}>
+                            ({isPositive ? '+' : ''}{ratingChange})
                           </Text>
                         </View>
+                        <Text style={[styles.ratingTier, { color: getRatingColor(userRating.newRating) }]}>
+                          {getRatingTier(userRating.newRating)} Tier
+                        </Text>
+                        {userRating.isPlacement && (
+                          <Text style={styles.placementText}>Placement Match ({userRating.gamesPlayed}/10)</Text>
+                        )}
+                        {userRating.marginBonus && userRating.marginBonus > 0 && (
+                          <Text style={styles.bonusText}>+{userRating.marginBonus} margin bonus</Text>
+                        )}
                       </View>
-                      {userRating.winStreak >= 3 && (
-                        <View style={styles.streakBadge}>
-                          <Text style={styles.streakText}>🔥 {userRating.winStreak} Win Streak!</Text>
-                        </View>
-                      )}
                     </View>
-                  );
-                })()}
-              </View>
-            )}
+                    {userRating.winStreak >= 3 && (
+                      <View style={styles.streakBadge}>
+                        <Text style={styles.streakText}>🔥 {userRating.winStreak} Win Streak!</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })()}
 
             {/* Battle Pass Level Up */}
             {rewards.battlePassLevelUp && (
@@ -472,5 +490,17 @@ const createStyles = (COLORS: any) =>
       fontSize: 16,
       fontWeight: 'bold',
       color: '#FF6B6B',
+    },
+    placementText: {
+      fontSize: 12,
+      color: COLORS.primary,
+      fontWeight: '600',
+      marginTop: SPACING.xs,
+    },
+    bonusText: {
+      fontSize: 12,
+      color: '#10B981',
+      fontWeight: '600',
+      marginTop: 2,
     },
   });

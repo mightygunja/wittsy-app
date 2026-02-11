@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { GamePhase } from '../../types';
-import { useTheme } from '../../hooks/useTheme';;
+import { useTheme } from '../../hooks/useTheme';
 import { formatTime } from '../../utils/helpers';
 
 interface TimerProps {

@@ -34,7 +34,7 @@ import {
 } from '../services/realtime';
 import { Room, GamePhase } from '../types';
 import { ChatBox } from '../components/social/ChatBox';
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
 import { validatePhrase } from '../utils/validation';
 import { Button } from '../components/common/Button';
 import { rewards, REWARD_AMOUNTS } from '../services/rewardsService';
@@ -43,7 +43,7 @@ import { battlePass } from '../services/battlePassService';
 import { GameEndSummary } from '../components/game/GameEndSummary';
 import { StarCelebration } from '../components/game/StarCelebration';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
-import { updatePlayerRating, RatingUpdate } from '../services/eloRatingService';
+import { updatePlayerRating, updateMultiplayerRatings, RatingUpdate } from '../services/eloRatingService';
 
 // Helper function to advance game phase
 const advancePhase = async (roomId: string) => {
@@ -115,6 +115,8 @@ const GameRoomScreen: React.FC = () => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [submissionCount, setSubmissionCount] = useState(0);
   const [voteCount, setVoteCount] = useState(0);
+  const [shuffledSubmissions, setShuffledSubmissions] = useState<[string, string][]>([]);
+  const [multiplayerRatingChanges, setMultiplayerRatingChanges] = useState<Record<string, RatingUpdate> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showGameEndSummary, setShowGameEndSummary] = useState(false);
   const [gameEndRewards, setGameEndRewards] = useState<{
@@ -176,21 +178,52 @@ const GameRoomScreen: React.FC = () => {
       // Sort by score to determine winner and loser
       const sortedScores = [...scores].sort((a, b) => b.score - a.score);
       
-      // Update ELO ratings for 1v1 games
-      let ratingUpdate = null;
-      if (room.players.length === 2 && sortedScores.length === 2) {
+      // Update ELO ratings for ALL players in ranked games
+      if (room.isRanked && sortedScores.length >= 2) {
         try {
-          const winnerId = sortedScores[0].userId;
-          const loserId = sortedScores[1].userId;
-          
-          console.log('📊 Updating ELO ratings:', { winnerId, loserId });
-          ratingUpdate = await updatePlayerRating(winnerId, loserId);
-          setRatingChanges(ratingUpdate);
-          
-          console.log('✅ ELO ratings updated:', {
-            winner: `${ratingUpdate.winner.oldRating} → ${ratingUpdate.winner.newRating} (${ratingUpdate.winner.ratingChange > 0 ? '+' : ''}${ratingUpdate.winner.ratingChange})`,
-            loser: `${ratingUpdate.loser.oldRating} → ${ratingUpdate.loser.newRating} (${ratingUpdate.loser.ratingChange > 0 ? '+' : ''}${ratingUpdate.loser.ratingChange})`
-          });
+          // Build vote data for margin of victory calculation
+          const voteData: Record<string, number> = {};
+          for (const s of sortedScores) {
+            voteData[s.userId] = s.score;
+          }
+
+          if (sortedScores.length === 2) {
+            // 1v1: use dedicated 1v1 function with full margin of victory
+            const winnerId = sortedScores[0].userId;
+            const loserId = sortedScores[1].userId;
+            const totalVotes = sortedScores[0].score + sortedScores[1].score;
+            
+            console.log('📊 Updating 1v1 ELO ratings:', { winnerId, loserId });
+            const ratingUpdate = await updatePlayerRating(winnerId, loserId, true, {
+              winnerVotes: sortedScores[0].score,
+              secondPlaceVotes: sortedScores[1].score,
+              totalVotes,
+            });
+            setRatingChanges(ratingUpdate);
+            
+            console.log('✅ 1v1 ELO ratings updated:', {
+              winner: `${ratingUpdate.winner.oldRating} → ${ratingUpdate.winner.newRating} (${ratingUpdate.winner.ratingChange > 0 ? '+' : ''}${ratingUpdate.winner.ratingChange})`,
+              loser: `${ratingUpdate.loser.oldRating} → ${ratingUpdate.loser.newRating} (${ratingUpdate.loser.ratingChange > 0 ? '+' : ''}${ratingUpdate.loser.ratingChange})`
+            });
+          } else {
+            // 3+ players: use multiplayer pairwise comparison system
+            const playerIds = sortedScores.map(s => s.userId);
+            const finalScoreMap: Record<string, number> = {};
+            for (const s of sortedScores) {
+              finalScoreMap[s.userId] = s.score;
+            }
+            
+            console.log('📊 Updating multiplayer ELO ratings for', playerIds.length, 'players');
+            const multiUpdates = await updateMultiplayerRatings(
+              playerIds,
+              finalScoreMap,
+              true,
+              voteData
+            );
+            setMultiplayerRatingChanges(multiUpdates);
+            
+            console.log('✅ Multiplayer ELO ratings updated for', Object.keys(multiUpdates).length, 'players');
+          }
         } catch (error) {
           console.error('Failed to update ELO ratings:', error);
         }
@@ -441,6 +474,19 @@ const GameRoomScreen: React.FC = () => {
 
     return () => unsubscribe();
   }, [roomId, gameState?.phase, user?.uid]);
+
+  // Shuffle submissions once when entering voting phase
+  useEffect(() => {
+    if (gameState?.phase === 'voting' && gameState?.submissions) {
+      const entries = Object.entries(gameState.submissions) as [string, string][];
+      // Fisher-Yates shuffle for unbiased randomization
+      for (let i = entries.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [entries[i], entries[j]] = [entries[j], entries[i]];
+      }
+      setShuffledSubmissions(entries);
+    }
+  }, [gameState?.phase === 'voting' ? 'voting' : 'other']);
 
   // Subscribe to submission count
   useEffect(() => {
@@ -776,8 +822,7 @@ const GameRoomScreen: React.FC = () => {
             </View>
 
             <ScrollView style={styles.phrasesList} showsVerticalScrollIndicator={false}>
-              {Object.entries(gameState.submissions || {})
-                .sort(() => Math.random() - 0.5)
+              {shuffledSubmissions
                 .map(([userId, phraseText], index) => (
                 <PhraseCard
                   key={userId}
@@ -991,7 +1036,7 @@ const GameRoomScreen: React.FC = () => {
                 <Button
                   title="START GAME"
                   onPress={handleStartGame}
-                  disabled={room.players.length < 1}
+                  disabled={room.players.length < (room.settings?.minPlayers || 3)}
                   size="lg"
                   variant="primary"
                   style={styles.startButton}
@@ -1038,8 +1083,8 @@ const GameRoomScreen: React.FC = () => {
                         setRefreshing(false);
                       }
                     }}
-                    tintColor="#FFFFFF"
-                    colors={['#A855F7']}
+                    tintColor={COLORS.text}
+                    colors={[COLORS.primary]}
                   />
                 }
               >
@@ -1099,6 +1144,7 @@ const GameRoomScreen: React.FC = () => {
           rewards={gameEndRewards}
           finalScores={finalScores}
           ratingChanges={ratingChanges}
+          multiplayerRatingChanges={multiplayerRatingChanges}
           currentUserId={user?.uid}
           onContinue={handleGameEndContinue}
         />

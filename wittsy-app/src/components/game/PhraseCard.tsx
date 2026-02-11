@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, Animated } from 'react-native';
-import { useTheme } from '../../hooks/useTheme';;
+import { useTheme } from '../../hooks/useTheme';
 
 interface PhraseCardProps {
   number: number;
