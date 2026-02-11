@@ -23,7 +23,6 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Wittz needs access to your camera to take profile photos.",
         "NSPhotoLibraryUsageDescription": "Wittz needs access to your photo library to select profile photos.",
-        "NSMicrophoneUsageDescription": "Wittz needs access to your microphone for voice chat features.",
         "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events."
       },
       "entitlements": {
@@ -50,7 +49,6 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "RECORD_AUDIO",
         "VIBRATE",
         "POST_NOTIFICATIONS"
       ],
@@ -101,12 +99,7 @@
           ]
         }
       ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Allow Wittz to access your microphone for voice chat."
-        }
-      ]
+      "expo-av"
     ],
     "extra": {
       "eas": {

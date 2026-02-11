@@ -573,6 +573,63 @@ class MonetizationService {
   }
 
   /**
+   * Restore purchases (required by Apple App Store guidelines 3.1.1)
+   * Restores any previously purchased non-consumable items or active subscriptions
+   */
+  async restorePurchases(): Promise<{ success: boolean; restored: number; error?: string }> {
+    try {
+      console.log('🔄 Restoring purchases...');
+
+      if (!RNIap) {
+        console.log('⏭️ IAP not available (Expo Go)');
+        return { success: true, restored: 0 };
+      }
+
+      if (!this.initialized) {
+        console.error('❌ IAP not initialized');
+        return { success: false, restored: 0, error: 'Store not initialized. Please try again.' };
+      }
+
+      const purchases = await RNIap.getAvailablePurchases();
+      console.log('🔄 Found', purchases?.length || 0, 'previous purchases');
+
+      let restoredCount = 0;
+
+      if (purchases && purchases.length > 0) {
+        for (const purchase of purchases) {
+          // Handle battle pass premium restoration
+          if (purchase.productId === 'com.wittz.battlepass.premium' && this.currentUserId) {
+            try {
+              const { battlePass } = await import('./battlePassService');
+              const userBP = await battlePass.getUserBattlePass(this.currentUserId);
+              if (userBP && !userBP.isPremium) {
+                const bpRef = doc(firestore, 'battlePasses', this.currentUserId);
+                await updateDoc(bpRef, { isPremium: true });
+                restoredCount++;
+                console.log('✅ Restored Battle Pass Premium');
+              }
+            } catch (e) {
+              console.error('Failed to restore battle pass:', e);
+            }
+          }
+
+          // Finish the transaction
+          await RNIap.finishTransaction({ purchase });
+        }
+      }
+
+      analytics.logEvent('restore_purchases', { restored_count: restoredCount });
+      console.log('✅ Restore complete:', restoredCount, 'items restored');
+
+      return { success: true, restored: restoredCount };
+    } catch (error: any) {
+      console.error('❌ Restore purchases failed:', error);
+      errorTracking.logError(error as Error, { context: 'Restore purchases' });
+      return { success: false, restored: 0, error: error.message || 'Failed to restore purchases' };
+    }
+  }
+
+  /**
    * Cleanup
    */
   async cleanup(): Promise<void> {

@@ -10,6 +10,8 @@ import {
   StyleSheet,
   Animated,
   Alert,
+  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,6 +34,7 @@ export const CoinShopScreen: React.FC = () => {
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [hasFirstPurchase, setHasFirstPurchase] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [restoring, setRestoring] = useState<boolean>(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   
@@ -106,6 +109,28 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
       Alert.alert('Error', 'Failed to complete purchase.');
     } finally {
       setPurchasing(null);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    setRestoring(true);
+    haptics.medium();
+    try {
+      const result = await monetization.restorePurchases();
+      if (result.success) {
+        if (result.restored > 0) {
+          await refreshUserProfile();
+          Alert.alert('Purchases Restored', `Successfully restored ${result.restored} purchase${result.restored > 1 ? 's' : ''}.`);
+        } else {
+          Alert.alert('No Purchases Found', 'There are no previous purchases to restore.');
+        }
+      } else {
+        Alert.alert('Restore Failed', result.error || 'Please try again later.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to restore purchases. Please try again.');
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -220,6 +245,19 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
                 All transactions are processed securely through your app store
               </Text>
             </View>
+
+            {/* Restore Purchases - Required by Apple */}
+            <TouchableOpacity
+              style={styles.restoreButton}
+              onPress={handleRestorePurchases}
+              disabled={restoring}
+            >
+              {restoring ? (
+                <ActivityIndicator size="small" color={COLORS.text} />
+              ) : (
+                <Text style={styles.restoreText}>Restore Purchases</Text>
+              )}
+            </TouchableOpacity>
           </Animated.View>
         </Animated.ScrollView>
       </SafeAreaView>
@@ -252,13 +290,17 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
   },
   restoreButton: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xl,
   },
   restoreText: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.text,
+    textDecorationLine: 'underline',
+    opacity: 0.8,
   },
   tabs: {
     flexDirection: 'row',

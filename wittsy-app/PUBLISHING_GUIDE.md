@@ -36,8 +36,8 @@ This guide covers everything you need to publish Wittz to both the Apple App Sto
    - **Category:** Primary: Games, Secondary: Word
    - **Content Rights:** Check "Contains third-party content"
    - **Age Rating:** Complete questionnaire (likely 12+)
-   - **Privacy Policy URL:** https://wittsy.app/privacy
-   - **Terms of Service URL:** https://wittsy.app/terms
+   - **Privacy Policy URL:** https://wittz-support.netlify.app/privacy.html
+   - **Terms of Service URL:** https://wittz-support.netlify.app/terms.html
 
 #### **Step 1.3: Pricing and Availability**
 1. Go to **"Pricing and Availability"**
@@ -228,7 +228,7 @@ word game, party game, funny, wit, humor, multiplayer, battle, compete, friends,
 
 #### **Step 3.6: Support URL**
 ```
-https://wittsy.app/support
+https://wittz-support.netlify.app/support.html
 ```
 
 #### **Step 3.7: Marketing URL (Optional)**
@@ -391,7 +391,7 @@ Complete all required sections in the dashboard:
 - **Email:** your-email@example.com
 - **Phone:** Your phone number
 - **Website:** https://wittsy.app
-- **Privacy policy:** https://wittsy.app/privacy
+- **Privacy policy:** https://wittz-support.netlify.app/privacy.html
 
 ---
 
