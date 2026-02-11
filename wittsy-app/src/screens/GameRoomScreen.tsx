@@ -1228,6 +1228,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
+    overflow: 'hidden',
   },
   playerCountSection: {
     alignItems: 'center',
@@ -1274,6 +1275,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   },
   lobbyBadgesRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING.xs,
     marginBottom: SPACING.xs,
   },
@@ -1294,6 +1296,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
+    flexShrink: 1,
   },
   compactBadgeIcon: {
     fontSize: 12,
@@ -1303,6 +1306,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
     color: COLORS.text,
+    flexShrink: 1,
   },
   autoStartHint: {
     fontSize: 11,
