@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common/BackButton';
 import { SPACING } from '../../utils/constants';
 import { createSettingsStyles } from '../../styles/settingsStyles';
+import { deleteAccount } from '../../services/auth';
 export const PrivacySettingsScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
   const navigation = useNavigation();
@@ -50,10 +51,12 @@ export const PrivacySettingsScreen: React.FC = () => {
     );
   };
 
+  const [deleting, setDeleting] = useState(false);
+
   const handleDeleteAccount = () => {
     Alert.alert(
       '⚠️ Delete Account',
-      'This action is permanent and cannot be undone. All your data, progress, and achievements will be lost forever.',
+      'This action is permanent and cannot be undone. All your data, progress, achievements, and purchases will be permanently deleted.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -61,16 +64,27 @@ export const PrivacySettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: () => {
             Alert.alert(
-              'Final Confirmation',
-              'Type DELETE to confirm account deletion',
+              'Are you absolutely sure?',
+              'This will permanently delete your account and all associated data. This action cannot be reversed.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 { 
-                  text: 'I Understand', 
+                  text: 'Delete My Account', 
                   style: 'destructive',
-                  onPress: () => {
-                    console.log('🗑️ Account deletion initiated');
-                    Alert.alert('Account Deletion', 'Your account deletion request has been submitted. You will be logged out shortly.');
+                  onPress: async () => {
+                    setDeleting(true);
+                    try {
+                      await deleteAccount();
+                      // Auth state listener will handle navigation after deletion
+                    } catch (error: any) {
+                      console.error('❌ Account deletion failed:', error);
+                      Alert.alert(
+                        'Deletion Failed',
+                        error.message || 'Failed to delete account. Please try again.'
+                      );
+                    } finally {
+                      setDeleting(false);
+                    }
                   }
                 }
               ]
@@ -264,16 +278,16 @@ export const PrivacySettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Legal</Text>
           
-          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittsy.app/privacy', 'Privacy Policy')}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittz-support.netlify.app/privacy.html', 'Privacy Policy')}>
             <Text style={styles.actionButtonText}>Privacy Policy →</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittsy.app/terms', 'Terms of Service')}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittz-support.netlify.app/terms.html', 'Terms of Service')}>
             <Text style={styles.actionButtonText}>Terms of Service →</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittsy.app/cookies', 'Cookie Policy')}>
-            <Text style={styles.actionButtonText}>Cookie Policy →</Text>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openLink('https://wittz-support.netlify.app/data-deletion.html', 'Data Deletion')}>
+            <Text style={styles.actionButtonText}>Data Deletion Policy →</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

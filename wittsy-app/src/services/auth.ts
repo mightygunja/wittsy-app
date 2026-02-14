@@ -5,6 +5,7 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged,
+  deleteUser,
   User as FirebaseUser,
   GoogleAuthProvider,
   OAuthProvider,
@@ -12,7 +13,7 @@ import {
   fetchSignInMethodsForEmail,
   linkWithCredential,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
 import { referralService } from './referralService';
@@ -480,6 +481,74 @@ export const getCurrentUser = async (): Promise<User | null> => {
   } catch (error) {
     console.error('Error getting current user:', error);
     return null;
+  }
+};
+
+// Delete account permanently (required by Apple App Store guidelines)
+export const deleteAccount = async (): Promise<void> => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('No user is currently signed in');
+  }
+
+  const userId = currentUser.uid;
+  console.log('🗑️ Starting account deletion for user:', userId);
+
+  try {
+    // 1. Delete user's Firestore document
+    try {
+      await deleteDoc(doc(firestore, 'users', userId));
+      console.log('✅ Deleted user document');
+    } catch (e) {
+      console.error('Failed to delete user document:', e);
+    }
+
+    // 2. Delete user's battle pass data
+    try {
+      await deleteDoc(doc(firestore, 'battlePasses', userId));
+      console.log('✅ Deleted battle pass data');
+    } catch (e) {
+      console.error('Failed to delete battle pass data:', e);
+    }
+
+    // 3. Delete user's avatar data
+    try {
+      await deleteDoc(doc(firestore, 'avatars', userId));
+      console.log('✅ Deleted avatar data');
+    } catch (e) {
+      console.error('Failed to delete avatar data:', e);
+    }
+
+    // 4. Delete user's friend requests
+    try {
+      const sentRequests = await getDocs(
+        query(collection(firestore, 'friendRequests'), where('fromUserId', '==', userId))
+      );
+      const receivedRequests = await getDocs(
+        query(collection(firestore, 'friendRequests'), where('toUserId', '==', userId))
+      );
+      for (const docSnap of [...sentRequests.docs, ...receivedRequests.docs]) {
+        await deleteDoc(docSnap.ref);
+      }
+      console.log('✅ Deleted friend requests');
+    } catch (e) {
+      console.error('Failed to delete friend requests:', e);
+    }
+
+    // 5. Delete the Firebase Auth account
+    await deleteUser(currentUser);
+    console.log('✅ Firebase Auth account deleted');
+
+    console.log('✅ Account deletion complete for user:', userId);
+  } catch (error: any) {
+    console.error('❌ Account deletion failed:', error);
+
+    // If the error is auth/requires-recent-login, the user needs to re-authenticate
+    if (error.code === 'auth/requires-recent-login') {
+      throw new Error('For security, please sign out and sign back in, then try deleting your account again.');
+    }
+
+    throw new Error(error.message || 'Failed to delete account');
   }
 };
 
