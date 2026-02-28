@@ -1,0 +1,6 @@
+Files changed:
+- src/services/auth.ts (removed top-level GoogleSignin import, added dynamic imports)
+- App.tsx (made configureGoogleSignIn call async)
+- EXPO_GO_ERROR_ANALYSIS.md (new file explaining the fix)
+
+Changes ready to commit.
