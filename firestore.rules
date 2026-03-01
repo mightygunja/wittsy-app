@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      // Temporarily disabled - users collection was deleted
+      // TODO: Re-enable after users collection is restored
+      return false;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Battle Pass collection
+    match /battlePasses/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isAdmin();
+    }
+
+    // Battle Pass Seasons collection
+    match /battlePassSeasons/{seasonId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Game rooms collection
+    match /rooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Prompts collection
+    match /prompts/{promptId} {
+      allow read: if true; // Open for reading
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Prompt Submissions collection (user-submitted prompts pending approval)
+    match /promptSubmissions/{submissionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Prompt Packs collection
+    match /promptPacks/{packId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Achievements collection
+    match /achievements/{achievementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // User achievements
+    match /userAchievements/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isAdmin();
+    }
+
+    // Leaderboards
+    match /leaderboards/{leaderboardId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Friends
+    match /friends/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+
+    // Challenges - OPEN READ ACCESS
+    match /challenges/{challengeId} {
+      allow read: if true; // Open for reading
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // User challenges
+    match /userChallenges/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+
+    // Challenge Progress
+    match /challengeProgress/{progressId} {
+      allow read, write: if true; // Open for now
+    }
+
+    // Battle Pass Seasons
+    match /battlePassSeasons/{seasonId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated(); // Allow for auto-creation
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Seasons (for admin console)
+    match /seasons/{seasonId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated(); // Allow for auto-creation
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Events
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // Analytics (write-only for users, read for admins)
+    match /analytics/{document=**} {
+      allow read: if isAdmin();
+      allow write: if isAuthenticated();
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

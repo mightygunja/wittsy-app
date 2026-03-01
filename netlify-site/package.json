@@ -1,0 +1,8 @@
+{
+  "name": "wittz-landing",
+  "version": "1.0.0",
+  "description": "Wittz landing page",
+  "scripts": {
+    "build": "echo 'No build needed - static site'"
+  }
+}

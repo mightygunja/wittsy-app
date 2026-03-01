@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Wittz - Join Game Room</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .room-code {
+            background: #f5f5f5;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+            letter-spacing: 2px;
+        }
+        
+        .status {
+            color: #666;
+            margin: 20px 0;
+            font-size: 16px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 10px 5px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .button.secondary {
+            background: #764ba2;
+        }
+        
+        .instructions {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            color: #666;
+        }
+        
+        .instructions li {
+            margin: 8px 0;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+            color: #999;
+            font-size: 0.85em;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🎮</div>
+        <h1>Join Wittz Game Room</h1>
+        
+        <div class="room-code" id="roomCode">Loading...</div>
+        
+        <div class="status" id="status">
+            <div class="spinner"></div>
+            Attempting to open Wittz app...
+        </div>
+        
+        <div id="actions" style="display: none;">
+            <a href="#" class="button" id="openApp">Open Wittz App</a>
+            <a href="https://apps.apple.com/app/wittz" class="button secondary" id="appStore" style="display: none;">Download on App Store</a>
+            <a href="https://play.google.com/store/apps/details?id=com.wittsy.app" class="button secondary" id="playStore" style="display: none;">Get it on Google Play</a>
+        </div>
+        
+        <div class="instructions">
+            <h3>Manual Join Instructions:</h3>
+            <ol>
+                <li>Open the Wittz app</li>
+                <li>Tap "Join Room"</li>
+                <li>Enter the room code above</li>
+            </ol>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2026 Wittz. All rights reserved.</p>
+            <p>
+                <a href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp;
+                <a href="/terms.html">Terms of Service</a> &nbsp;|&nbsp;
+                <a href="/support.html">Support</a> &nbsp;|&nbsp;
+                <a href="/data-deletion.html">Data Deletion</a>
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Extract room ID from URL
+        const path = window.location.pathname;
+        const fullUrl = window.location.href;
+        const roomId = path.split('/room/')[1]?.split('?')[0] || '';
+        
+        // Try to get room code from query parameter first, otherwise use full roomId
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeParam = urlParams.get('code');
+        const roomCode = codeParam || roomId.toUpperCase();
+        
+        // Debug logging
+        console.log('🔍 Full URL:', fullUrl);
+        console.log('🔍 Path:', path);
+        console.log('🔍 Room ID:', roomId);
+        console.log('🔍 Query params:', window.location.search);
+        console.log('🔍 Code param:', codeParam);
+        console.log('🔍 Final room code:', roomCode);
+        
+        // Display room code
+        document.getElementById('roomCode').textContent = roomCode || 'Invalid Code';
+        
+        // Detect platform
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+        const isAndroid = /android/i.test(userAgent);
+        
+        // Deep link URLs
+        const appSchemeUrl = `wittsy://room/${roomId}`;
+        
+        // Try to open the app
+        function attemptAppOpen() {
+            if (!roomId) {
+                document.getElementById('status').innerHTML = '<span style="color: #e74c3c;">Invalid room link</span>';
+                return;
+            }
+            
+            // Create hidden iframe to trigger app
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = appSchemeUrl;
+            document.body.appendChild(iframe);
+            
+            // Set timeout to show fallback options
+            setTimeout(() => {
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('actions').style.display = 'block';
+                
+                // Show appropriate store link
+                if (isIOS) {
+                    document.getElementById('appStore').style.display = 'inline-block';
+                } else if (isAndroid) {
+                    document.getElementById('playStore').style.display = 'inline-block';
+                }
+                
+                // Update open app button
+                document.getElementById('openApp').href = appSchemeUrl;
+            }, 2000);
+        }
+        
+        // Attempt to open app on page load
+        if (roomId) {
+            attemptAppOpen();
+        } else {
+            document.getElementById('status').innerHTML = '<span style="color: #e74c3c;">Invalid room link</span>';
+        }
+    </script>
+</body>
+</html>

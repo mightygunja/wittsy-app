@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "expo-blur": "^15.0.8",
+    "expo-build-properties": "^1.0.10"
+  }
+}
