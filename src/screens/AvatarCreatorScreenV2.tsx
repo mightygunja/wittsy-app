@@ -542,21 +542,46 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
             ))}
           </View>
           
-          {selectedFeatureId && (
-            <View style={styles.featureControls}>
-              <Text style={styles.controlsTitle}>Selected: {selectedFeatureId}</Text>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => {
-                  setDraggableFeatures(prev => prev.filter(f => f.id !== selectedFeatureId));
-                  setSelectedFeatureId(null);
-                  haptics.success();
-                }}
-              >
-                <Text style={styles.deleteButtonText}>🗑️ Remove</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {selectedFeatureId && (() => {
+            const selectedFeature = draggableFeatures.find(f => f.id === selectedFeatureId);
+            let displayName = selectedFeatureId;
+            
+            if (selectedFeature) {
+              // Get proper display name from the item lists
+              if (selectedFeature.type === 'eyes') {
+                const eyeItem = DEFAULT_EYES.find(e => e.id === `eyes_${selectedFeature.style}`);
+                displayName = eyeItem?.name || selectedFeature.style;
+              } else if (selectedFeature.type === 'mouth') {
+                const mouthItem = DEFAULT_MOUTHS.find(m => m.id === `mouth_${selectedFeature.style}`);
+                displayName = mouthItem?.name || selectedFeature.style;
+              } else if (selectedFeature.type === 'hair') {
+                const hairItem = DEFAULT_HAIR_STYLES.find(h => h.id === `hair_${selectedFeature.style}`);
+                displayName = hairItem?.name || selectedFeature.style;
+              } else if (selectedFeature.type === 'accessory') {
+                const accItem = DEFAULT_ACCESSORIES.find(a => a.id === selectedFeature.style);
+                displayName = accItem?.name || selectedFeature.style;
+              }
+            }
+            
+            return (
+              <View style={styles.featureControls}>
+                <View style={styles.controlsTextContainer}>
+                  <Text style={styles.controlsLabel}>Selected Item</Text>
+                  <Text style={styles.controlsTitle}>{displayName}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => {
+                    setDraggableFeatures(prev => prev.filter(f => f.id !== selectedFeatureId));
+                    setSelectedFeatureId(null);
+                    haptics.success();
+                  }}
+                >
+                  <Text style={styles.deleteButtonText}>🗑️ Remove</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Category Tabs */}
@@ -814,10 +839,23 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: SPACING.md,
+  },
+  controlsTextContainer: {
+    flex: 1,
+    marginRight: SPACING.sm,
+  },
+  controlsLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   controlsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: COLORS.text,
   },
   deleteButton: {
