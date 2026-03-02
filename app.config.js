@@ -112,7 +112,7 @@ export default {
       revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
       revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
     },
-    owner: "mightygunja",
+    owner: "adilgunja",
     updates: {
       enabled: false
     }
