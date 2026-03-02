@@ -91,6 +91,71 @@ export const Eyes = {
       </G>
     </Svg>
   ),
+  
+  star: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left star eye */}
+        <Path d="M 15 5 L 17 10 L 22 10 L 18 13 L 20 18 L 15 15 L 10 18 L 12 13 L 8 10 L 13 10 Z" fill="#FFD700" stroke="#FFA500" strokeWidth="1" />
+        {/* Right star eye */}
+        <Path d="M 45 5 L 47 10 L 52 10 L 48 13 L 50 18 L 45 15 L 40 18 L 42 13 L 38 10 L 43 10 Z" fill="#FFD700" stroke="#FFA500" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
+  
+  heart: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left heart eye */}
+        <Path d="M 15 8 C 15 5 12 3 10 5 C 8 3 5 5 5 8 C 5 12 15 17 15 17 C 15 17 25 12 25 8 C 25 5 22 3 20 5 C 18 3 15 5 15 8 Z" fill="#FF1493" />
+        {/* Right heart eye */}
+        <Path d="M 45 8 C 45 5 42 3 40 5 C 38 3 35 5 35 8 C 35 12 45 17 45 17 C 45 17 55 12 55 8 C 55 5 52 3 50 5 C 48 3 45 5 45 8 Z" fill="#FF1493" />
+      </G>
+    </Svg>
+  ),
+  
+  money: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left dollar sign eye */}
+        <Circle cx="15" cy="10" r="8" fill="#00AA00" />
+        <Path d="M 15 4 L 15 16 M 12 7 Q 15 5 18 7 Q 18 10 15 10 Q 12 10 12 13 Q 15 15 18 13" stroke="#FFD700" strokeWidth="2" fill="none" />
+        {/* Right dollar sign eye */}
+        <Circle cx="45" cy="10" r="8" fill="#00AA00" />
+        <Path d="M 45 4 L 45 16 M 42 7 Q 45 5 48 7 Q 48 10 45 10 Q 42 10 42 13 Q 45 15 48 13" stroke="#FFD700" strokeWidth="2" fill="none" />
+      </G>
+    </Svg>
+  ),
+  
+  fire: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left fire eye */}
+        <Path d="M 15 18 Q 10 15 10 10 Q 10 5 15 2 Q 18 5 18 8 Q 20 5 20 10 Q 20 15 15 18 Z" fill="#FF4500" />
+        <Path d="M 15 15 Q 12 13 12 10 Q 12 7 15 5 Q 17 7 17 10 Q 17 13 15 15 Z" fill="#FFD700" />
+        {/* Right fire eye */}
+        <Path d="M 45 18 Q 40 15 40 10 Q 40 5 45 2 Q 48 5 48 8 Q 50 5 50 10 Q 50 15 45 18 Z" fill="#FF4500" />
+        <Path d="M 45 15 Q 42 13 42 10 Q 42 7 45 5 Q 47 7 47 10 Q 47 13 45 15 Z" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  crying: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left eye */}
+        <Ellipse cx="15" cy="8" rx="7" ry="9" fill="#000" />
+        <Circle cx="17" cy="6" r="2" fill="#fff" />
+        {/* Left tear */}
+        <Path d="M 15 17 Q 13 20 15 22 Q 17 20 15 17 Z" fill="#4A90E2" />
+        {/* Right eye */}
+        <Ellipse cx="45" cy="8" rx="7" ry="9" fill="#000" />
+        <Circle cx="47" cy="6" r="2" fill="#fff" />
+        {/* Right tear */}
+        <Path d="M 45 17 Q 43 20 45 22 Q 47 20 45 17 Z" fill="#4A90E2" />
+      </G>
+    </Svg>
+  ),
 };
 
 // MOUTHS
@@ -174,6 +239,42 @@ export const Mouths = {
         fill="none"
         strokeLinecap="round"
       />
+    </Svg>
+  ),
+  
+  tongue: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Mouth */}
+        <Path d="M 10 10 Q 30 25 50 10" stroke="#000" strokeWidth="3" fill="none" strokeLinecap="round" />
+        {/* Tongue */}
+        <Ellipse cx="30" cy="20" rx="8" ry="6" fill="#FF6B9D" />
+      </G>
+    </Svg>
+  ),
+  
+  kiss: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Lips */}
+        <Ellipse cx="30" cy="15" rx="12" ry="8" fill="#FF1493" />
+        <Path d="M 18 15 Q 30 10 42 15" stroke="#C71585" strokeWidth="2" fill="none" />
+        {/* Heart */}
+        <Path d="M 50 8 C 50 6 48 5 47 6 C 46 5 44 6 44 8 C 44 10 50 14 50 14 C 50 14 56 10 56 8 C 56 6 54 5 53 6 C 52 5 50 6 50 8 Z" fill="#FF69B4" />
+      </G>
+    </Svg>
+  ),
+  
+  fire: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Open mouth */}
+        <Ellipse cx="30" cy="15" rx="15" ry="10" fill="#000" />
+        {/* Fire coming out */}
+        <Path d="M 25 15 Q 20 10 20 5 Q 20 2 25 0 Q 28 3 28 6 Q 30 3 30 5 Q 30 10 25 15 Z" fill="#FF4500" />
+        <Path d="M 35 15 Q 30 10 30 5 Q 30 2 35 0 Q 38 3 38 6 Q 40 3 40 5 Q 40 10 35 15 Z" fill="#FF4500" />
+        <Path d="M 30 12 Q 27 9 27 6 Q 27 4 30 3 Q 32 5 32 6 Q 32 9 30 12 Z" fill="#FFD700" />
+      </G>
     </Svg>
   ),
 };

@@ -184,46 +184,42 @@ export const DEFAULT_SKIN_TONES = [
 ];
 
 export const DEFAULT_EYES = [
-  // Common
-  { id: 'eyes_normal', name: 'Classic Look', emoji: '👀', rarity: 'common' as AvatarRarity },
-  { id: 'eyes_happy', name: 'Joyful', emoji: '😊', rarity: 'common' as AvatarRarity },
-  { id: 'eyes_wink', name: 'Playful Wink', emoji: '😉', rarity: 'common' as AvatarRarity },
-  { id: 'eyes_closed', name: 'Peaceful', emoji: '😌', rarity: 'common' as AvatarRarity },
-  { id: 'eyes_surprised', name: 'Shocked', emoji: '😲', rarity: 'common' as AvatarRarity },
-  // Rare
-  { id: 'eyes_cool', name: 'Cool Stare', emoji: '😎', rarity: 'rare' as AvatarRarity },
-  { id: 'eyes_determined', name: 'Determined', emoji: '😤', rarity: 'rare' as AvatarRarity },
-  { id: 'eyes_sleepy', name: 'Sleepy', emoji: '😴', rarity: 'rare' as AvatarRarity },
-  { id: 'eyes_angry', name: 'Fierce', emoji: '😠', rarity: 'rare' as AvatarRarity },
-  { id: 'eyes_crying', name: 'Tears of Joy', emoji: '😂', rarity: 'rare' as AvatarRarity },
-  // Epic
-  { id: 'eyes_star', name: 'Starstruck', emoji: '🤩', rarity: 'epic' as AvatarRarity },
-  { id: 'eyes_heart', name: 'Lovestruck', emoji: '😍', rarity: 'epic' as AvatarRarity },
-  { id: 'eyes_money', name: 'Money Eyes', emoji: '🤑', rarity: 'epic' as AvatarRarity },
-  { id: 'eyes_fire', name: 'Burning Passion', emoji: '🔥', rarity: 'epic' as AvatarRarity },
-  { id: 'eyes_rainbow', name: 'Rainbow Vision', emoji: '🌈', rarity: 'epic' as AvatarRarity },
-  { id: 'eyes_founder', name: 'Founder\'s Gaze', emoji: '�️', rarity: 'epic' as AvatarRarity },
-  // Legendary
-  { id: 'eyes_laser', name: 'Laser Vision', emoji: '👁️‍🗨️', rarity: 'legendary' as AvatarRarity },
-  { id: 'eyes_galaxy', name: 'Cosmic Eyes', emoji: '🌌', rarity: 'legendary' as AvatarRarity },
-  { id: 'eyes_lightning', name: 'Thunder Eyes', emoji: '⚡', rarity: 'legendary' as AvatarRarity },
-  { id: 'eyes_void', name: 'Void Stare', emoji: '🌑', rarity: 'legendary' as AvatarRarity },
+  // Common - All have SVG implementations
+  { id: 'eyes_normal', name: 'Normal Eyes', emoji: '👀', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_happy', name: 'Happy Eyes', emoji: '😊', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_wink', name: 'Winking', emoji: '😉', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_sleepy', name: 'Sleepy Eyes', emoji: '�', rarity: 'common' as AvatarRarity },
+  { id: 'eyes_surprised', name: 'Surprised Eyes', emoji: '😲', rarity: 'common' as AvatarRarity },
+  // Rare - All have SVG implementations
+  { id: 'eyes_angry', name: 'Angry Eyes', emoji: '😠', rarity: 'rare' as AvatarRarity },
+  { id: 'eyes_crying', name: 'Crying Eyes', emoji: '😂', rarity: 'rare' as AvatarRarity },
+  // Epic - All have SVG implementations
+  { id: 'eyes_star', name: 'Star Eyes', emoji: '⭐', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_heart', name: 'Heart Eyes', emoji: '�', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_money', name: 'Money Eyes', emoji: '💰', rarity: 'epic' as AvatarRarity },
+  { id: 'eyes_fire', name: 'Fire Eyes', emoji: '🔥', rarity: 'epic' as AvatarRarity },
+  // Legendary - Need SVG implementations (will use emoji fallback for now)
+  { id: 'eyes_laser', name: 'Laser Eyes', emoji: '👁️', rarity: 'legendary' as AvatarRarity },
+  { id: 'eyes_galaxy', name: 'Galaxy Eyes', emoji: '🌌', rarity: 'legendary' as AvatarRarity },
+  { id: 'eyes_rainbow', name: 'Rainbow Eyes', emoji: '🌈', rarity: 'legendary' as AvatarRarity },
 ];
 
 export const DEFAULT_MOUTHS = [
-  // Common
-  { id: 'mouth_smile', name: 'Friendly Smile', emoji: '😊', rarity: 'common' as AvatarRarity },
+  // Common - All have SVG implementations
+  { id: 'mouth_smile', name: 'Smile', emoji: '😊', rarity: 'common' as AvatarRarity },
   { id: 'mouth_grin', name: 'Big Grin', emoji: '😁', rarity: 'common' as AvatarRarity },
   { id: 'mouth_laugh', name: 'Laughing', emoji: '😂', rarity: 'common' as AvatarRarity },
   { id: 'mouth_neutral', name: 'Neutral', emoji: '😐', rarity: 'common' as AvatarRarity },
-  { id: 'mouth_kiss', name: 'Kiss', emoji: '😘', rarity: 'common' as AvatarRarity },
-  // Rare
-  { id: 'mouth_smirk', name: 'Confident Smirk', emoji: '😏', rarity: 'rare' as AvatarRarity },
-  { id: 'mouth_tongue', name: 'Cheeky', emoji: '😛', rarity: 'rare' as AvatarRarity },
+  { id: 'mouth_sad', name: 'Sad', emoji: '�', rarity: 'common' as AvatarRarity },
+  // Rare - All have SVG implementations
+  { id: 'mouth_smirk', name: 'Smirk', emoji: '😏', rarity: 'rare' as AvatarRarity },
+  { id: 'mouth_surprised', name: 'Shocked', emoji: '�', rarity: 'rare' as AvatarRarity },
+  { id: 'mouth_tongue', name: 'Tongue Out', emoji: '😛', rarity: 'rare' as AvatarRarity },
   { id: 'mouth_thinking', name: 'Pondering', emoji: '🤔', rarity: 'rare' as AvatarRarity },
   { id: 'mouth_yawn', name: 'Yawning', emoji: '🥱', rarity: 'rare' as AvatarRarity },
-  { id: 'mouth_whistle', name: 'Whistling', emoji: '�', rarity: 'rare' as AvatarRarity },
-  // Epic
+  { id: 'mouth_whistle', name: 'Whistling', emoji: '🎵', rarity: 'rare' as AvatarRarity },
+  // Epic - All have SVG implementations
+  { id: 'mouth_kiss', name: 'Kiss', emoji: '😘', rarity: 'epic' as AvatarRarity },
   { id: 'mouth_vampire', name: 'Vampire Fangs', emoji: '🧛', rarity: 'epic' as AvatarRarity },
   { id: 'mouth_zipper', name: 'Zipped', emoji: '🤐', rarity: 'epic' as AvatarRarity },
   { id: 'mouth_robot', name: 'Robot Grill', emoji: '🤖', rarity: 'epic' as AvatarRarity },
