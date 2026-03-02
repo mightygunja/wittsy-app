@@ -156,6 +156,55 @@ export const Eyes = {
       </G>
     </Svg>
   ),
+  
+  laser: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left eye with laser beam */}
+        <Circle cx="15" cy="10" r="7" fill="#FF0000" />
+        <Circle cx="17" cy="8" r="3" fill="#FFFF00" />
+        <Path d="M 22 10 L 30 10 L 32 8 L 32 12 Z" fill="#FF0000" opacity="0.8" />
+        {/* Right eye with laser beam */}
+        <Circle cx="45" cy="10" r="7" fill="#FF0000" />
+        <Circle cx="47" cy="8" r="3" fill="#FFFF00" />
+        <Path d="M 52 10 L 60 10 L 62 8 L 62 12 Z" fill="#FF0000" opacity="0.8" />
+      </G>
+    </Svg>
+  ),
+  
+  galaxy: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left galaxy eye */}
+        <Circle cx="15" cy="10" r="8" fill="#4A00E0" />
+        <Circle cx="13" cy="8" r="2" fill="#FFFFFF" opacity="0.8" />
+        <Circle cx="17" cy="11" r="1" fill="#FFFFFF" opacity="0.6" />
+        <Circle cx="15" cy="13" r="1.5" fill="#8E2DE2" opacity="0.7" />
+        {/* Right galaxy eye */}
+        <Circle cx="45" cy="10" r="8" fill="#4A00E0" />
+        <Circle cx="43" cy="8" r="2" fill="#FFFFFF" opacity="0.8" />
+        <Circle cx="47" cy="11" r="1" fill="#FFFFFF" opacity="0.6" />
+        <Circle cx="45" cy="13" r="1.5" fill="#8E2DE2" opacity="0.7" />
+      </G>
+    </Svg>
+  ),
+  
+  rainbow: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 20">
+      <G>
+        {/* Left rainbow eye */}
+        <Circle cx="15" cy="10" r="8" fill="#FF0000" />
+        <Circle cx="15" cy="10" r="6" fill="#FFA500" />
+        <Circle cx="15" cy="10" r="4" fill="#FFFF00" />
+        <Circle cx="15" cy="10" r="2" fill="#00FF00" />
+        {/* Right rainbow eye */}
+        <Circle cx="45" cy="10" r="8" fill="#FF0000" />
+        <Circle cx="45" cy="10" r="6" fill="#FFA500" />
+        <Circle cx="45" cy="10" r="4" fill="#FFFF00" />
+        <Circle cx="45" cy="10" r="2" fill="#00FF00" />
+      </G>
+    </Svg>
+  ),
 };
 
 // MOUTHS
@@ -277,6 +326,90 @@ export const Mouths = {
       </G>
     </Svg>
   ),
+  
+  thinking: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Mouth */}
+        <Path d="M 15 15 Q 25 18 35 15" stroke="#000" strokeWidth="2" fill="none" />
+        {/* Thought bubble */}
+        <Circle cx="50" cy="8" r="4" fill="#E0E0E0" stroke="#000" strokeWidth="1" />
+        <Circle cx="46" cy="14" r="2" fill="#E0E0E0" stroke="#000" strokeWidth="1" />
+        <Circle cx="43" cy="18" r="1.5" fill="#E0E0E0" stroke="#000" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
+  
+  yawn: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Wide open yawning mouth */}
+        <Ellipse cx="30" cy="18" rx="18" ry="12" fill="#000" />
+        <Ellipse cx="30" cy="16" rx="16" ry="9" fill="#FF6B9D" />
+        {/* Uvula */}
+        <Ellipse cx="30" cy="12" rx="3" ry="6" fill="#FF1493" />
+      </G>
+    </Svg>
+  ),
+  
+  whistle: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Puckered lips */}
+        <Ellipse cx="25" cy="15" rx="8" ry="6" fill="#FF6B9D" />
+        {/* Musical notes */}
+        <Circle cx="40" cy="10" r="3" fill="#000" />
+        <Path d="M 43 10 L 43 5" stroke="#000" strokeWidth="2" />
+        <Circle cx="48" cy="8" r="2.5" fill="#000" />
+        <Path d="M 50.5 8 L 50.5 4" stroke="#000" strokeWidth="1.5" />
+      </G>
+    </Svg>
+  ),
+  
+  vampire: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Mouth with fangs */}
+        <Path d="M 10 12 Q 30 22 50 12" stroke="#000" strokeWidth="3" fill="none" />
+        {/* Left fang */}
+        <Path d="M 20 12 L 18 20 L 22 12 Z" fill="#FFFFFF" stroke="#000" strokeWidth="1" />
+        {/* Right fang */}
+        <Path d="M 40 12 L 38 20 L 42 12 Z" fill="#FFFFFF" stroke="#000" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
+  
+  zipper: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Zipper line */}
+        <Path d="M 15 15 L 45 15" stroke="#000" strokeWidth="3" />
+        {/* Zipper teeth */}
+        <Rect x="18" y="13" width="3" height="4" fill="#C0C0C0" />
+        <Rect x="23" y="13" width="3" height="4" fill="#C0C0C0" />
+        <Rect x="28" y="13" width="3" height="4" fill="#C0C0C0" />
+        <Rect x="33" y="13" width="3" height="4" fill="#C0C0C0" />
+        <Rect x="38" y="13" width="3" height="4" fill="#C0C0C0" />
+        {/* Zipper pull */}
+        <Circle cx="48" cy="15" r="4" fill="#FFD700" stroke="#000" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
+  
+  robot: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 60 30">
+      <G>
+        {/* Robot grill */}
+        <Rect x="15" y="10" width="30" height="12" fill="#C0C0C0" stroke="#000" strokeWidth="2" rx="2" />
+        {/* Grill lines */}
+        <Path d="M 20 12 L 20 20" stroke="#000" strokeWidth="1" />
+        <Path d="M 25 12 L 25 20" stroke="#000" strokeWidth="1" />
+        <Path d="M 30 12 L 30 20" stroke="#000" strokeWidth="1" />
+        <Path d="M 35 12 L 35 20" stroke="#000" strokeWidth="1" />
+        <Path d="M 40 12 L 40 20" stroke="#000" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
 };
 
 // HAIR STYLES
@@ -330,6 +463,77 @@ export const Hair = {
     <Svg width={size} height={size} viewBox="0 0 100 60">
       {/* No hair - just returns empty */}
       <G />
+    </Svg>
+  ),
+  
+  pixie: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <Path
+        d="M 15 50 Q 15 15 50 10 Q 85 15 85 50"
+        fill={color}
+        stroke={color}
+        strokeWidth="2"
+      />
+    </Svg>
+  ),
+  
+  bob: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 70">
+      <Path
+        d="M 10 50 Q 10 10 50 5 Q 90 10 90 50 L 85 65 Q 50 70 15 65 Z"
+        fill={color}
+        stroke={color}
+        strokeWidth="2"
+      />
+    </Svg>
+  ),
+  
+  mohawk: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <Path
+        d="M 40 50 L 45 5 L 50 0 L 55 5 L 60 50"
+        fill={color}
+        stroke={color}
+        strokeWidth="3"
+      />
+    </Svg>
+  ),
+  
+  afro: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <Circle cx="50" cy="40" r="40" fill={color} />
+    </Svg>
+  ),
+  
+  ponytail: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        <Ellipse cx="50" cy="10" rx="15" ry="25" fill={color} />
+      </G>
+    </Svg>
+  ),
+  
+  braids: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        <Path d="M 25 50 Q 20 60 25 70" stroke={color} strokeWidth="8" fill="none" />
+        <Path d="M 75 50 Q 80 60 75 70" stroke={color} strokeWidth="8" fill="none" />
+      </G>
+    </Svg>
+  ),
+  
+  dreadlocks: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        <Path d="M 20 50 L 15 75" stroke={color} strokeWidth="6" />
+        <Path d="M 35 50 L 30 75" stroke={color} strokeWidth="6" />
+        <Path d="M 50 50 L 50 75" stroke={color} strokeWidth="6" />
+        <Path d="M 65 50 L 70 75" stroke={color} strokeWidth="6" />
+        <Path d="M 80 50 L 85 75" stroke={color} strokeWidth="6" />
+      </G>
     </Svg>
   ),
 };
@@ -395,6 +599,142 @@ export const Accessories = {
         <Rect x="10" y="40" width="15" height="25" rx="5" fill="#000" />
         {/* Right cup */}
         <Rect x="75" y="40" width="15" height="25" rx="5" fill="#000" />
+      </G>
+    </Svg>
+  ),
+  
+  cap: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Ellipse cx="50" cy="25" rx="40" ry="6" fill="#FF4757" />
+        <Path d="M 20 25 Q 20 10 50 5 Q 80 10 80 25" fill="#FF6B6B" />
+        <Ellipse cx="85" cy="25" rx="8" ry="4" fill="#FF4757" />
+      </G>
+    </Svg>
+  ),
+  
+  beanie: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Path d="M 15 30 Q 15 10 50 5 Q 85 10 85 30" fill="#4ECDC4" stroke="#45B7AF" strokeWidth="2" />
+        <Circle cx="50" cy="5" r="4" fill="#45B7AF" />
+      </G>
+    </Svg>
+  ),
+  
+  visor: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 30">
+      <G>
+        <Path d="M 20 15 Q 50 10 80 15" stroke="#000" strokeWidth="3" fill="none" />
+        <Path d="M 15 15 Q 30 20 50 18 Q 70 20 85 15" fill="rgba(0,0,0,0.5)" />
+      </G>
+    </Svg>
+  ),
+  
+  mask: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Path d="M 20 20 Q 50 10 80 20 L 75 30 Q 50 35 25 30 Z" fill="#9B59B6" stroke="#8E44AD" strokeWidth="2" />
+        <Ellipse cx="35" cy="20" rx="8" ry="6" fill="#000" />
+        <Ellipse cx="65" cy="20" rx="8" ry="6" fill="#000" />
+      </G>
+    </Svg>
+  ),
+  
+  earrings: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Circle cx="20" cy="25" r="5" fill="#FFD700" stroke="#FFA500" strokeWidth="1" />
+        <Circle cx="80" cy="25" r="5" fill="#FFD700" stroke="#FFA500" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
+  
+  necklace: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <G>
+        <Path d="M 30 10 Q 50 20 70 10" stroke="#FFD700" strokeWidth="3" fill="none" />
+        <Circle cx="50" cy="22" r="6" fill="#FFD700" stroke="#FFA500" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
+  
+  scarf: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <G>
+        <Path d="M 20 20 Q 50 30 80 20 L 75 40 Q 50 50 25 40 Z" fill="#E74C3C" stroke="#C0392B" strokeWidth="2" />
+        <Path d="M 30 25 L 70 25" stroke="#C0392B" strokeWidth="1" />
+        <Path d="M 30 35 L 70 35" stroke="#C0392B" strokeWidth="1" />
+      </G>
+    </Svg>
+  ),
+  
+  tiara: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Path d="M 20 30 L 30 10 L 40 25 L 50 5 L 60 25 L 70 10 L 80 30" stroke="#FFD700" strokeWidth="3" fill="none" />
+        <Circle cx="30" cy="10" r="3" fill="#FF69B4" />
+        <Circle cx="50" cy="5" r="4" fill="#FF69B4" />
+        <Circle cx="70" cy="10" r="3" fill="#FF69B4" />
+      </G>
+    </Svg>
+  ),
+  
+  monocle: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Circle cx="65" cy="20" r="12" fill="none" stroke="#FFD700" strokeWidth="2" />
+        <Circle cx="65" cy="20" r="10" fill="rgba(255,255,255,0.2)" />
+        <Path d="M 53 20 L 40 25" stroke="#FFD700" strokeWidth="2" />
+      </G>
+    </Svg>
+  ),
+  
+  goggles: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Circle cx="30" cy="20" r="14" fill="#8B4513" stroke="#654321" strokeWidth="2" />
+        <Circle cx="30" cy="20" r="11" fill="rgba(139,69,19,0.5)" />
+        <Path d="M 44 20 L 56 20" stroke="#654321" strokeWidth="3" />
+        <Circle cx="70" cy="20" r="14" fill="#8B4513" stroke="#654321" strokeWidth="2" />
+        <Circle cx="70" cy="20" r="11" fill="rgba(139,69,19,0.5)" />
+      </G>
+    </Svg>
+  ),
+  
+  halo: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 30">
+      <G>
+        <Ellipse cx="50" cy="15" rx="30" ry="8" fill="none" stroke="#FFD700" strokeWidth="4" opacity="0.8" />
+        <Ellipse cx="50" cy="15" rx="28" ry="6" fill="#FFFF00" opacity="0.3" />
+      </G>
+    </Svg>
+  ),
+  
+  horns: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Path d="M 25 30 Q 20 20 15 10 Q 12 5 10 10 Q 15 15 20 25 Q 23 30 25 30" fill="#8B0000" stroke="#660000" strokeWidth="2" />
+        <Path d="M 75 30 Q 80 20 85 10 Q 88 5 90 10 Q 85 15 80 25 Q 77 30 75 30" fill="#8B0000" stroke="#660000" strokeWidth="2" />
+      </G>
+    </Svg>
+  ),
+  
+  bandana: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Path d="M 15 25 Q 50 15 85 25" fill="#FF6B6B" stroke="#FF4757" strokeWidth="2" />
+        <Path d="M 85 25 L 95 20 L 90 30" fill="#FF4757" />
+      </G>
+    </Svg>
+  ),
+  
+  bow: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Path d="M 30 20 Q 25 10 20 15 Q 25 20 30 20" fill="#FF69B4" stroke="#FF1493" strokeWidth="1" />
+        <Path d="M 70 20 Q 75 10 80 15 Q 75 20 70 20" fill="#FF69B4" stroke="#FF1493" strokeWidth="1" />
+        <Circle cx="50" cy="20" r="6" fill="#FF1493" />
       </G>
     </Svg>
   ),
