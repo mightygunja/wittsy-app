@@ -48,6 +48,37 @@ import { GameEndSummary } from '../components/game/GameEndSummary';
 import { StarCelebration } from '../components/game/StarCelebration';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
 import { updatePlayerRating, updateMultiplayerRatings, RatingUpdate } from '../services/eloRatingService';
+import { doc as firestoreDoc, setDoc } from 'firebase/firestore';
+
+// Helper function to save match history
+const saveMatchHistory = async (
+  userId: string,
+  matchData: {
+    roomId: string;
+    roomName: string;
+    won: boolean;
+    score: number;
+    stars: number;
+    totalVotes: number;
+    roundsWon: number;
+    playerCount: number;
+    isRanked: boolean;
+    bestPhrase?: string;
+    xpEarned: number;
+    leveledUp: boolean;
+    playedAt: Date;
+    prompt?: string;
+  }
+): Promise<void> => {
+  const matchId = `${userId}_${matchData.roomId}_${Date.now()}`;
+  const matchRef = firestoreDoc(firestore, 'matches', matchId);
+  
+  await setDoc(matchRef, {
+    userId,
+    ...matchData,
+    createdAt: matchData.playedAt.toISOString(),
+  });
+};
 
 // Helper function to advance game phase
 const advancePhase = async (roomId: string) => {
@@ -102,6 +133,11 @@ const GameRoomScreen: React.FC = () => {
   const { roomId } = route.params;
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
+  
+  // Debug logging for roomId
+  console.log('🎮 GameRoomScreen loaded with roomId:', roomId);
+  console.log('🎮 RoomId type:', typeof roomId);
+  console.log('🎮 RoomId length:', roomId?.length);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -168,14 +204,28 @@ const GameRoomScreen: React.FC = () => {
         'game_end'
       );
 
-      // Prepare final scores
+      // Prepare final scores with phrase data
       const scores = room.players.map((player) => {
         const playerScore = room.scores?.[player.userId];
         const totalVotes = typeof playerScore === 'object' ? (playerScore.totalVotes || 0) : 0;
+        const phrases = typeof playerScore === 'object' ? (playerScore.phrases || []) : [];
+        
+        // Find best phrase (highest votes)
+        let bestPhrase = '';
+        let maxVotes = 0;
+        for (const phrase of phrases) {
+          if (phrase.votes > maxVotes) {
+            maxVotes = phrase.votes;
+            bestPhrase = phrase.text;
+          }
+        }
+        
         return {
           userId: player.userId,
           username: player.username,
           score: totalVotes,
+          bestPhrase,
+          phrases,
         };
       });
 
@@ -230,6 +280,42 @@ const GameRoomScreen: React.FC = () => {
           }
         } catch (error) {
           console.error('Failed to update ELO ratings:', error);
+        }
+      }
+
+      // Save match history for all players (for starred phrases)
+      const winnerId = sortedScores[0]?.userId;
+      
+      // Grant game win XP to the winner
+      if (winnerId) {
+        await rewards.grantGameWinRewards(winnerId);
+      }
+      
+      for (const player of scores) {
+        try {
+          const playerScore = room.scores?.[player.userId];
+          const stars = typeof playerScore === 'object' ? (playerScore.stars || 0) : 0;
+          const roundWins = typeof playerScore === 'object' ? (playerScore.roundWins || 0) : 0;
+          
+          // Save to matches collection
+          await saveMatchHistory(player.userId, {
+            roomId: room.roomId,
+            roomName: room.name,
+            won: player.userId === winnerId,
+            score: player.score,
+            stars,
+            totalVotes: player.score,
+            roundsWon: roundWins,
+            playerCount: room.players.length,
+            isRanked: room.isRanked || false,
+            bestPhrase: player.bestPhrase,
+            xpEarned: 0,
+            leveledUp: false,
+            playedAt: new Date(),
+            prompt: typeof room.currentPrompt === 'string' ? room.currentPrompt : room.currentPrompt?.text,
+          });
+        } catch (error) {
+          console.error(`Failed to save match history for ${player.userId}:`, error);
         }
       }
 
@@ -597,11 +683,12 @@ const GameRoomScreen: React.FC = () => {
   const handleStartGame = async () => {
     if (!room) return;
     
-    // Allow auto-start for ranked games, otherwise require host
+    // Ranked games can only auto-start (no manual start)
+    // Casual games require host to manually start
     if (!room.isRanked && room.hostId !== user?.uid) return;
 
-    // For casual games, allow 1 player for testing. For ranked, require 3.
-    const minPlayers = room.isRanked ? 3 : 1;
+    // Both casual and ranked games require 3 players
+    const minPlayers = 3;
     if (room.players.length < minPlayers) {
       Alert.alert('Error', `Need at least ${minPlayers} players to start`);
       return;
@@ -689,20 +776,24 @@ const GameRoomScreen: React.FC = () => {
     if (!room) return;
 
     try {
-      const roomCode = roomId.substring(0, 6).toUpperCase();
-      const inviteUrl = `https://wittz.app/room/${roomId}`;
+      // Use 6-digit room code for manual entry
+      const roomCode = room.roomCode;
+      const inviteUrl = `https://wittz.app/room/${roomId}?code=${roomCode}`;
+      const shareMessage = `🎮 Join my Wittz game room!\n\nTap to join: ${inviteUrl}\n\nOr use room code: ${roomCode}`;
       
-      // Create share message with clickable link and room code fallback
-      const message = `🎮 Join my Wittz game room!\n\n📝 Room: ${room.name}\n👥 Players: ${room.players.length}/${room.settings.maxPlayers}\n🔑 Room Code: ${roomCode}\n\n👉 Tap to join: ${inviteUrl}`;
-
-      const result = await Share.share({
-        message: message,
-        title: '🎮 Join my Wittz game!',
+      console.log('📤 ========== SHARE DEBUG ==========');
+      console.log('📤 Room object:', JSON.stringify(room, null, 2));
+      console.log('📤 Room ID from params:', roomId);
+      console.log('📤 Room ID from room object:', room.roomId);
+      console.log('📤 Room code from room object:', room.roomCode);
+      console.log('📤 Room name:', room.name);
+      console.log('📤 Final URL:', inviteUrl);
+      console.log('📤 ==================================');
+      
+      await Share.share({
+        message: shareMessage,
+        url: inviteUrl,
       });
-
-      if (result.action === Share.sharedAction) {
-        console.log('Invite shared successfully');
-      }
     } catch (error) {
       console.error('Error sharing invite:', error);
       Alert.alert('Error', 'Failed to share invite');
@@ -1034,7 +1125,7 @@ const GameRoomScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.roomName}>{room.name}</Text>
-          <Text style={styles.roomCode}>Room ID: {roomId.substring(0, 6).toUpperCase()}</Text>
+          <Text style={styles.roomCode}>Room ID: {room.roomCode}</Text>
         </View>
         
         {gameState && settings.gameplay.showTimer && (
@@ -1181,7 +1272,7 @@ const GameRoomScreen: React.FC = () => {
                 <Button
                   title="START GAME"
                   onPress={handleStartGame}
-                  disabled={room.players.length < (room.isRanked ? 3 : 1)}
+                  disabled={room.players.length < 3}
                   size="lg"
                   variant="primary"
                   style={styles.startButton}

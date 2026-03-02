@@ -122,66 +122,45 @@ export const AvatarShopScreen: React.FC<{
       return;
     }
 
-    // Improvement #3: Add purchase confirmation dialog
-    Alert.alert(
-      'Confirm Purchase',
-      `Purchase "${item.name}" for ${coinPrice} coins?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Purchase',
-          onPress: async () => {
-            haptics.medium();
-            setPurchasing(item.id);
+    haptics.medium();
+    setPurchasing(item.id);
 
-            try {
-              const success = await avatarService.purchaseItem(user.uid, item.id, coinPrice);
-              
-              if (!success) {
-                haptics.error();
-                Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
-                return;
-              }
-              
-              // Improvement #2: Refresh coins BEFORE UI updates
-              await refreshUserProfile();
-              
-              // Update local state after coin refresh
-              setUnlockedItems(prev => [...prev, item.id]);
-              setShopItems(prev => prev.filter(i => i.id !== item.id));
-              
-              haptics.success();
-              
-              Alert.alert(
-                '🎉 Purchase Successful!',
-                `You unlocked "${item.name}"! Check it out in the Avatar Creator.`,
-                [
-                  { text: 'OK' },
-                  {
-                    text: 'Go to Avatar Creator',
-                    onPress: () => navigation.navigate('AvatarCreator'),
-                  },
-                ]
-              );
-
-              analytics.logEvent('avatar_item_purchased', {
-                item_id: item.id,
-                item_name: item.name,
-                category: item.category,
-                rarity: item.rarity,
-                price: coinPrice,
-              });
-            } catch (error) {
-              console.error('Purchase failed:', error);
-              haptics.error();
-              Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
-            } finally {
-              setPurchasing(null);
-            }
+    try {
+      await avatarService.purchaseItem(user.uid, item.id, coinPrice);
+      
+      setUnlockedItems(prev => [...prev, item.id]);
+      setShopItems(prev => prev.filter(i => i.id !== item.id));
+      
+      await refreshUserProfile();
+      
+      haptics.success();
+      
+      Alert.alert(
+        '🎉 Purchase Successful!',
+        `You unlocked "${item.name}"! Check it out in the Avatar Creator.`,
+        [
+          { text: 'OK' },
+          {
+            text: 'Go to Avatar Creator',
+            onPress: () => navigation.navigate('AvatarCreator'),
           },
-        },
-      ]
-    );
+        ]
+      );
+
+      analytics.logEvent('avatar_item_purchased', {
+        item_id: item.id,
+        item_name: item.name,
+        category: item.category,
+        rarity: item.rarity,
+        price: coinPrice,
+      });
+    } catch (error) {
+      console.error('Purchase failed:', error);
+      haptics.error();
+      Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
+    } finally {
+      setPurchasing(null);
+    }
   }, [user, userCoins, unlockedItems, navigation, refreshUserProfile]);
 
   const getFilteredAndSortedItems = (items: AvatarItem[]) => {

@@ -25,9 +25,10 @@ import { useAuth } from '../hooks/useAuth';
 import { avatarService } from '../services/avatarService';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
+import { firestore } from '../services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { SPACING, RADIUS, SHADOWS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
-import { BackButton } from '../components/common/BackButton';;
 import {
   AvatarConfig,
   AvatarCategory,
@@ -93,6 +94,23 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Real-time listener for unlocked items (detects purchases from Avatar Shop)
+  useEffect(() => {
+    if (!user) return;
+
+    const avatarRef = doc(firestore, 'avatars', user.uid);
+    const unsubscribe = onSnapshot(avatarRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        const newUnlockedItems = data?.unlockedItems || [];
+        console.log('🔄 Avatar unlocked items updated:', newUnlockedItems.length);
+        setUnlockedItems(newUnlockedItems);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const loadAvatar = async () => {
     if (!user) return;
@@ -293,9 +311,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
       
       await avatarService.updateAvatarConfig(user.uid, configWithPositions);
       haptics.success();
-      Alert.alert('Success', 'Avatar saved!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      navigation.goBack();
     } catch (error) {
       console.error('Failed to save avatar:', error);
       haptics.error();
@@ -304,6 +320,23 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
       setSaving(false);
     }
   };
+
+  // Set Save button in navigation header
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saving}
+          style={{ marginRight: 15, opacity: saving ? 0.5 : 1 }}
+        >
+          <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>
+            {saving ? 'Saving...' : 'Save'}
+          </Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, saving, handleSave]);
 
   const handleItemSelect = (category: AvatarCategory, itemId: string) => {
     if (!config) return;
@@ -477,21 +510,6 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <BackButton onPress={() => navigation.goBack()} />
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Avatar Creator</Text>
-            <Text style={styles.headerSubtitle}>Customize your look</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.saveButtonHeader, saving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            <Text style={styles.saveButtonText}>{saving ? '...' : '✓'}</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Avatar Canvas */}
         <View style={styles.canvasSection}>
@@ -740,65 +758,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 16,
     color: COLORS.text,
     fontWeight: '600',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    ...SHADOWS.sm,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: COLORS.text,
-    fontWeight: '600',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  saveButtonHeader: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.md,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    fontSize: 24,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
   },
   canvasSection: {
     paddingHorizontal: SPACING.lg,

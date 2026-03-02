@@ -13,6 +13,8 @@ class AudioService {
   private areSFXEnabled: boolean = true;
   private musicVolume: number = 0.5;
   private sfxVolume: number = 0.7;
+  private masterVolume: number = 1.0;
+  private muteAll: boolean = false;
   private isInitialized: boolean = false;
 
   async initialize() {
@@ -49,6 +51,8 @@ class AudioService {
         this.areSFXEnabled = parsed.enableSFX ?? true;
         this.musicVolume = parsed.musicVolume ?? 0.5;
         this.sfxVolume = parsed.sfxVolume ?? 0.7;
+        this.masterVolume = parsed.masterVolume ?? 1.0;
+        this.muteAll = parsed.muteAll ?? false;
       }
     } catch (error) {
       console.error('Failed to load audio settings:', error);
@@ -85,7 +89,7 @@ class AudioService {
   }
 
   async playBackgroundMusic() {
-    if (!this.isMusicEnabled) return;
+    if (!this.isMusicEnabled || this.muteAll) return;
 
     try {
       // Stop existing music if playing
@@ -100,7 +104,7 @@ class AudioService {
           require('../../assets/audio/background-music.mp3'),
           {
             isLooping: true,
-            volume: this.musicVolume,
+            volume: this.musicVolume * this.masterVolume,
           }
         );
 
@@ -150,7 +154,7 @@ class AudioService {
   }
 
   async playSoundEffect(effectName: string) {
-    if (!this.areSFXEnabled) return;
+    if (!this.areSFXEnabled || this.muteAll) return;
 
     const sound = this.soundEffects.get(effectName);
     if (sound) {
@@ -213,7 +217,7 @@ class AudioService {
 
     if (this.backgroundMusic) {
       try {
-        await this.backgroundMusic.setVolumeAsync(this.musicVolume);
+        await this.backgroundMusic.setVolumeAsync(this.musicVolume * this.masterVolume);
       } catch (error) {
         console.error('Failed to set music volume:', error);
       }
@@ -227,9 +231,47 @@ class AudioService {
     // Update all sound effects volume
     for (const sound of this.soundEffects.values()) {
       try {
-        await sound.setVolumeAsync(this.sfxVolume);
+        await sound.setVolumeAsync(this.sfxVolume * this.masterVolume);
       } catch (error) {
         console.error('Failed to set SFX volume:', error);
+      }
+    }
+  }
+
+  async setMasterVolume(volume: number) {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    await this.saveSettings();
+
+    // Update music volume
+    if (this.backgroundMusic) {
+      try {
+        await this.backgroundMusic.setVolumeAsync(this.musicVolume * this.masterVolume);
+      } catch (error) {
+        console.error('Failed to set music volume:', error);
+      }
+    }
+
+    // Update all sound effects volume
+    for (const sound of this.soundEffects.values()) {
+      try {
+        await sound.setVolumeAsync(this.sfxVolume * this.masterVolume);
+      } catch (error) {
+        console.error('Failed to set SFX volume:', error);
+      }
+    }
+  }
+
+  async setMuteAll(muted: boolean) {
+    this.muteAll = muted;
+    await this.saveSettings();
+
+    if (muted) {
+      // Stop all audio
+      await this.stopBackgroundMusic();
+    } else {
+      // Resume music if enabled
+      if (this.isMusicEnabled) {
+        await this.playBackgroundMusic();
       }
     }
   }
@@ -241,6 +283,8 @@ class AudioService {
         enableSFX: this.areSFXEnabled,
         musicVolume: this.musicVolume,
         sfxVolume: this.sfxVolume,
+        masterVolume: this.masterVolume,
+        muteAll: this.muteAll,
       };
       await AsyncStorage.setItem('audioSettings', JSON.stringify(settings));
     } catch (error) {
@@ -278,6 +322,14 @@ class AudioService {
 
   getSFXVolume() {
     return this.sfxVolume;
+  }
+
+  getMasterVolume() {
+    return this.masterVolume;
+  }
+
+  getMuteAll() {
+    return this.muteAll;
   }
 }
 

@@ -8,20 +8,30 @@ import { DeepLinkConfig, DeepLinkURL, DEEP_LINK_SCHEMES, DEEP_LINK_PATHS } from 
 
 class DeepLinkingService {
   private listeners: ((config: DeepLinkConfig) => void)[] = [];
+  private pendingDeepLink: DeepLinkConfig | null = null;
 
   /**
    * Initialize deep linking
    */
   async initialize(navigationRef: any): Promise<void> {
     try {
+      console.log('🔗 Initializing deep linking');
+      console.log('🔗 Navigation ref available:', !!navigationRef?.current);
+      
       // Get initial URL (if app was opened via deep link)
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) {
+        console.log('📱 Initial deep link URL:', initialUrl);
+        console.log('📱 Navigation ref at initial URL:', !!navigationRef?.current);
         this.handleDeepLink(initialUrl, navigationRef);
+      } else {
+        console.log('📱 No initial deep link URL');
       }
 
       // Listen for deep links while app is running
       Linking.addEventListener('url', (event) => {
+        console.log('📱 Deep link received:', event.url);
+        console.log('📱 Navigation ref at event:', !!navigationRef?.current);
         this.handleDeepLink(event.url, navigationRef);
       });
     } catch (error) {
@@ -40,12 +50,17 @@ class DeepLinkingService {
       const config = this.urlToConfig(parsed);
       if (!config) return;
 
+      console.log('🔗 Deep link config:', config);
+
       // Notify listeners
       this.notifyListeners(config);
 
-      // Navigate
+      // Navigate if ready, otherwise store for later
       if (navigationRef?.current) {
         this.navigate(navigationRef, config);
+      } else {
+        console.log('⏳ Navigation not ready, storing pending deep link');
+        this.pendingDeepLink = config;
       }
     } catch (error) {
       console.error('Failed to handle deep link:', error);
@@ -58,6 +73,14 @@ class DeepLinkingService {
   private parseDeepLink(url: string): DeepLinkURL | null {
     try {
       const { scheme, hostname, path, queryParams } = Linking.parse(url);
+      
+      console.log('🔍 Parsing deep link:', {
+        url,
+        scheme,
+        hostname,
+        path,
+        queryParams
+      });
 
       return {
         url,
@@ -79,18 +102,26 @@ class DeepLinkingService {
     const path = parsed.path;
     const params = parsed.queryParams;
 
+    console.log('🎯 Matching path:', path);
+    console.log('🎯 Scheme:', parsed.scheme);
+    console.log('🎯 Hostname:', parsed.hostname);
+
     // Match path to screen
     if (path === '/' || path === '/home') {
+      console.log('✅ Matched: Home');
       return { screen: 'Home' };
     }
 
-    if (path.startsWith('/game/')) {
-      const roomId = path.split('/game/')[1];
+    // Handle both /game/ and /room/ paths
+    if (path.startsWith('/game/') || path.startsWith('game/')) {
+      const roomId = path.replace(/^\/?(game|room)\//, '');
+      console.log('✅ Matched: GameRoom with roomId:', roomId);
       return { screen: 'GameRoom', params: { roomId } };
     }
 
-    if (path.startsWith('/room/')) {
-      const roomId = path.split('/room/')[1];
+    if (path.startsWith('/room/') || path.startsWith('room/')) {
+      const roomId = path.replace(/^\/?(game|room)\//, '');
+      console.log('✅ Matched: GameRoom with roomId:', roomId);
       return { screen: 'GameRoom', params: { roomId } };
     }
 
@@ -136,13 +167,29 @@ class DeepLinkingService {
    */
   private navigate(navigationRef: any, config: DeepLinkConfig) {
     try {
+      console.log('🚀 NAVIGATING NOW to:', config.screen, 'with params:', config.params);
+      console.log('🚀 Navigation ref current:', !!navigationRef?.current);
+      
       if (config.params) {
         navigationRef.current?.navigate(config.screen, config.params);
+        console.log('✅ Navigation called with params');
       } else {
         navigationRef.current?.navigate(config.screen);
+        console.log('✅ Navigation called without params');
       }
     } catch (error) {
-      console.error('Failed to navigate:', error);
+      console.error('❌ Failed to navigate:', error);
+    }
+  }
+
+  /**
+   * Handle pending deep link (call after authentication)
+   */
+  handlePendingDeepLink(navigationRef: any) {
+    if (this.pendingDeepLink && navigationRef?.current) {
+      console.log('✅ Handling pending deep link:', this.pendingDeepLink);
+      this.navigate(navigationRef, this.pendingDeepLink);
+      this.pendingDeepLink = null;
     }
   }
 
@@ -283,6 +330,7 @@ export const deepLinkingService = new DeepLinkingService();
 // Export convenience functions
 export const deepLinking = {
   initialize: (navigationRef: any) => deepLinkingService.initialize(navigationRef),
+  handlePendingDeepLink: (navigationRef: any) => deepLinkingService.handlePendingDeepLink(navigationRef),
   addListener: (callback: (config: DeepLinkConfig) => void) =>
     deepLinkingService.addListener(callback),
   removeListener: (callback: (config: DeepLinkConfig) => void) =>

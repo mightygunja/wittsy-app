@@ -143,9 +143,7 @@ service cloud.firestore {
     match /promptSubmissions/{submissionId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && 
-        request.auth.uid == request.resource.data.submittedBy &&
-        isValidString(request.resource.data.content, 1, 200) &&
-        hasValidTimestamp();
+        request.auth.uid == request.resource.data.submittedBy;
       allow update: if isAdmin(); // Only admins can update (for moderation)
       allow delete: if isAdmin();
     }
@@ -344,6 +342,21 @@ service cloud.firestore {
     match /blockedUsers/{userId} {
       allow read: if isSignedIn() && isOwner(userId);
       allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // ==================== FEEDBACK ====================
+    
+    // User Feedback - users can submit, admins can read/update
+    match /feedback/{feedbackId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && 
+        request.auth.uid == request.resource.data.userId &&
+        isValidString(request.resource.data.title, 1, 100) &&
+        isValidString(request.resource.data.description, 1, 1000) &&
+        request.resource.data.type in ['bug', 'feature', 'improvement', 'other'] &&
+        hasValidTimestamp();
+      allow update: if isAdmin(); // Only admins can update status
+      allow delete: if isAdmin();
     }
     
     // ==================== ADMIN ONLY ====================

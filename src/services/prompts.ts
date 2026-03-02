@@ -144,6 +144,60 @@ export const getPromptsByCategory = async (
 };
 
 /**
+ * Get prompt counts by category
+ */
+export const getCategoryCounts = async (): Promise<Record<string, number>> => {
+  try {
+    const q = query(
+      collection(firestore, 'prompts'),
+      where('status', '==', 'active')
+    );
+    
+    const snapshot = await getDocs(q);
+    const counts: Record<string, number> = {};
+    
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const category = data.category || 'general';
+      counts[category] = (counts[category] || 0) + 1;
+    });
+    
+    return counts;
+  } catch (error) {
+    console.error('Error getting category counts:', error);
+    return {};
+  }
+};
+
+/**
+ * Get unique categories from prompts collection
+ */
+export const getActiveCategories = async (): Promise<PromptCategory[]> => {
+  try {
+    const q = query(
+      collection(firestore, 'prompts'),
+      where('status', '==', 'active')
+    );
+    
+    const snapshot = await getDocs(q);
+    const categories = new Set<PromptCategory>();
+    
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const category = data.category as PromptCategory;
+      if (category) {
+        categories.add(category);
+      }
+    });
+    
+    return Array.from(categories);
+  } catch (error) {
+    console.error('Error getting active categories:', error);
+    return [];
+  }
+};
+
+/**
  * Get all prompt packs
  */
 export const getPromptPacks = async (includeExpired: boolean = false): Promise<PromptPack[]> => {

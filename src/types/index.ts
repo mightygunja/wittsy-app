@@ -84,6 +84,7 @@ export interface UserSettings {
 // Room Types
 export interface Room {
   roomId: string;
+  roomCode: string;
   name: string;
   hostId: string;
   status: 'waiting' | 'active' | 'finished';

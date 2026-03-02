@@ -206,6 +206,7 @@ class MonetizationService {
 
       // Get available products
       const productIds = [
+        COIN_PRODUCTS.FIRST_TIME!,
         COIN_PRODUCTS.SMALL!,
         COIN_PRODUCTS.MEDIUM!,
         COIN_PRODUCTS.LARGE!,
@@ -266,7 +267,7 @@ class MonetizationService {
         await this.grantCoinsToUser(this.currentUserId, coinProduct.coins);
         console.log(`✅ Granted ${coinProduct.coins} coins to user ${this.currentUserId}`);
         
-        // Mark first-time purchase if applicable
+        // Mark first-time purchase if applicable and grant exclusive item
         if (coinProduct.firstTimeOnly) {
           const userRef = doc(firestore, 'users', this.currentUserId);
           await updateDoc(userRef, {
@@ -274,6 +275,11 @@ class MonetizationService {
             firstPurchaseDate: new Date().toISOString(),
           });
           console.log('✅ Marked first-time purchase');
+          
+          // Grant exclusive Founder's Glory Hair
+          const { avatarService } = await import('./avatarService');
+          await avatarService.unlockItem(this.currentUserId, 'hair_founder_gold', 'purchase');
+          console.log('✅ Granted exclusive Founder\'s Glory Hair');
         }
         
         await RNIap.finishTransaction({ purchase });

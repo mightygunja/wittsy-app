@@ -18,9 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
-import { BackButton } from '../components/common/BackButton';
 import { getUserStarredPhrases, getCommunityStarredPhrases, StarredPhrase } from '../services/starredPhrases';
-import { SPACING, RADIUS, SHADOWS } from '../utils/constants';
+import { SPACING, RADIUS } from '../utils/constants';
 import { haptics } from '../services/haptics';
 import { tabletHorizontalPadding } from '../utils/responsive';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
@@ -145,7 +144,7 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
             <View style={styles.userSection}>
               {phrase.userAvatar && (
                 <View style={styles.avatarContainer}>
-                  <AvatarDisplay avatar={phrase.userAvatar} size={32} />
+                  <AvatarDisplay config={phrase.userAvatar} size={32} />
                 </View>
               )}
               <View style={styles.userInfo}>
@@ -400,7 +399,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    ...SHADOWS.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   cardGradient: {
     padding: SPACING.lg,
@@ -531,21 +534,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.xl,
+    paddingHorizontal: SPACING.xl * 2,
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: SPACING.md,
+    fontSize: 72,
+    marginBottom: SPACING.lg,
+    opacity: 0.5,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
+    maxWidth: 300,
   },
   bottomPadding: {
     height: SPACING.xl,

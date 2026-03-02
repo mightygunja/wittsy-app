@@ -190,7 +190,7 @@ export const claimChallengeReward = async (
     updates.xp = increment(reward.xp);
   }
   if (reward.coins) {
-    updates['stats.coins'] = increment(reward.coins);
+    updates['coins'] = increment(reward.coins);
   }
 
   if (Object.keys(updates).length > 0) {

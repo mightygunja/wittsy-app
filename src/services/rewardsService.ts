@@ -17,10 +17,13 @@ export const REWARD_AMOUNTS = {
   CHALLENGE_COMPLETE: 100,
   LEVEL_UP: 100,
   
-  // XP
-  ROUND_WIN_XP: 100,
-  GAME_PARTICIPATION_XP: 50,
-  VOTE_RECEIVED_XP: 10,
+  // Battle Pass XP (Balanced for 100-200 XP per hour)
+  GAME_PARTICIPATION_XP: 10,  // Base XP for playing a game
+  GAME_WIN_XP: 25,             // Bonus XP for winning a game
+  ROUND_WIN_XP: 5,             // XP for winning a round
+  VOTE_RECEIVED_XP: 3,         // XP per vote received
+  DAILY_CHALLENGE_XP: 50,      // Daily challenge completion
+  WEEKLY_CHALLENGE_XP: 200,    // Weekly challenge completion
 };
 
 class RewardsService {
@@ -40,7 +43,7 @@ class RewardsService {
 
       // Update coins
       await updateDoc(userRef, {
-        'stats.coins': increment(amount)
+        coins: increment(amount)
       });
 
       // Track analytics
@@ -66,13 +69,27 @@ class RewardsService {
       // Grant coins
       await this.grantCoins(userId, REWARD_AMOUNTS.ROUND_WIN, 'round_win');
 
-      // Grant Battle Pass XP
+      // Grant Battle Pass XP (round win + votes)
       const xpAmount = REWARD_AMOUNTS.ROUND_WIN_XP + (voteCount * REWARD_AMOUNTS.VOTE_RECEIVED_XP);
       await battlePass.addXP(userId, xpAmount, 'round_win');
 
-      console.log(`✅ Round win rewards granted to ${userId}: ${REWARD_AMOUNTS.ROUND_WIN} coins, ${xpAmount} XP`);
+      console.log(`✅ Round win rewards granted to ${userId}: ${REWARD_AMOUNTS.ROUND_WIN} coins, ${xpAmount} XP (${REWARD_AMOUNTS.ROUND_WIN_XP} base + ${voteCount * REWARD_AMOUNTS.VOTE_RECEIVED_XP} from votes)`);
     } catch (error) {
       console.error('Failed to grant round win rewards:', error);
+    }
+  }
+
+  /**
+   * Grant rewards for winning a game
+   */
+  async grantGameWinRewards(userId: string): Promise<void> {
+    try {
+      // Grant Battle Pass XP for winning
+      await battlePass.addXP(userId, REWARD_AMOUNTS.GAME_WIN_XP, 'game_win');
+
+      console.log(`✅ Game win rewards granted to ${userId}: ${REWARD_AMOUNTS.GAME_WIN_XP} XP`);
+    } catch (error) {
+      console.error('Failed to grant game win rewards:', error);
     }
   }
 
@@ -213,6 +230,8 @@ export const rewards = {
     rewardsService.grantCoins(userId, amount, source),
   grantRoundWinRewards: (userId: string, voteCount: number) => 
     rewardsService.grantRoundWinRewards(userId, voteCount),
+  grantGameWinRewards: (userId: string) =>
+    rewardsService.grantGameWinRewards(userId),
   grantParticipationRewards: (userId: string) => 
     rewardsService.grantParticipationRewards(userId),
   grantDailyLoginReward: (userId: string) => 

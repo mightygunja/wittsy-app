@@ -11,6 +11,7 @@ export type AvatarCategory =
   | 'mouth'
   | 'hair'
   | 'facial_hair'
+  | 'face_paint'
   | 'accessories'
   | 'clothing'
   | 'background'
@@ -75,6 +76,7 @@ export interface AvatarConfig {
   mouth: string;
   hair: string;
   facialHair?: string;
+  facePaint?: string;
   accessories: string[];
   clothing: string;
   background: string;
@@ -391,3 +393,7 @@ export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
   background: 'bg_purple',
   effects: [],
 };
+
+// ==================== EXPORT EXPANDED ITEMS ====================
+// Re-export all expanded item collections for use in Avatar Shop
+export * from './avatar-items-expanded';

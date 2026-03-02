@@ -311,6 +311,49 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
+  const handleJoinByCode = () => {
+    Alert.prompt(
+      'Join Room',
+      'Enter the 6-digit room code:',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Join',
+          onPress: async (code?: string) => {
+            if (!code || code.trim().length === 0) {
+              Alert.alert('Invalid Code', 'Please enter a valid 6-digit room code');
+              return;
+            }
+            
+            const roomCode = code.trim().toUpperCase();
+            console.log('🔑 Attempting to join room with 6-digit code:', roomCode);
+            
+            try {
+              // Look up room by roomCode using dedicated function
+              const { getRoomByCode } = await import('../services/database');
+              const matchingRoom = await getRoomByCode(roomCode);
+              
+              if (matchingRoom) {
+                console.log('✅ Found room with code:', roomCode, 'Room ID:', matchingRoom.roomId);
+                await handleJoinRoom(matchingRoom.roomId);
+              } else {
+                console.error('❌ No room found with code:', roomCode);
+                Alert.alert('Room Not Found', `No active room found with code: ${roomCode}`);
+              }
+            } catch (error: any) {
+              console.error('❌ Error joining by code:', error);
+              Alert.alert('Error', 'Failed to join room. Please try again.');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
+  };
+
   const handleQuickMatch = async () => {
     if (!user?.uid || !userProfile?.username) {
       Alert.alert('Error', 'Please sign in to play');
@@ -538,6 +581,24 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </Card>
         </Animated.View>
 
+        {/* Join by Code - Thin Full Width Card */}
+        <Animated.View style={[{ opacity: fadeAnim, marginBottom: SPACING.lg }]}>
+          <Card variant="elevated">
+            <TouchableOpacity 
+              onPress={handleJoinByCode}
+              style={styles.joinByCodeCard}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.joinByCodeIcon}>🔑</Text>
+              <View style={styles.joinByCodeTextContainer}>
+                <Text style={styles.joinByCodeTitle}>Join by Room Code</Text>
+                <Text style={styles.joinByCodeSubtitle}>Enter 6-digit code from invite</Text>
+              </View>
+              <Text style={styles.joinByCodeArrow}>›</Text>
+            </TouchableOpacity>
+          </Card>
+        </Animated.View>
+
         {/* Secondary Features - Horizontal Scroll */}
         <Animated.View style={[styles.secondarySection, { opacity: fadeAnim }]}>
           <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>Explore</Text>
@@ -600,6 +661,32 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
             <TouchableOpacity 
               style={styles.secondaryCard}
+              onPress={() => navigation.navigate('CoinShop')}
+            >
+              <LinearGradient
+                colors={['#FFA726', '#F57C00']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>💰</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Coin Shop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('AvatarShop')}
+            >
+              <LinearGradient
+                colors={['#AB47BC', '#8E24AA']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>👤</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Shop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.secondaryCard}
               onPress={() => navigation.navigate('Challenges')}
             >
               <LinearGradient
@@ -634,32 +721,6 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               >
                 <Text style={styles.secondaryIcon}>👥</Text>
                 <Text style={styles.secondaryTitle} numberOfLines={0}>Friends</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('CoinShop')}
-            >
-              <LinearGradient
-                colors={['#FFA726', '#F57C00']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>💰</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Coin Shop</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('AvatarShop')}
-            >
-              <LinearGradient
-                colors={['#AB47BC', '#8E24AA']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>🎨</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Shop</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -1235,5 +1296,33 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 10,
     color: COLORS.text,
     fontWeight: '600',
+  },
+  joinByCodeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
+  },
+  joinByCodeIcon: {
+    fontSize: 20,
+  },
+  joinByCodeTextContainer: {
+    flex: 1,
+  },
+  joinByCodeTitle: {
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.base),
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+    lineHeight: getLineHeight(scaleFontSize(TYPOGRAPHY.fontSize.base)),
+  },
+  joinByCodeSubtitle: {
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.sm),
+    color: COLORS.textSecondary,
+    lineHeight: getLineHeight(scaleFontSize(TYPOGRAPHY.fontSize.sm)),
+  },
+  joinByCodeArrow: {
+    fontSize: 20,
+    color: COLORS.textTertiary,
   },
 });

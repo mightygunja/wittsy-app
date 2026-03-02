@@ -31,13 +31,17 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
       await audioService.setMusicEnabled(value);
     } else if (key === 'enableSFX') {
       await audioService.setSFXEnabled(value);
+    } else if (key === 'muteAll') {
+      await audioService.setMuteAll(value);
     }
     
-    audioService.playClick();
+    if (!value || key !== 'muteAll') {
+      audioService.playClick();
+    }
   };
 
   const handleVolumeChange = async (key: string, delta: number) => {
-    const currentVolume = settings.audio[key] || 50;
+    const currentVolume = (settings.audio[key as keyof typeof settings.audio] as number) || 50;
     const newVolume = Math.max(0, Math.min(100, currentVolume + delta));
     updateAudio({ [key]: newVolume });
     
@@ -45,6 +49,8 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
       await audioService.setMusicVolume(newVolume / 100);
     } else if (key === 'sfxVolume') {
       await audioService.setSFXVolume(newVolume / 100);
+    } else if (key === 'masterVolume') {
+      await audioService.setMasterVolume(newVolume / 100);
     }
     
     audioService.playClick();
@@ -54,13 +60,13 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
     { key: 'masterVolume', label: 'Master Volume', icon: '🔊' },
     { key: 'musicVolume', label: 'Music', icon: '🎵' },
     { key: 'sfxVolume', label: 'Sound Effects', icon: '🔔' },
-    { key: 'voiceVolume', label: 'Voice Chat', icon: '🎤' },
+    { key: 'voiceVolume', label: 'Voice Chat (Coming Soon)', icon: '🎤' },
   ];
 
   const toggleSettings = [
     { key: 'enableMusic', label: 'Enable Music', description: 'Background music during gameplay' },
     { key: 'enableSFX', label: 'Enable Sound Effects', description: 'Button clicks, notifications' },
-    { key: 'enableVoice', label: 'Enable Voice Chat', description: 'In-game voice communication' },
+    { key: 'enableVoice', label: 'Enable Voice Chat', description: 'In-game voice communication (Coming Soon)' },
     { key: 'enableVibration', label: 'Enable Vibration', description: 'Haptic feedback' },
   ];
 
@@ -85,7 +91,7 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
               </View>
               <Switch
                 value={settings.audio.muteAll}
-                onValueChange={(value) => updateAudio({ muteAll: value })}
+                onValueChange={(value) => handleToggle('muteAll', value)}
                 trackColor={{ false: COLORS.border, true: COLORS.error }}
                 thumbColor={COLORS.surface}
               />

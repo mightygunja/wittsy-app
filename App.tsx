@@ -18,6 +18,12 @@ export default function App() {
   const navigationRef = useRef(null);
 
   useEffect(() => {
+    console.log('🚀 APP STARTING - VERSION WITH JOIN ROOM CARD FEATURE');
+    console.log('📱 Running in Expo Go:', isExpoGo());
+    
+    // Make navigation ref available globally for push notifications
+    (global as any).navigationRef = navigationRef;
+    
     // Initialize all services
     const initializeServices = async () => {
       try {

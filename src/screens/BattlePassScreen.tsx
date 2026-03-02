@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { battlePass } from '../services/battlePassService';
+import { getCurrentSeason } from '../services/seasons';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { BackButton } from '../components/common/BackButton';
@@ -26,6 +27,8 @@ import { SPACING, RADIUS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
 import { UserBattlePass, BattlePassStats, BattlePassReward } from '../types/battlePass';
 import { contentWidth, tabletHorizontalPadding } from '../utils/responsive';
+import { BattlePassInfoModal } from '../components/battlepass/BattlePassInfoModal';
+import { XPSourcesCard } from '../components/battlepass/XPSourcesCard';
 
 const width = contentWidth;
 const REWARD_CARD_WIDTH = 120;
@@ -39,6 +42,8 @@ export const BattlePassScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const [claiming, setClaiming] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [premiumPercentage, setPremiumPercentage] = useState<number>(0);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [rankedSeasonName, setRankedSeasonName] = useState<string>('Season 1: Launch');
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -49,6 +54,7 @@ const scrollViewRef = useRef<ScrollView>(null);
   useEffect(() => {
     loadBattlePass();
     loadPremiumStats();
+    loadRankedSeasonName();
     analytics.screenView('BattlePass');
 
     Animated.timing(fadeAnim, {
@@ -110,6 +116,17 @@ const scrollViewRef = useRef<ScrollView>(null);
       setPremiumPercentage(23); // 23% of players have premium
     } catch (error) {
       console.error('Failed to load premium stats:', error);
+    }
+  };
+
+  const loadRankedSeasonName = async () => {
+    try {
+      const rankedSeason = await getCurrentSeason();
+      if (rankedSeason) {
+        setRankedSeasonName(rankedSeason.name);
+      }
+    } catch (error) {
+      console.error('Failed to load ranked season:', error);
     }
   };
 
@@ -291,12 +308,24 @@ const scrollViewRef = useRef<ScrollView>(null);
 
     const isPremiumReward = userBP.isPremium && reward.premium;
     
-    // A reward is truly unlocked only if:
-    // 1. User has reached the level AND
-    // 2. User has claimed it (which unlocks the avatar item)
-    const isUnlocked = isLevelReached && isClaimed;
+    // Can only claim if level reached AND not already claimed
     const canClaim = isLevelReached && !isClaimed;
     const needsUpgrade = !userBP.isPremium && reward.premium && !reward.free;
+    const isLocked = !isLevelReached && !needsUpgrade;
+
+    // Get rarity color
+    const getRarityColor = (rarity?: string) => {
+      switch (rarity) {
+        case 'common': return '#9CA3AF';
+        case 'rare': return '#3B82F6';
+        case 'epic': return '#8B5CF6';
+        case 'legendary': return '#F59E0B';
+        case 'exclusive': return '#EC4899';
+        default: return '#6B7280';
+      }
+    };
+
+    const rarityColor = getRarityColor(displayReward.rarity);
 
     return (
       <View key={reward.level} style={styles.rewardContainer}>
@@ -311,6 +340,7 @@ const scrollViewRef = useRef<ScrollView>(null);
             styles.rewardCard,
             canClaim && styles.rewardCardCanClaim,
             isClaimed && styles.rewardCardClaimed,
+            isLocked && styles.rewardCardLocked,
           ]}
           onPress={() => {
             if (needsUpgrade) {
@@ -319,11 +349,11 @@ const scrollViewRef = useRef<ScrollView>(null);
               handleClaimReward(reward.level, !!isPremiumReward);
             }
           }}
-          disabled={isClaimed || (!isUnlocked && !needsUpgrade)}
+          disabled={isClaimed || isLocked}
           activeOpacity={0.7}
         >
           <LinearGradient
-            colors={isPremiumReward ? ['#FFD700', '#FFA500'] : ['#4A90E2', '#357ABD']}
+            colors={isPremiumReward ? ['#FFD700', '#FFA500'] : [rarityColor, rarityColor]}
             style={styles.cardGradient}
           >
             {/* Reward Icon */}
@@ -352,10 +382,16 @@ const scrollViewRef = useRef<ScrollView>(null);
                displayReward.name || displayReward.type}
             </Text>
             {canClaim && (
-              <Text style={styles.claimPrompt}>Tap to Claim!</Text>
+              <Text style={styles.claimPrompt}>✨ Tap to Claim!</Text>
             )}
-            {!isLevelReached && !needsUpgrade && (
-              <Text style={styles.lockedText}>Level {reward.level}</Text>
+            {isClaimed && (
+              <Text style={styles.claimedPrompt}>✓ Claimed</Text>
+            )}
+            {isLocked && (
+              <Text style={styles.lockedText}>🔒 Reach Tier {reward.level}</Text>
+            )}
+            {needsUpgrade && (
+              <Text style={styles.upgradePrompt}>👑 Premium Only</Text>
             )}
           </View>
         </TouchableOpacity>
@@ -376,34 +412,76 @@ const scrollViewRef = useRef<ScrollView>(null);
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        {/* Season Info */}
-        <View style={styles.seasonInfo}>
-          <Text style={styles.seasonTitle}>{season.name}</Text>
-          <Text style={styles.seasonSubtitle}>
-            {daysRemaining} days remaining
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Battle Pass Info Modal */}
+        <BattlePassInfoModal
+          visible={showInfoModal}
+          onClose={() => setShowInfoModal(false)}
+          seasonPrice={season.price}
+        />
+
+        {/* Season Header - Fixed at top */}
+        <View style={styles.seasonHeader}>
+          <View style={styles.seasonInfo}>
+            <Text style={styles.seasonTitle}>{rankedSeasonName}</Text>
+            <Text style={styles.seasonSubtitle}>Battle Pass - {season.description}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.infoButton}
+            onPress={() => {
+              haptics.light();
+              setShowInfoModal(true);
+            }}
+          >
+            <Text style={styles.infoButtonText}>ℹ️</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Scrollable Content */}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Days Remaining Banner */}
+          <View style={[styles.daysRemainingBanner, { backgroundColor: COLORS.warning + '30' }]}>
+          <Text style={[styles.daysRemainingText, { color: COLORS.text }]}>
+            ⏰ <Text style={{ fontWeight: 'bold' }}>{daysRemaining} days remaining</Text> in this season!
           </Text>
         </View>
 
-        {/* Stats Card */}
-        <Animated.View style={[styles.statsCard, { opacity: fadeAnim }]}>
+          {/* Stats Card */}
+          <Animated.View style={[styles.statsCard, { opacity: fadeAnim }]}>
           <Card variant="glass" style={styles.statsCardInner}>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.currentLevel}</Text>
-                <Text style={styles.statLabel}>Level</Text>
+            {/* Player Level - Overall Account Progress */}
+            <View style={styles.playerLevelSection}>
+              <Text style={styles.playerLevelLabel}>Your Account Level</Text>
+              <View style={styles.playerLevelDisplay}>
+                <Text style={styles.playerLevelValue}>{userProfile?.level || 1}</Text>
+                <Text style={styles.playerLevelDescription}>Overall game progress</Text>
               </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {stats.claimedRewards}/{stats.totalRewards}
-                </Text>
-                <Text style={styles.statLabel}>Claimed</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {userBP.isPremium ? '✓ Premium' : 'Free'}
-                </Text>
-                <Text style={styles.statLabel}>Status</Text>
+            </View>
+
+            {/* Battle Pass Progress - Seasonal Rewards */}
+            <View style={styles.bpProgressSection}>
+              <Text style={styles.bpProgressLabel}>Season Reward Progress</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.currentLevel}</Text>
+                  <Text style={styles.statLabel}>Reward Tier</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {stats.claimedRewards}/{stats.totalRewards}
+                  </Text>
+                  <Text style={styles.statLabel}>Claimed</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {userBP.isPremium ? '✓ Premium' : 'Free'}
+                  </Text>
+                  <Text style={styles.statLabel}>Pass Type</Text>
+                </View>
               </View>
             </View>
 
@@ -418,7 +496,7 @@ const scrollViewRef = useRef<ScrollView>(null);
             {/* Progress Bar */}
             <View style={styles.progressContainer}>
               <Text style={styles.progressLabel}>
-                {userBP.currentXP} / {stats.nextLevelXP} XP
+                {userBP.currentXP} / {stats.nextLevelXP} Battle Pass XP to next tier
               </Text>
               <View style={styles.progressBarBg}>
                 <Animated.View
@@ -433,12 +511,40 @@ const scrollViewRef = useRef<ScrollView>(null);
                   ]}
                 />
               </View>
+              <Text style={styles.progressHint}>
+                🎮 Playing games earns both Account XP (for levels/titles) and Battle Pass XP (for cosmetic rewards)
+              </Text>
             </View>
           </Card>
-        </Animated.View>
+          </Animated.View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
+          {/* Battle Pass XP Explanation */}
+          <View style={styles.xpSourcesContainer}>
+          <XPSourcesCard />
+          <View style={styles.xpExplanationCard}>
+            <Text style={styles.xpExplanationTitle}>ℹ️ Two XP Systems Explained</Text>
+            <View style={styles.xpComparisonRow}>
+              <View style={styles.xpComparisonColumn}>
+                <Text style={styles.xpComparisonHeader}>Account XP</Text>
+                <Text style={styles.xpComparisonText}>• Unlocks titles & features</Text>
+                <Text style={styles.xpComparisonText}>• Never resets</Text>
+                <Text style={styles.xpComparisonText}>• See Profile screen</Text>
+              </View>
+              <View style={styles.xpComparisonColumn}>
+                <Text style={styles.xpComparisonHeader}>Battle Pass XP</Text>
+                <Text style={styles.xpComparisonText}>• Unlocks cosmetic rewards</Text>
+                <Text style={styles.xpComparisonText}>• Resets each season</Text>
+                <Text style={styles.xpComparisonText}>• This screen</Text>
+              </View>
+            </View>
+            <Text style={styles.xpExplanationNote}>
+              🎮 Playing games earns BOTH types of XP simultaneously!
+            </Text>
+          </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
           {!userBP.isPremium && (
             <View style={styles.buttonWrapper}>
               <Button
@@ -471,11 +577,12 @@ const scrollViewRef = useRef<ScrollView>(null);
               fullWidth
             />
           </View>
-        </View>
+          </View>
 
-        {/* Rewards Track */}
-        <View style={styles.trackContainer}>
-          <Text style={styles.trackTitle}>🎁 Rewards</Text>
+          {/* Rewards Track */}
+          <View style={styles.trackContainer}>
+          <Text style={styles.trackTitle}>🎁 Season Rewards (Tier {stats.currentLevel}/100)</Text>
+          <Text style={styles.trackSubtitle}>Earn Battle Pass XP by playing to unlock each tier's reward</Text>
           <ScrollView
             ref={scrollViewRef}
             horizontal
@@ -485,7 +592,8 @@ const scrollViewRef = useRef<ScrollView>(null);
           >
             {season?.rewards?.map((reward) => renderRewardCard(reward)) || null}
           </ScrollView>
-        </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -494,6 +602,12 @@ const scrollViewRef = useRef<ScrollView>(null);
 const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: SPACING.xl * 2,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -505,19 +619,95 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     fontWeight: '600',
   },
-  seasonInfo: {
+  seasonHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  seasonInfo: {
+    flex: 1,
   },
   seasonTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.text,
+    marginBottom: 4,
   },
   seasonSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.textSecondary,
-    marginTop: 4,
+    lineHeight: 18,
+  },
+  infoButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoButtonText: {
+    fontSize: 20,
+  },
+  daysRemainingBanner: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+    borderRadius: RADIUS.md,
+  },
+  daysRemainingText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  xpSourcesContainer: {
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  xpExplanationCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginTop: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  xpExplanationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  xpComparisonRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  xpComparisonColumn: {
+    flex: 1,
+  },
+  xpComparisonHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.gold,
+    marginBottom: SPACING.xs,
+  },
+  xpComparisonText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
+  },
+  xpExplanationNote: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: SPACING.xs,
   },
   statsCard: {
     paddingHorizontal: SPACING.md,
@@ -526,10 +716,46 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   statsCardInner: {
     padding: SPACING.md,
   },
+  playerLevelSection: {
+    marginBottom: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  playerLevelLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
+  },
+  playerLevelDisplay: {
+    alignItems: 'center',
+  },
+  playerLevelValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginBottom: 4,
+  },
+  playerLevelDescription: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  },
+  bpProgressSection: {
+    marginBottom: SPACING.sm,
+  },
+  bpProgressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   statItem: {
     alignItems: 'center',
@@ -545,13 +771,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textSecondary,
   },
   progressContainer: {
-    marginTop: SPACING.sm,
+    marginTop: SPACING.md,
   },
   progressLabel: {
     fontSize: 12,
     color: COLORS.textSecondary,
     marginBottom: 4,
     textAlign: 'center',
+  },
+  progressHint: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   progressBarBg: {
     height: 8,
@@ -575,21 +808,28 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     minWidth: '45%',
   },
   trackContainer: {
-    flex: 1,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   trackTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text,
     paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.xs,
+  },
+  trackSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    paddingHorizontal: SPACING.md,
     marginBottom: SPACING.md,
   },
   rewardsScroll: {
-    flex: 1,
+    flexGrow: 0,
   },
   rewardsScrollContent: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
     gap: SPACING.lg,
   },
   rewardContainer: {
@@ -633,6 +873,9 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   rewardCardClaimed: {
     opacity: 0.7,
+  },
+  rewardCardLocked: {
+    opacity: 0.5,
   },
   cardGradient: {
     height: 100,
@@ -692,8 +935,22 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginTop: 2,
   },
   lockedText: {
-    fontSize: 10,
+    fontSize: 9,
     color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  claimedPrompt: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: COLORS.success,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  upgradePrompt: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: COLORS.gold,
     textAlign: 'center',
     marginTop: 2,
   },

@@ -3,7 +3,7 @@
  * Manage avatar data, unlocks, and purchases
  */
 
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { firestore } from './firebase';
 import { analytics } from './analytics';
 import {
@@ -105,6 +105,7 @@ class AvatarService {
 
   /**
    * Purchase avatar item with coins
+   * Uses Firestore transaction to ensure atomic coin deduction and item unlock
    */
   async purchaseItem(
     userId: string,
@@ -112,34 +113,64 @@ class AvatarService {
     price: number
   ): Promise<boolean> {
     try {
-      // Check user's coin balance
       const userRef = doc(firestore, 'users', userId);
-      const userSnap = await getDoc(userRef);
+      const avatarRef = doc(firestore, 'avatars', userId);
 
-      if (!userSnap.exists()) {
-        throw new Error('User not found');
-      }
+      // Use transaction to ensure atomic operation
+      await runTransaction(firestore, async (transaction) => {
+        // Read user document
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+          throw new Error('User not found');
+        }
 
-      const userData = userSnap.data();
-      const currentCoins = userData.stats?.coins || 0;
+        const userData = userDoc.data();
+        const currentCoins = userData.coins || 0;
 
-      if (currentCoins < price) {
-        return false; // Insufficient coins
-      }
+        if (currentCoins < price) {
+          throw new Error('Insufficient coins');
+        }
 
-      // Deduct coins
-      await updateDoc(userRef, {
-        'stats.coins': currentCoins - price,
+        // Read avatar document
+        const avatarDoc = await transaction.get(avatarRef);
+        if (!avatarDoc.exists()) {
+          throw new Error('Avatar not found');
+        }
+
+        const avatarData = avatarDoc.data();
+        const unlockedItems = avatarData.unlockedItems || [];
+
+        // Check if already unlocked
+        if (unlockedItems.includes(itemId)) {
+          throw new Error('Item already unlocked');
+        }
+
+        // Perform atomic updates
+        transaction.update(userRef, {
+          coins: currentCoins - price,
+        });
+
+        transaction.update(avatarRef, {
+          unlockedItems: arrayUnion(itemId),
+          updatedAt: new Date(),
+        });
       });
 
-      // Unlock item
-      await this.unlockItem(userId, itemId, 'purchase');
-
+      // Log analytics after successful transaction
       analytics.spendCoins(price, `avatar_item_${itemId}`);
+      analytics.logEvent('unlock_avatar_item', {
+        user_id: userId,
+        item_id: itemId,
+        unlock_method: 'purchase',
+      });
 
+      console.log(`✅ Successfully purchased item ${itemId} for ${price} coins`);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to purchase item:', error);
+      if (error.message === 'Insufficient coins' || error.message === 'Item already unlocked') {
+        return false;
+      }
       throw error;
     }
   }

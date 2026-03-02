@@ -162,7 +162,42 @@ const handleNotificationPress = (notification: Notifications.Notification): void
     type: data.type || 'unknown',
   });
 
-  // Navigation would be handled here
+  // Navigate based on notification type
+  const notifData = data as any;
+  
+  // Get navigation reference
+  const navigationRef = (global as any).navigationRef;
+  
+  if (!navigationRef?.current) {
+    console.warn('Navigation ref not available');
+    return;
+  }
+
+  switch (notifData.type) {
+    case 'friend_request':
+      navigationRef.current.navigate('Friends', { tab: 'requests' });
+      break;
+    case 'game_invite':
+      if (notifData.roomId) {
+        navigationRef.current.navigate('GameRoom', { roomId: notifData.roomId });
+      }
+      break;
+    case 'challenge_completed':
+      navigationRef.current.navigate('Challenges');
+      break;
+    case 'event_starting':
+      navigationRef.current.navigate('Events');
+      break;
+    case 'achievement_unlocked':
+      navigationRef.current.navigate('Profile');
+      break;
+    case 'battle_pass_level_up':
+      navigationRef.current.navigate('BattlePass');
+      break;
+    default:
+      navigationRef.current.navigate('Notifications');
+      break;
+  }
 };
 
 /**

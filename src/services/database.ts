@@ -126,7 +126,7 @@ export const createRoom = async (
 ): Promise<string> => {
   const defaultSettings: RoomSettings = {
     maxPlayers: 12,
-    minPlayers: isRanked ? 3 : 1, // Casual games can start with 1 player for testing
+    minPlayers: 3, // Both casual and ranked require 3 players
     submissionTime: 20,
     votingTime: 20,
     winningVotes: WINNING_VOTES, // FIXED at 20 - not adjustable
@@ -229,6 +229,37 @@ export const getActiveRooms = async (filters: {
 };
 
 /**
+ * Find a room by its 6-digit room code
+ */
+export const getRoomByCode = async (roomCode: string): Promise<Room | null> => {
+  console.log('🔍 Looking up room by code:', roomCode);
+  
+  // Query for room with matching roomCode, regardless of privacy or ranked status
+  const q = query(
+    collection(firestore, 'rooms'),
+    where('roomCode', '==', roomCode),
+    where('status', 'in', ['waiting', 'active']),
+    limit(1)
+  );
+  
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) {
+    console.log('❌ No room found with code:', roomCode);
+    return null;
+  }
+  
+  const doc = snapshot.docs[0];
+  const room = {
+    roomId: doc.id,
+    ...doc.data()
+  } as Room;
+  
+  console.log('✅ Found room:', { roomCode: room.roomCode, name: room.name, roomId: room.roomId });
+  return room;
+};
+
+/**
  * Join a room as a player
  */
 export const joinRoom = async (
@@ -237,12 +268,18 @@ export const joinRoom = async (
   username: string
 ): Promise<void> => {
   console.log('🚪 Joining room:', { roomId, userId, username });
+  console.log('🔍 Looking up room in Firestore with ID:', roomId);
+  console.log('🔍 Room ID length:', roomId.length);
+  console.log('🔍 Room ID characters:', roomId.split('').map(c => c.charCodeAt(0)));
   
   const roomRef = doc(firestore, 'rooms', roomId);
   const roomDoc = await getDoc(roomRef);
   
+  console.log('📊 Room exists in Firestore:', roomDoc.exists());
+  
   if (!roomDoc.exists()) {
-    throw new Error('Room not found');
+    console.error('❌ Room not found in Firestore. Room ID:', roomId);
+    throw new Error(`Room not found. Please check the room code and try again. Code entered: ${roomId}`);
   }
   
   const roomData = roomDoc.data();

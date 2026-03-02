@@ -166,29 +166,39 @@ const handleNotificationPress = (notification: Notifications.Notification): void
   });
 
   // Navigate based on notification type
-  // This would need to be integrated with your navigation system
   const notifData = data as any;
+  
+  // Get navigation reference (you'll need to set this up in your app)
+  const navigationRef = (global as any).navigationRef;
+  
+  if (!navigationRef?.current) {
+    console.warn('Navigation ref not available');
+    return;
+  }
+
   switch (notifData.type) {
     case 'friend_request':
-      // Navigate to friends screen
+      navigationRef.current.navigate('Friends', { tab: 'requests' });
       break;
     case 'game_invite':
-      // Navigate to game room
+      if (notifData.roomId) {
+        navigationRef.current.navigate('GameRoom', { roomId: notifData.roomId });
+      }
       break;
     case 'challenge_completed':
-      // Navigate to challenges screen
+      navigationRef.current.navigate('Challenges');
       break;
     case 'event_starting':
-      // Navigate to events screen
+      navigationRef.current.navigate('Events');
       break;
     case 'achievement_unlocked':
-      // Navigate to profile/achievements
+      navigationRef.current.navigate('Profile');
       break;
     case 'battle_pass_level_up':
-      // Navigate to Battle Pass
+      navigationRef.current.navigate('BattlePass');
       break;
     default:
-      // Navigate to home or notifications
+      navigationRef.current.navigate('Notifications');
       break;
   }
 };

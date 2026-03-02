@@ -246,14 +246,14 @@ class BattlePassService {
     switch (reward.type) {
       case 'coins':
         await updateDoc(userRef, {
-          'stats.coins': increment(reward.amount),
+          coins: increment(reward.amount),
         });
         console.log(`Granted ${reward.amount} coins to user ${userId}`);
         break;
 
       case 'premium':
         await updateDoc(userRef, {
-          'stats.coins': increment(reward.amount),
+          coins: increment(reward.amount),
         });
         console.log(`Granted ${reward.amount} coins to user ${userId}`);
         break;

@@ -6,56 +6,65 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Animated,
   RefreshControl,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../hooks/useAuth';
-import { getPromptsByCategory, getPromptPacks, getUserPromptPreferences } from '../services/prompts';
+import { getPromptsByCategory, getPromptPacks, getCategoryCounts, getActiveCategories } from '../services/prompts';
 import { Prompt, PromptPack, PromptCategory } from '../types/prompts';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
 import { tabletHorizontalPadding } from '../utils/responsive';
-import { BackButton } from '../components/common/BackButton';
-import { Loading } from '../components/common/Loading';
 
-const CATEGORIES: { id: PromptCategory; name: string; icon: string; color: string }[] = [
-  { id: 'general', name: 'General', icon: '💬', color: '#A855F7' },
-  { id: 'pop-culture', name: 'Pop Culture', icon: '🎬', color: '#FF6B9D' },
-  { id: 'food', name: 'Food', icon: '🍕', color: '#FFB84D' },
-  { id: 'technology', name: 'Tech', icon: '💻', color: '#4ECDC4' },
-  { id: 'sports', name: 'Sports', icon: '⚽', color: '#95E1D3' },
-  { id: 'movies', name: 'Movies', icon: '🎥', color: '#F38181' },
-  { id: 'music', name: 'Music', icon: '🎵', color: '#AA96DA' },
-  { id: 'travel', name: 'Travel', icon: '✈️', color: '#FCBAD3' },
-  { id: 'animals', name: 'Animals', icon: '🐾', color: '#A8D8EA' },
-  { id: 'history', name: 'History', icon: '📜', color: '#D4A5A5' },
-  { id: 'science', name: 'Science', icon: '🔬', color: '#9FD8CB' },
-  { id: 'relationships', name: 'Love', icon: '💕', color: '#FFB6B9' },
-];
+// Category metadata mapping - provides display info for known categories
+const CATEGORY_METADATA: Record<string, { name: string; icon: string; color: string }> = {
+  'general': { name: 'General', icon: '💬', color: '#A855F7' },
+  'pop-culture': { name: 'Pop Culture', icon: '🎬', color: '#FF6B9D' },
+  'food': { name: 'Food', icon: '🍕', color: '#FFB84D' },
+  'technology': { name: 'Tech', icon: '💻', color: '#4ECDC4' },
+  'sports': { name: 'Sports', icon: '⚽', color: '#95E1D3' },
+  'movies': { name: 'Movies', icon: '🎥', color: '#F38181' },
+  'music': { name: 'Music', icon: '🎵', color: '#AA96DA' },
+  'travel': { name: 'Travel', icon: '✈️', color: '#FCBAD3' },
+  'animals': { name: 'Animals', icon: '🐾', color: '#A8D8EA' },
+  'history': { name: 'History', icon: '📜', color: '#D4A5A5' },
+  'science': { name: 'Science', icon: '🔬', color: '#9FD8CB' },
+  'relationships': { name: 'Love', icon: '💕', color: '#FFB6B9' },
+  'work': { name: 'Work', icon: '💼', color: '#FFA07A' },
+  'school': { name: 'School', icon: '📚', color: '#98D8C8' },
+  'holidays': { name: 'Holidays', icon: '🎄', color: '#FF6B6B' },
+  'seasonal': { name: 'Seasonal', icon: '🍂', color: '#F7B731' },
+  'trending': { name: 'Trending', icon: '🔥', color: '#FF4757' },
+  'nsfw': { name: 'NSFW', icon: '🔞', color: '#E74C3C' },
+};
+
+// Fallback for unknown categories
+const getDefaultCategoryMetadata = (category: string) => ({
+  name: category.charAt(0).toUpperCase() + category.slice(1).replace(/-/g, ' '),
+  icon: '📝',
+  color: '#9B59B6',
+});
 
 export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
-  const { user } = useAuth();
-  const [selectedCategory, setSelectedCategory] = useState<PromptCategory>('general');
+  const [selectedCategory, setSelectedCategory] = useState<PromptCategory>('food');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [packs, setPacks] = useState<PromptPack[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [fadeAnim] = useState(new Animated.Value(0));
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [activeCategories, setActiveCategories] = useState<PromptCategory[]>([
+    'food', 'general', 'personal', 'entertainment', 'technology',
+    'social-media', 'work', 'relationships', 'travel', 'fashion',
+    'music', 'gaming', 'animals', 'sports', 'shopping'
+  ] as PromptCategory[]);
   
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
   useEffect(() => {
+    // Load data immediately - no delays
     loadData();
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
   }, []);
 
   useEffect(() => {
@@ -63,18 +72,27 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
   }, [selectedCategory]);
 
   const loadData = async () => {
-    setLoading(true);
     try {
-      const [promptsData, packsData] = await Promise.all([
-        getPromptsByCategory(selectedCategory, 50),
+      const [packsData, counts, categories] = await Promise.all([
         getPromptPacks(),
+        getCategoryCounts(),
+        getActiveCategories(),
       ]);
-      setPrompts(promptsData);
       setPacks(packsData);
+      setCategoryCounts(counts);
+      setActiveCategories(categories);
+      
+      // Update selected category to first in sorted list
+      const sorted = [...categories].sort((a, b) => {
+        const countA = counts[a] || 0;
+        const countB = counts[b] || 0;
+        return countB - countA;
+      });
+      if (sorted.length > 0 && sorted[0] !== selectedCategory) {
+        setSelectedCategory(sorted[0]);
+      }
     } catch (error) {
       console.error('Error loading prompt library:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -95,12 +113,28 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
 
   const filteredPrompts = prompts.filter(prompt =>
     prompt.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    prompt.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    (prompt.tags || []).some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  if (loading) {
-    return <Loading />;
-  }
+  // Build category objects from active categories in Firestore
+  const categories = activeCategories.map(categoryId => {
+    const metadata = CATEGORY_METADATA[categoryId] || getDefaultCategoryMetadata(categoryId);
+    return {
+      id: categoryId,
+      name: metadata.name,
+      icon: metadata.icon,
+      color: metadata.color,
+    };
+  });
+
+  // Sort categories by prompt count (descending) and limit to top 15
+  const sortedCategories = [...categories].sort((a, b) => {
+    const countA = categoryCounts[a.id] || 0;
+    const countB = categoryCounts[b.id] || 0;
+    return countB - countA;
+  }).slice(0, 15);
+
+  // Removed loading check - render immediately
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -113,24 +147,21 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Subtitle */}
-        <Animated.View style={[styles.subtitleContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.subtitle}>Explore {prompts.length}+ creative prompts</Text>
-        </Animated.View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search prompts..."
-            placeholderTextColor={COLORS.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+        <View>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search prompts..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
         </View>
 
         {/* Category Tabs */}
@@ -140,7 +171,7 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
           style={styles.categoriesContainer}
           contentContainerStyle={styles.categoriesContent}
         >
-          {CATEGORIES.map((category) => (
+          {sortedCategories.map((category) => (
             <TouchableOpacity
               key={category.id}
               style={[
@@ -159,6 +190,11 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
               >
                 {category.name}
               </Text>
+              {categoryCounts[category.id] > 0 && (
+                <View style={styles.categoryCount}>
+                  <Text style={styles.categoryCountText}>{categoryCounts[category.id]}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -201,7 +237,7 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              {CATEGORIES.find(c => c.id === selectedCategory)?.icon} {CATEGORIES.find(c => c.id === selectedCategory)?.name} Prompts
+              {categories.find(c => c.id === selectedCategory)?.icon} {categories.find(c => c.id === selectedCategory)?.name} Prompts
             </Text>
             <Text style={styles.promptCount}>{filteredPrompts.length}</Text>
           </View>
@@ -209,26 +245,21 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
           {filteredPrompts.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📭</Text>
-              <Text style={styles.emptyText}>No prompts found</Text>
-              <Text style={styles.emptySubtext}>Try a different category or search term</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery ? 'No matching prompts' : `No ${categories.find(c => c.id === selectedCategory)?.name} prompts yet`}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {searchQuery 
+                  ? 'Try a different search term or category'
+                  : 'Check back soon or try another category'}
+              </Text>
             </View>
           ) : (
             <View style={styles.promptsList}>
-              {filteredPrompts.map((prompt, index) => (
-                <Animated.View
+              {filteredPrompts.map((prompt) => (
+                <View
                   key={prompt.id}
-                  style={[
-                    styles.promptCard,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      }],
-                    },
-                  ]}
+                  style={styles.promptCard}
                 >
                   <View style={styles.promptHeader}>
                     <View style={[styles.difficultyBadge, styles[`difficulty${prompt.difficulty}`]]}>
@@ -245,36 +276,38 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
                   <Text style={styles.promptText}>{prompt.text}</Text>
                   <View style={styles.promptFooter}>
                     <View style={styles.promptTags}>
-                      {prompt.tags.slice(0, 3).map((tag, i) => (
+                      {(prompt.tags || []).slice(0, 3).map((tag, i) => (
                         <View key={i} style={styles.tag}>
                           <Text style={styles.tagText}>#{tag}</Text>
                         </View>
                       ))}
                     </View>
-                    <Text style={styles.promptStats}>🎮 {prompt.timesUsed}</Text>
+                    <Text style={styles.promptStats}>🎮 {prompt.timesUsed || 0}</Text>
                   </View>
-                </Animated.View>
+                </View>
               ))}
             </View>
           )}
         </View>
 
-        {/* Submit Prompt Button */}
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={() => navigation.navigate('SubmitPrompt')}
-        >
-          <LinearGradient
-            colors={COLORS.gradientPrimary as any}
-            style={styles.submitGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Text style={styles.submitIcon}>✨</Text>
-            <Text style={styles.submitText}>Submit Your Own Prompt</Text>
-          </LinearGradient>
-        </TouchableOpacity>
       </ScrollView>
+
+      {/* Floating Submit Button */}
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={() => navigation.navigate('SubmitPrompt')}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={COLORS.gradientPrimary as any}
+          style={styles.floatingGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={styles.floatingIcon}>✨</Text>
+          <Text style={styles.floatingText}>Submit Prompt</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -295,22 +328,9 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: SPACING.xl,
-    paddingTop: SPACING.md,
     paddingHorizontal: SPACING.xl + tabletHorizontalPadding,
-  },
-  subtitleContainer: {
-    paddingHorizontal: SPACING.xl + tabletHorizontalPadding,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm,
-  },
-  backButton: {
-    marginBottom: SPACING.md,
-  },
-  backButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.primary,
-    fontWeight: '600',
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
   },
   title: {
     fontSize: TYPOGRAPHY.fontSize['4xl'],
@@ -327,7 +347,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.surface,
     marginHorizontal: SPACING.xl,
-    marginBottom: SPACING.lg,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.lg,
     ...SHADOWS.sm,
@@ -343,7 +364,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
   },
   categoriesContainer: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   categoriesContent: {
     paddingHorizontal: SPACING.xl,
@@ -375,6 +396,21 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   categoryNameActive: {
     color: COLORS.primary,
+  },
+  categoryCount: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    marginLeft: SPACING.xs,
+    minWidth: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.text,
   },
   section: {
     marginBottom: SPACING.xl,
@@ -525,42 +561,47 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: SPACING.xl * 2,
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: SPACING.md,
+    fontSize: 48,
+    marginBottom: SPACING.sm,
   },
   emptyText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
     marginBottom: SPACING.xs,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
+    textAlign: 'center',
   },
-  submitButton: {
-    marginHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-    borderRadius: RADIUS.lg,
+  floatingButton: {
+    position: 'absolute',
+    bottom: SPACING.xl,
+    right: SPACING.xl,
+    borderRadius: RADIUS.full,
     overflow: 'hidden',
-    ...SHADOWS.lg,
+    ...SHADOWS.xl,
+    elevation: 8,
   },
-  submitGradient: {
+  floatingGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.xs,
   },
-  submitIcon: {
-    fontSize: 24,
-    marginRight: SPACING.sm,
+  floatingIcon: {
+    fontSize: 20,
   },
-  submitText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+  floatingText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
   },

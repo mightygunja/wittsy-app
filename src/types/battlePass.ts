@@ -69,14 +69,14 @@ export interface BattlePassStats {
   isPremium: boolean;
 }
 
-// Season 1: Founders Pass
+// Season 1: Launch
 export const SEASON_1: BattlePassSeason = {
   id: 'season_1',
-  name: 'Founders Pass',
-  description: 'Exclusive rewards for our founding players!',
+  name: 'Season 1: Launch',
+  description: 'Unlock exclusive avatar items, coins, and special effects as you play!',
   theme: 'Launch',
   startDate: new Date('2025-12-22'),
-  endDate: new Date('2026-02-20'),
+  endDate: new Date('2026-04-30'),
   price: 4.99,
   maxLevel: 100,
   xpPerLevel: 100,
@@ -91,14 +91,14 @@ export const SEASON_1: BattlePassSeason = {
     // Level 3
     {
       level: 3,
-      free: { type: 'avatar', itemId: 'eyes_happy', name: 'Joyful Eyes', icon: '😊', rarity: 'common' },
-      premium: { type: 'avatar', itemId: 'hair_spiky', name: 'Anime Spikes', icon: '⚡', rarity: 'rare' },
+      free: { type: 'avatar', itemId: 'eyes_happy', name: 'Happy Eyes', icon: '😊', rarity: 'common' },
+      premium: { type: 'avatar', itemId: 'hair_spiky', name: 'Spiky Hair', icon: '⚡', rarity: 'epic' },
     },
     // Level 5 - First Major Reward
     {
       level: 5,
-      free: { type: 'avatar', itemId: 'hair_short_blue', name: 'Electric Blue Hair', icon: '💇', rarity: 'rare' },
-      premium: { type: 'avatar', itemId: 'hair_fire', name: 'Inferno Blaze', icon: '🔥', rarity: 'legendary' },
+      free: { type: 'coins', amount: 75, name: 'Coin Reward', icon: '🪙' },
+      premium: { type: 'avatar', itemId: 'hair_fire', name: 'Flame Hair', icon: '🔥', rarity: 'legendary' },
     },
     // Level 7
     {
@@ -116,11 +116,11 @@ export const SEASON_1: BattlePassSeason = {
       level: 12,
       premium: { type: 'avatar', itemId: 'acc_sunglasses', name: 'Cool Shades', icon: '🕶️', rarity: 'rare' },
     },
-    // Level 15 - Exclusive Skin
+    // Level 15 - Exclusive Background
     {
       level: 15,
-      free: { type: 'avatar', itemId: 'bg_gradient_sunset', name: 'Golden Sunset', icon: '🌅', rarity: 'rare' },
-      premium: { type: 'avatar', itemId: 'skin_founder', name: 'Founder\'s Mark', icon: '👤', rarity: 'exclusive' },
+      free: { type: 'avatar', itemId: 'bg_gradient_sunset', name: 'Sunset Background', icon: '🌅', rarity: 'rare' },
+      premium: { type: 'avatar', itemId: 'bg_holographic', name: 'Holographic Background', icon: '✨', rarity: 'exclusive' },
     },
     // Level 18
     {
@@ -136,8 +136,8 @@ export const SEASON_1: BattlePassSeason = {
     // Level 25 - Quarter Mark
     {
       level: 25,
-      free: { type: 'avatar', itemId: 'bg_gradient_founder', name: 'Founder\'s Glory', icon: '🎨', rarity: 'epic' },
-      premium: { type: 'avatar', itemId: 'bg_animated_founder', name: 'Founder\'s Radiance', icon: '✨', rarity: 'legendary' },
+      free: { type: 'coins', amount: 200, name: 'Quarter Milestone', icon: '�' },
+      premium: { type: 'avatar', itemId: 'acc_neon_visor', name: 'Neon Visor', icon: '🕶️', rarity: 'legendary' },
     },
     // Level 28
     {
@@ -238,16 +238,14 @@ export const SEASON_1: BattlePassSeason = {
   ],
 };
 
-// XP Sources
+// XP Sources (matches REWARD_AMOUNTS in rewardsService.ts)
 export const XP_REWARDS = {
-  GAME_PLAYED: 10,
-  GAME_WON: 25,
-  ROUND_WON: 5,
-  DAILY_CHALLENGE: 50,
-  WEEKLY_CHALLENGE: 200,
-  FRIEND_GAME: 15,
-  VOTE_RECEIVED: 3,
-  PERFECT_SCORE: 50,
+  GAME_PLAYED: 10,        // Base XP for playing a game
+  GAME_WON: 25,           // Bonus XP for winning a game (total 35 with participation)
+  ROUND_WON: 5,           // XP for winning a round
+  VOTE_RECEIVED: 3,       // XP per vote received on your phrase
+  DAILY_CHALLENGE: 50,    // Daily challenge completion
+  WEEKLY_CHALLENGE: 200,  // Weekly challenge completion
 };
 
 // Level Skip Pricing

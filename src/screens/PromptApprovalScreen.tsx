@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
-import { BackButton } from '../components/common/BackButton';
 import { isUserAdmin } from '../utils/adminCheck';
 import {
   getPendingPromptSubmissions,
@@ -47,30 +46,6 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1 },
     safeArea: { flex: 1 },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    backButtonText: {
-      fontSize: 28,
-      color: '#FFFFFF',
-      fontWeight: '300',
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: '#FFFFFF',
-    },
-    headerRight: { width: 40 },
     scrollView: { flex: 1 },
     content: {
       padding: SPACING.md,
@@ -168,7 +143,7 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
     emptyContainer: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: SPACING.xxl,
+      paddingVertical: SPACING.xl * 2,
     },
     emptyText: {
       fontSize: 18,
@@ -205,10 +180,12 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
   }, []);
 
   const handleApprove = async (submission: PromptSubmission) => {
+    if (!user) return;
+    
     const difficulty = selectedDifficulty[submission.id] || submission.suggestedDifficulty;
     
     try {
-      await approvePromptSubmission(submission.id, difficulty);
+      await approvePromptSubmission(submission.id, user.uid, difficulty);
       Alert.alert('Success', 'Prompt approved!');
       loadSubmissions();
     } catch (error) {
@@ -218,6 +195,8 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
   };
 
   const handleReject = async (submissionId: string) => {
+    if (!user) return;
+    
     Alert.alert(
       'Reject Prompt',
       'Are you sure you want to reject this prompt?',
@@ -228,7 +207,7 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
           style: 'destructive',
           onPress: async () => {
             try {
-              await rejectPromptSubmission(submissionId);
+              await rejectPromptSubmission(submissionId, user.uid, 'Rejected by admin');
               Alert.alert('Success', 'Prompt rejected');
               loadSubmissions();
             } catch (error) {
@@ -244,12 +223,6 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.header}>
-          <BackButton onPress={() => navigation.goBack()} />
-          <Text style={styles.headerTitle}>Approve Prompts</Text>
-          <View style={styles.headerRight} />
-        </View>
-
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.content}

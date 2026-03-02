@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,33 +7,39 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
-import { submitPrompt, containsProfanity } from '../services/prompts';
+import { submitPrompt, containsProfanity, getActiveCategories, getCategoryCounts } from '../services/prompts';
 import { PromptCategory, PromptDifficulty } from '../types/prompts';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
-import { BackButton } from '../components/common/BackButton';;
 import { Button } from '../components/common/Button';
 import { tabletHorizontalPadding } from '../utils/responsive';
 
-const CATEGORIES: { id: PromptCategory; name: string; icon: string }[] = [
-  { id: 'general', name: 'General', icon: '💬' },
-  { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
-  { id: 'food', name: 'Food', icon: '🍕' },
-  { id: 'technology', name: 'Tech', icon: '💻' },
-  { id: 'sports', name: 'Sports', icon: '⚽' },
-  { id: 'movies', name: 'Movies', icon: '🎥' },
-  { id: 'music', name: 'Music', icon: '🎵' },
-  { id: 'travel', name: 'Travel', icon: '✈️' },
-  { id: 'animals', name: 'Animals', icon: '🐾' },
-  { id: 'history', name: 'History', icon: '📜' },
-  { id: 'science', name: 'Science', icon: '🔬' },
-  { id: 'relationships', name: 'Love', icon: '💕' },
-];
+// Category metadata mapping
+const CATEGORY_METADATA: Record<string, { name: string; icon: string }> = {
+  'general': { name: 'General', icon: '💬' },
+  'food': { name: 'Food', icon: '�' },
+  'entertainment': { name: 'Entertainment', icon: '�' },
+  'technology': { name: 'Tech', icon: '💻' },
+  'sports': { name: 'Sports', icon: '⚽' },
+  'music': { name: 'Music', icon: '🎵' },
+  'travel': { name: 'Travel', icon: '✈️' },
+  'animals': { name: 'Animals', icon: '🐾' },
+  'personal': { name: 'Personal', icon: '👤' },
+  'relationships': { name: 'Love', icon: '💕' },
+  'work': { name: 'Work', icon: '💼' },
+  'gaming': { name: 'Gaming', icon: '🎮' },
+  'fashion': { name: 'Fashion', icon: '�' },
+  'social-media': { name: 'Social Media', icon: '�' },
+};
+
+const getDefaultCategoryMetadata = (category: string) => ({
+  name: category.charAt(0).toUpperCase() + category.slice(1).replace(/-/g, ' '),
+  icon: '�',
+});
 
 const DIFFICULTIES: { id: PromptDifficulty; name: string; description: string }[] = [
   { id: 'easy', name: 'Easy', description: 'Simple, straightforward prompts' },
@@ -43,21 +49,38 @@ const DIFFICULTIES: { id: PromptDifficulty; name: string; description: string }[
 
 export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const { user } = useAuth();
   const [promptText, setPromptText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<PromptCategory>('general');
+  const [customCategory, setCustomCategory] = useState('');
+  const [showCustomCategory, setShowCustomCategory] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] = useState<PromptDifficulty>('medium');
   const [tags, setTags] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [fadeAnim] = useState(new Animated.Value(0));
+  const [activeCategories, setActiveCategories] = useState<PromptCategory[]>([
+    'general', 'food', 'technology', 'relationships', 'work', 
+    'sports', 'music', 'animals', 'travel', 'history', 'science'
+  ] as PromptCategory[]);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
 
-  React.useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
+  useEffect(() => {
+    // Load categories immediately
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const [categories, counts] = await Promise.all([
+        getActiveCategories(),
+        getCategoryCounts(),
+      ]);
+      setActiveCategories(categories);
+      setCategoryCounts(counts);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!user) {
@@ -85,29 +108,37 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
         .map(t => t.trim())
         .filter(t => t.length > 0);
 
+      const categoryToSubmit = showCustomCategory && customCategory.trim() 
+        ? customCategory.trim().toLowerCase().replace(/\s+/g, '-') as PromptCategory
+        : selectedCategory;
+
       await submitPrompt(
         user.uid,
         promptText,
-        selectedCategory,
+        categoryToSubmit,
         selectedDifficulty,
         tagArray
       );
 
       Alert.alert(
-        'Success! 🎉',
-        'Your prompt has been submitted for review. Thank you for contributing!',
+        'Submitted Successfully! 🎉',
+        'Your prompt is now in the approval queue. Our team will review it shortly and you\'ll be credited as the creator if approved!',
         [
           {
             text: 'Submit Another',
+            style: 'default',
             onPress: () => {
               setPromptText('');
               setTags('');
               setSelectedCategory('general');
+              setCustomCategory('');
+              setShowCustomCategory(false);
               setSelectedDifficulty('medium');
             },
           },
           {
-            text: 'Done',
+            text: 'Back to Library',
+            style: 'cancel',
             onPress: () => navigation.goBack(),
           },
         ]
@@ -121,7 +152,6 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   const characterCount = promptText.length;
   const isValid = characterCount >= 10 && characterCount <= 200;
-  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
 
   return (
@@ -132,14 +162,6 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
       />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-          <BackButton onPress={() => navigation.goBack()} />
-          <Text style={styles.title}>Submit a Prompt</Text>
-          <Text style={styles.subtitle}>
-            Share your creative prompts with the community
-          </Text>
-        </Animated.View>
 
         {/* Guidelines */}
         <View style={styles.guidelinesCard}>
@@ -191,27 +213,65 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
         <View style={styles.section}>
           <Text style={styles.label}>Category *</Text>
           <View style={styles.optionsGrid}>
-            {CATEGORIES.map((category) => (
-              <TouchableOpacity
-                key={category.id}
+            {activeCategories
+              .sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))
+              .slice(0, 12)
+              .map((categoryId) => {
+                const metadata = CATEGORY_METADATA[categoryId] || getDefaultCategoryMetadata(categoryId);
+                return (
+                  <TouchableOpacity
+                    key={categoryId}
+                    style={[
+                      styles.optionCard,
+                      selectedCategory === categoryId && !showCustomCategory && styles.optionCardSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedCategory(categoryId);
+                      setShowCustomCategory(false);
+                    }}
+                  >
+                    <Text style={styles.optionIcon}>{metadata.icon}</Text>
+                    <Text
+                      style={[
+                        styles.optionText,
+                        selectedCategory === categoryId && !showCustomCategory && styles.optionTextSelected,
+                      ]}
+                    >
+                      {metadata.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            <TouchableOpacity
+              style={[
+                styles.optionCard,
+                showCustomCategory && styles.optionCardSelected,
+              ]}
+              onPress={() => setShowCustomCategory(true)}
+            >
+              <Text style={styles.optionIcon}>➕</Text>
+              <Text
                 style={[
-                  styles.optionCard,
-                  selectedCategory === category.id && styles.optionCardSelected,
+                  styles.optionText,
+                  showCustomCategory && styles.optionTextSelected,
                 ]}
-                onPress={() => setSelectedCategory(category.id)}
               >
-                <Text style={styles.optionIcon}>{category.icon}</Text>
-                <Text
-                  style={[
-                    styles.optionText,
-                    selectedCategory === category.id && styles.optionTextSelected,
-                  ]}
-                >
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                Custom
+              </Text>
+            </TouchableOpacity>
           </View>
+          {showCustomCategory && (
+            <View style={styles.customCategoryContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter custom category name"
+                placeholderTextColor={COLORS.textSecondary}
+                value={customCategory}
+                onChangeText={setCustomCategory}
+                autoFocus
+              />
+            </View>
+          )}
         </View>
 
         {/* Difficulty Selection */}
@@ -271,10 +331,12 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
         {/* Info Card */}
         <View style={styles.infoCard}>
           <Text style={styles.infoIcon}>ℹ️</Text>
-          <Text style={styles.infoText}>
-            All submissions are reviewed by our team before being added to the game.
-            You'll be credited as the creator if approved!
-          </Text>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoTitle}>Admin Review Process</Text>
+            <Text style={styles.infoText}>
+              All submissions go through our approval queue to ensure quality and appropriateness. You'll be credited as the creator if your prompt is approved!
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -431,6 +493,9 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   optionTextSelected: {
     color: COLORS.primary,
   },
+  customCategoryContainer: {
+    marginTop: SPACING.md,
+  },
   difficultyContainer: {
     gap: SPACING.sm,
   },
@@ -465,21 +530,31 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.primaryLight,
     marginHorizontal: SPACING.xl,
     marginBottom: SPACING.xl,
     padding: SPACING.md,
     borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
     ...SHADOWS.sm,
   },
   infoIcon: {
     fontSize: 24,
     marginRight: SPACING.sm,
   },
-  infoText: {
+  infoContent: {
     flex: 1,
+  },
+  infoTitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.xxs,
+  },
+  infoText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.textSecondary,
+    color: COLORS.text,
     lineHeight: 20,
   },
 });

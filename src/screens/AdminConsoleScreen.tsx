@@ -148,17 +148,6 @@ export const AdminConsoleScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Admin Console</Text>
-        <View style={styles.headerRight} />
-      </View>
-
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
 
         {/* Admin Tools */}

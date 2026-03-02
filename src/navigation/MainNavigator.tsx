@@ -48,7 +48,15 @@ export const MainNavigator: React.FC = () => {
         headerTintColor: '#FFFFFF',
         headerTitleStyle: {
           fontWeight: 'bold'
-        }
+        },
+        detachPreviousScreen: false,
+        animationEnabled: true,
+        gestureEnabled: true,
+        cardStyleInterpolator: ({ current: { progress } }) => ({
+          cardStyle: {
+            opacity: progress,
+          },
+        }),
       }}
     >
       <Stack.Screen 
@@ -84,7 +92,7 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="AdminConsole" 
         component={AdminConsoleScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Admin Console' }}
       />
       <Stack.Screen 
         name="PromptLibrary" 
@@ -185,7 +193,7 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen 
         name="AvatarCreator" 
         component={AvatarCreatorScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'Avatar Creator' }}
       />
       <Stack.Screen 
         name="AvatarShop" 

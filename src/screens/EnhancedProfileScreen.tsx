@@ -332,15 +332,49 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
             {/* XP Progress - Redesigned */}
             <View style={styles.xpSection}>
               <View style={styles.xpRow}>
-                <Text style={styles.xpLabel}>Experience Points</Text>
+                <Text style={styles.xpLabel}>Account Experience (XP)</Text>
                 <Text style={styles.xpNumbers}>{userProfile.xp} XP</Text>
               </View>
               <View style={styles.progressBarContainer}>
                 <View style={[styles.progressBarFill, { width: `${Math.min(100, xpProgress.percentage)}%` }]} />
               </View>
               <Text style={styles.xpSubtext}>
-                Level {userProfile.level} • {xpProgress.percentage}% to next level
+                Level {userProfile.level} • {xpProgress.current}/{xpProgress.required} XP to Level {userProfile.level + 1}
               </Text>
+              
+              {/* XP Earning Guide */}
+              <View style={styles.xpGuideContainer}>
+                <Text style={styles.xpGuideTitle}>💡 How to Earn Account XP:</Text>
+                <View style={styles.xpGuideGrid}>
+                  <View style={styles.xpGuideItem}>
+                    <Text style={styles.xpGuideValue}>+10</Text>
+                    <Text style={styles.xpGuideLabel}>Play Round</Text>
+                  </View>
+                  <View style={styles.xpGuideItem}>
+                    <Text style={styles.xpGuideValue}>+25</Text>
+                    <Text style={styles.xpGuideLabel}>Win Round</Text>
+                  </View>
+                  <View style={styles.xpGuideItem}>
+                    <Text style={styles.xpGuideValue}>+100</Text>
+                    <Text style={styles.xpGuideLabel}>Win Game</Text>
+                  </View>
+                  <View style={styles.xpGuideItem}>
+                    <Text style={styles.xpGuideValue}>+50</Text>
+                    <Text style={styles.xpGuideLabel}>Earn Star</Text>
+                  </View>
+                  <View style={styles.xpGuideItem}>
+                    <Text style={styles.xpGuideValue}>+20</Text>
+                    <Text style={styles.xpGuideLabel}>Daily Login</Text>
+                  </View>
+                  <View style={styles.xpGuideItem}>
+                    <Text style={styles.xpGuideValue}>+5</Text>
+                    <Text style={styles.xpGuideLabel}>Vote</Text>
+                  </View>
+                </View>
+                <Text style={styles.xpGuideNote}>
+                  ℹ️ Account XP unlocks titles, features & content. Separate from Battle Pass XP.
+                </Text>
+              </View>
               <TouchableOpacity 
                 style={styles.fixLevelButton}
                 onPress={async () => {
@@ -978,7 +1012,50 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 10,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  xpGuideContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  xpGuideTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  xpGuideGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  xpGuideItem: {
+    flex: 1,
+    minWidth: '30%',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: RADIUS.sm,
+    padding: SPACING.sm,
+    alignItems: 'center',
+  },
+  xpGuideValue: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.success,
+    marginBottom: 2,
+  },
+  xpGuideLabel: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  xpGuideNote: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   fixLevelButton: {
     backgroundColor: COLORS.gold,
@@ -986,6 +1063,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     borderRadius: RADIUS.md,
     alignSelf: 'center',
+    marginTop: SPACING.sm,
   },
   fixLevelText: {
     fontSize: 11,
