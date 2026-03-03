@@ -618,64 +618,71 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
           })()}
           
           {/* Remove All Accessories Button */}
-          {config && config.accessories.length > 0 && (
-            <View style={styles.removeAllContainer}>
-              <TouchableOpacity
-                style={styles.removeAllButton}
-                onPress={() => {
-                  if (!config) return;
-                  
-                  const currentAccessories = [...config.accessories];
-                  console.log('🗑️ BEFORE REMOVAL - Accessories:', currentAccessories);
-                  console.log('🗑️ BEFORE REMOVAL - Draggable features:', draggableFeatures.filter(f => f.id.startsWith('accessory_')).map(f => f.id));
-                  
-                  Alert.alert(
-                    'Remove All Accessories',
-                    `This will remove ${currentAccessories.length} accessory items. Continue?`,
-                    [
-                      {
-                        text: 'Cancel',
-                        style: 'cancel'
-                      },
-                      {
-                        text: 'Remove All',
-                        style: 'destructive',
-                        onPress: () => {
-                          // Force complete reset
-                          const newConfig = {
-                            ...config,
-                            accessories: []
-                          };
-                          
-                          const newFeatures = draggableFeatures.filter(f => !f.id.startsWith('accessory_'));
-                          
-                          console.log('🗑️ AFTER REMOVAL - New config accessories:', newConfig.accessories);
-                          console.log('🗑️ AFTER REMOVAL - New features count:', newFeatures.length);
-                          
-                          setConfig(newConfig);
-                          setDraggableFeatures(newFeatures);
-                          
-                          // Clear selected feature if it was an accessory
-                          if (selectedFeatureId?.startsWith('accessory_')) {
-                            setSelectedFeatureId(null);
+          {(() => {
+            const accessoryFeatures = draggableFeatures.filter(f => f.id.startsWith('accessory_'));
+            return accessoryFeatures.length > 0 && (
+              <View style={styles.removeAllContainer}>
+                <TouchableOpacity
+                  style={styles.removeAllButton}
+                  onPress={() => {
+                    if (!config) return;
+                    
+                    const accessoryFeatureIds = accessoryFeatures.map(f => f.id);
+                    const accessoryCount = accessoryFeatures.length;
+                    
+                    console.log('🗑️ BEFORE REMOVAL - Config accessories:', config.accessories);
+                    console.log('🗑️ BEFORE REMOVAL - Draggable accessory features:', accessoryFeatureIds);
+                    console.log('🗑️ TOTAL ACCESSORIES TO REMOVE:', accessoryCount);
+                    
+                    Alert.alert(
+                      'Remove All Accessories',
+                      `This will remove ${accessoryCount} accessory item${accessoryCount !== 1 ? 's' : ''}. Continue?`,
+                      [
+                        {
+                          text: 'Cancel',
+                          style: 'cancel'
+                        },
+                        {
+                          text: 'Remove All',
+                          style: 'destructive',
+                          onPress: () => {
+                            // Force complete reset of BOTH config and draggable features
+                            const newConfig = {
+                              ...config,
+                              accessories: []
+                            };
+                            
+                            const newFeatures = draggableFeatures.filter(f => !f.id.startsWith('accessory_'));
+                            
+                            console.log('🗑️ AFTER REMOVAL - New config accessories:', newConfig.accessories);
+                            console.log('🗑️ AFTER REMOVAL - Remaining features:', newFeatures.length);
+                            console.log('🗑️ REMOVED:', accessoryCount, 'accessories');
+                            
+                            setConfig(newConfig);
+                            setDraggableFeatures(newFeatures);
+                            
+                            // Clear selected feature if it was an accessory
+                            if (selectedFeatureId?.startsWith('accessory_')) {
+                              setSelectedFeatureId(null);
+                            }
+                            
+                            haptics.success();
+                            
+                            // Confirm removal
+                            setTimeout(() => {
+                              Alert.alert('Success', `Removed all ${accessoryCount} accessory item${accessoryCount !== 1 ? 's' : ''}!`);
+                            }, 100);
                           }
-                          
-                          haptics.success();
-                          
-                          // Confirm removal
-                          setTimeout(() => {
-                            Alert.alert('Success', `Removed all ${currentAccessories.length} accessories!`);
-                          }, 100);
                         }
-                      }
-                    ]
-                  );
-                }}
-              >
-                <Text style={styles.removeAllButtonText}>🗑️ Remove All Accessories</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.removeAllButtonText}>🗑️ Remove All Accessories ({accessoryFeatures.length})</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Category Tabs */}
