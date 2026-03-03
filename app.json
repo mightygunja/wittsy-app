@@ -2,7 +2,7 @@
   "expo": {
     "name": "Wittz",
     "slug": "wittsy-app",
-    "version": "1.0.1",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wittsy.app",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events."
