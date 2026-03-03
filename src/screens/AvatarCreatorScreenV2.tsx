@@ -52,7 +52,40 @@ const CANVAS_SIZE = AVATAR_SIZE; // Store for position calculations
 const getStyleFromId = (id: string): string => {
   // Extract style from ID (e.g., 'eyes_happy' -> 'happy')
   const parts = id.split('_');
-  return parts.length > 1 ? parts[1] : parts[0];
+  return parts.length > 1 ? parts.slice(1).join('_') : parts[0];
+};
+
+// Extract hair color from hair ID to match AvatarDisplay rendering
+const getHairColor = (hairId: string): string => {
+  if (!hairId) return HAIR_COLORS.brown;
+  
+  const colorMap: { [key: string]: string } = {
+    'blue': HAIR_COLORS.blue,
+    'pink': HAIR_COLORS.pink,
+    'green': HAIR_COLORS.green,
+    'purple': HAIR_COLORS.purple,
+    'rainbow': HAIR_COLORS.pink,
+    'galaxy': HAIR_COLORS.purple,
+    'neon': HAIR_COLORS.green,
+    'cyber': HAIR_COLORS.blue,
+    'ice': '#B0E0E6',
+    'lava': '#FF4500',
+    'fire': '#FF4500',
+    'lightning': '#FFD700',
+    'phoenix': '#FF6347',
+    'celestial': '#E6E6FA',
+    'void': '#2F4F4F',
+    'founder_gold': HAIR_COLORS.blonde,
+    'champion': HAIR_COLORS.blonde,
+  };
+  
+  for (const [keyword, color] of Object.entries(colorMap)) {
+    if (hairId.includes(keyword)) {
+      return color;
+    }
+  }
+  
+  return HAIR_COLORS.brown;
 };
 
 interface DraggableFeature {
@@ -199,7 +232,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
           y: pos.y,
           scale: pos.scale,
           rotation: pos.rotation,
-          color: HAIR_COLORS.brown,
+          color: getHairColor(avatarConfig.hair), // Extract color from hair ID
         });
       }
     }
@@ -406,6 +439,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
           if (hairIndex >= 0) {
             newFeatures[hairIndex].emoji = hairItem.emoji;
             newFeatures[hairIndex].style = getStyleFromId(itemId);
+            newFeatures[hairIndex].color = getHairColor(itemId); // Update color when changing hair
           } else {
             newFeatures.push({
               id: 'hair',
@@ -416,7 +450,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
               y: 20,
               scale: 1.2,
               rotation: 0,
-              color: HAIR_COLORS.brown,
+              color: getHairColor(itemId), // Extract color from hair ID
             });
           }
         }
