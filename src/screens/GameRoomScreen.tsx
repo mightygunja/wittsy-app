@@ -1305,6 +1305,41 @@ const GameRoomScreen: React.FC = () => {
           </ScrollView>
         )}
 
+        {/* FLOATING TEST BUTTON - ALWAYS VISIBLE */}
+        {user && (
+          <View style={{
+            position: 'absolute',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            zIndex: 9999,
+            elevation: 9999,
+          }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#FF4757',
+                padding: 20,
+                borderRadius: 12,
+                alignItems: 'center',
+                borderWidth: 3,
+                borderColor: '#FFFFFF',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.5,
+                shadowRadius: 8,
+              }}
+              onPress={() => {
+                console.log('🔥 TEST BUTTON PRESSED!');
+                Alert.alert('SUCCESS!', 'Touch events work! Issue is in ChatBox component.');
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>
+                🔴 TAP HERE TO TEST CHAT 🔴
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Active game */}
         {gameState && (
           <View style={{ flex: 1 }} pointerEvents="box-none">
@@ -1345,28 +1380,6 @@ const GameRoomScreen: React.FC = () => {
                   </View>
                 )}
               </ScrollView>
-              
-              {/* In-game Chat */}
-              {user && (
-                <View style={styles.chatContainer}>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: '#FF4757',
-                      padding: 20,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => {
-                      console.log('🔥 TEST BUTTON PRESSED!');
-                      Alert.alert('Chat Test', 'Touch events are working! Now fixing ChatBox...');
-                    }}
-                  >
-                    <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>
-                      TAP HERE TO TEST CHAT
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
           </View>
         )}
