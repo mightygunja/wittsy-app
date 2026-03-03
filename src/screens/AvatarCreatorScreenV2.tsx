@@ -619,7 +619,13 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
           
           {/* Remove All Accessories Button */}
           {(() => {
-            const accessoryFeatures = draggableFeatures.filter(f => f.id.startsWith('accessory_'));
+            // DEBUG: Log ALL draggable features to see what we have
+            console.log('🔍 ALL DRAGGABLE FEATURES:', draggableFeatures.map(f => ({ id: f.id, type: f.type })));
+            
+            const accessoryFeatures = draggableFeatures.filter(f => f.type === 'accessory');
+            console.log('🔍 FILTERED ACCESSORY FEATURES:', accessoryFeatures.map(f => f.id));
+            console.log('🔍 ACCESSORY COUNT:', accessoryFeatures.length);
+            
             return accessoryFeatures.length > 0 && (
               <View style={styles.removeAllContainer}>
                 <TouchableOpacity
@@ -652,7 +658,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
                               accessories: []
                             };
                             
-                            const newFeatures = draggableFeatures.filter(f => !f.id.startsWith('accessory_'));
+                            const newFeatures = draggableFeatures.filter(f => f.type !== 'accessory');
                             
                             console.log('🗑️ AFTER REMOVAL - New config accessories:', newConfig.accessories);
                             console.log('🗑️ AFTER REMOVAL - Remaining features:', newFeatures.length);
