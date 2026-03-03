@@ -854,9 +854,12 @@ const GameRoomScreen: React.FC = () => {
     if (room?.status === 'active' && !gameState) {
       return (
         <View style={styles.loadingPhase}>
-          <Text style={styles.loadingEmoji}>🤔</Text>
-          <Text style={styles.loadingText}>Loading game...</Text>
-          <Text style={styles.loadingSubtext}>Preparing your first prompt</Text>
+          <Text style={styles.loadingEmoji}>🎮</Text>
+          <Text style={styles.loadingText}>Starting Game...</Text>
+          <Text style={styles.loadingSubtext}>Get ready! Your prompt is loading</Text>
+          <View style={styles.loadingDotsContainer}>
+            <Text style={styles.loadingDots}>●●●</Text>
+          </View>
         </View>
       );
     }
@@ -1350,8 +1353,8 @@ const GameRoomScreen: React.FC = () => {
                     roomId={roomId}
                     userId={user.uid}
                     username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
-                    compact={true}
-                    maxHeight={300}
+                    compact={false}
+                    maxHeight={250}
                   />
                 </View>
               )}
@@ -1798,6 +1801,15 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
     textAlign: 'center',
+  },
+  loadingDotsContainer: {
+    marginTop: 16,
+  },
+  loadingDots: {
+    fontSize: 24,
+    color: COLORS.primary,
+    textAlign: 'center',
+    letterSpacing: 4,
   },
   promptPhase: {
     minHeight: 400,
