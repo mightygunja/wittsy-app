@@ -536,6 +536,86 @@ export const Hair = {
       </G>
     </Svg>
   ),
+  
+  // Legendary hair styles
+  fire: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        {/* Base hair */}
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        {/* Fire flames */}
+        <Path d="M 25 10 Q 20 5 20 0 Q 20 -3 25 -5 Q 28 -2 28 1 Q 30 -2 30 0 Q 30 5 25 10 Z" fill="#FF4500" />
+        <Path d="M 50 5 Q 45 0 45 -5 Q 45 -8 50 -10 Q 53 -7 53 -4 Q 55 -7 55 -5 Q 55 0 50 5 Z" fill="#FF4500" />
+        <Path d="M 75 10 Q 70 5 70 0 Q 70 -3 75 -5 Q 78 -2 78 1 Q 80 -2 80 0 Q 80 5 75 10 Z" fill="#FF4500" />
+        {/* Inner flames */}
+        <Path d="M 35 8 Q 32 5 32 2 Q 32 0 35 -1 Q 37 1 37 2 Q 37 5 35 8 Z" fill="#FFD700" />
+        <Path d="M 65 8 Q 62 5 62 2 Q 62 0 65 -1 Q 67 1 67 2 Q 67 5 65 8 Z" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  lightning: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        {/* Base hair */}
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        {/* Lightning bolts */}
+        <Path d="M 30 0 L 25 15 L 32 15 L 27 30" stroke="#FFD700" strokeWidth="3" fill="none" />
+        <Path d="M 50 -5 L 45 10 L 52 10 L 47 25" stroke="#FFD700" strokeWidth="3" fill="none" />
+        <Path d="M 70 0 L 65 15 L 72 15 L 67 30" stroke="#FFD700" strokeWidth="3" fill="none" />
+      </G>
+    </Svg>
+  ),
+  
+  phoenix: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        {/* Base hair with phoenix feathers */}
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        {/* Phoenix flames rising */}
+        <Path d="M 30 10 Q 25 0 30 -10 Q 35 0 30 10" fill="#FF6347" opacity="0.8" />
+        <Path d="M 50 5 Q 45 -5 50 -15 Q 55 -5 50 5" fill="#FF6347" opacity="0.8" />
+        <Path d="M 70 10 Q 65 0 70 -10 Q 75 0 70 10" fill="#FF6347" opacity="0.8" />
+        {/* Golden accents */}
+        <Circle cx="30" cy="-5" r="3" fill="#FFD700" />
+        <Circle cx="50" cy="-10" r="4" fill="#FFD700" />
+        <Circle cx="70" cy="-5" r="3" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  celestial: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        {/* Base hair */}
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        {/* Stars */}
+        <Path d="M 25 5 L 27 10 L 32 10 L 28 13 L 30 18 L 25 15 L 20 18 L 22 13 L 18 10 L 23 10 Z" fill="#E6E6FA" />
+        <Path d="M 50 0 L 52 5 L 57 5 L 53 8 L 55 13 L 50 10 L 45 13 L 47 8 L 43 5 L 48 5 Z" fill="#FFFFFF" />
+        <Path d="M 75 5 L 77 10 L 82 10 L 78 13 L 80 18 L 75 15 L 70 18 L 72 13 L 68 10 L 73 10 Z" fill="#E6E6FA" />
+        {/* Sparkles */}
+        <Circle cx="35" cy="15" r="2" fill="#FFFFFF" opacity="0.8" />
+        <Circle cx="65" cy="15" r="2" fill="#FFFFFF" opacity="0.8" />
+      </G>
+    </Svg>
+  ),
+  
+  void: (size: number, color: string) => (
+    <Svg width={size} height={size} viewBox="0 0 100 80">
+      <G>
+        {/* Base hair with void effect */}
+        <Path d="M 10 50 Q 10 10 50 5 Q 90 10 90 50" fill={color} stroke={color} strokeWidth="2" />
+        {/* Dark wisps */}
+        <Path d="M 25 10 Q 20 5 25 0 Q 30 5 25 10" fill="#2F4F4F" opacity="0.7" />
+        <Path d="M 50 5 Q 45 0 50 -5 Q 55 0 50 5" fill="#2F4F4F" opacity="0.7" />
+        <Path d="M 75 10 Q 70 5 75 0 Q 80 5 75 10" fill="#2F4F4F" opacity="0.7" />
+        {/* Void particles */}
+        <Circle cx="30" cy="8" r="2" fill="#000000" opacity="0.5" />
+        <Circle cx="50" cy="3" r="2" fill="#000000" opacity="0.5" />
+        <Circle cx="70" cy="8" r="2" fill="#000000" opacity="0.5" />
+      </G>
+    </Svg>
+  ),
 };
 
 // ACCESSORIES
