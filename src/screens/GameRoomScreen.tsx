@@ -1305,7 +1305,7 @@ const GameRoomScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        {/* FLOATING TEST BUTTON - ALWAYS VISIBLE */}
+        {/* FLOATING CHAT - ALWAYS VISIBLE */}
         {user && (
           <View style={{
             position: 'absolute',
@@ -1315,28 +1315,13 @@ const GameRoomScreen: React.FC = () => {
             zIndex: 9999,
             elevation: 9999,
           }}>
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#FF4757',
-                padding: 20,
-                borderRadius: 12,
-                alignItems: 'center',
-                borderWidth: 3,
-                borderColor: '#FFFFFF',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.5,
-                shadowRadius: 8,
-              }}
-              onPress={() => {
-                console.log('🔥 TEST BUTTON PRESSED!');
-                Alert.alert('SUCCESS!', 'Touch events work! Issue is in ChatBox component.');
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>
-                🔴 TAP HERE TO TEST CHAT 🔴
-              </Text>
-            </TouchableOpacity>
+            <ChatBox
+              roomId={roomId}
+              userId={user.uid}
+              username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
+              compact={false}
+              maxHeight={300}
+            />
           </View>
         )}
 
