@@ -616,6 +616,25 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
               </View>
             );
           })()}
+          
+          {/* Remove All Accessories Button */}
+          {config && config.accessories.length > 0 && (
+            <View style={styles.removeAllContainer}>
+              <TouchableOpacity
+                style={styles.removeAllButton}
+                onPress={() => {
+                  if (!config) return;
+                  const newConfig = { ...config, accessories: [] };
+                  setConfig(newConfig);
+                  // Remove all accessory draggable features
+                  setDraggableFeatures(prev => prev.filter(f => !f.id.startsWith('accessory_')));
+                  haptics.success();
+                }}
+              >
+                <Text style={styles.removeAllButtonText}>🗑️ Remove All Accessories</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Category Tabs */}
@@ -649,25 +668,6 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        {/* Remove All Accessories Button */}
-        {selectedCategory === 'accessories' && config && config.accessories.length > 0 && (
-          <View style={styles.removeAllContainer}>
-            <TouchableOpacity
-              style={styles.removeAllButton}
-              onPress={() => {
-                if (!config) return;
-                const newConfig = { ...config, accessories: [] };
-                setConfig(newConfig);
-                // Remove all accessory draggable features
-                setDraggableFeatures(prev => prev.filter(f => !f.id.startsWith('accessory_')));
-                haptics.success();
-              }}
-            >
-              <Text style={styles.removeAllButtonText}>🗑️ Remove All Accessories</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {/* Items Grid */}
         <ScrollView style={styles.itemsContainer} showsVerticalScrollIndicator={false}>
@@ -1016,14 +1016,14 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 32,
   },
   removeAllContainer: {
-    paddingHorizontal: SPACING.large,
-    paddingVertical: SPACING.medium,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
   },
   removeAllButton: {
     backgroundColor: '#FF4757',
-    paddingVertical: SPACING.medium,
-    paddingHorizontal: SPACING.large,
-    borderRadius: RADIUS.medium,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
