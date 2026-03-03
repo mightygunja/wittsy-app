@@ -818,6 +818,125 @@ export const Accessories = {
       </G>
     </Svg>
   ),
+  
+  // Epic accessories
+  laurel: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 40">
+      <G>
+        <Path d="M 20 30 Q 15 20 20 10 Q 25 15 30 20 Q 35 15 40 10 Q 45 15 50 20 Q 55 15 60 10 Q 65 15 70 20 Q 75 15 80 10 Q 85 20 80 30" 
+          fill="none" stroke="#228B22" strokeWidth="3" />
+        <Circle cx="25" cy="15" r="3" fill="#FFD700" />
+        <Circle cx="50" cy="15" r="3" fill="#FFD700" />
+        <Circle cx="75" cy="15" r="3" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  // Legendary accessories
+  wizard_hat: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <G>
+        <Path d="M 30 50 L 50 5 L 70 50 Z" fill="#4B0082" stroke="#2F004F" strokeWidth="2" />
+        <Ellipse cx="50" cy="50" rx="25" ry="6" fill="#4B0082" stroke="#2F004F" strokeWidth="2" />
+        <Path d="M 40 30 L 60 30" stroke="#FFD700" strokeWidth="2" />
+        <Circle cx="35" cy="20" r="2" fill="#FFD700" />
+        <Circle cx="50" cy="15" r="2" fill="#FFD700" />
+        <Circle cx="65" cy="20" r="2" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  dragon_helm: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <G>
+        <Path d="M 20 40 Q 20 20 50 15 Q 80 20 80 40 L 75 50 Q 50 55 25 50 Z" fill="#8B0000" stroke="#660000" strokeWidth="2" />
+        <Path d="M 50 15 L 55 5 L 60 15" fill="#FF4500" stroke="#8B0000" strokeWidth="1" />
+        <Path d="M 40 15 L 45 5 L 50 15" fill="#FF4500" stroke="#8B0000" strokeWidth="1" />
+        <Circle cx="35" cy="30" r="4" fill="#FFD700" />
+        <Circle cx="65" cy="30" r="4" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  phoenix_crown: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 50">
+      <G>
+        <Path d="M 10 40 L 20 15 L 30 30 L 50 5 L 70 30 L 80 15 L 90 40 Z" fill="#FF6347" stroke="#FF4500" strokeWidth="2" />
+        <Path d="M 50 5 Q 45 0 50 -5 Q 55 0 50 5" fill="#FFD700" />
+        <Path d="M 30 15 Q 27 12 30 9 Q 33 12 30 15" fill="#FFD700" />
+        <Path d="M 70 15 Q 67 12 70 9 Q 73 12 70 15" fill="#FFD700" />
+        <Circle cx="50" cy="0" r="3" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  galaxy_visor: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 30">
+      <G>
+        <Path d="M 20 15 Q 50 10 80 15" stroke="#4A00E0" strokeWidth="3" fill="none" />
+        <Path d="M 15 15 Q 30 20 50 18 Q 70 20 85 15" fill="#4A00E0" opacity="0.7" />
+        <Circle cx="30" cy="17" r="1.5" fill="#FFFFFF" opacity="0.8" />
+        <Circle cx="50" cy="16" r="2" fill="#FFFFFF" opacity="0.8" />
+        <Circle cx="70" cy="17" r="1.5" fill="#FFFFFF" opacity="0.8" />
+        <Circle cx="40" cy="18" r="1" fill="#8E2DE2" opacity="0.6" />
+        <Circle cx="60" cy="18" r="1" fill="#8E2DE2" opacity="0.6" />
+      </G>
+    </Svg>
+  ),
+  
+  lightning_bolt: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <G>
+        <Path d="M 50 5 L 40 25 L 50 25 L 45 45 L 65 20 L 55 20 L 60 5 Z" fill="#FFD700" stroke="#FFA500" strokeWidth="2" />
+        <Path d="M 50 10 L 55 15" stroke="#FFFF00" strokeWidth="2" />
+      </G>
+    </Svg>
+  ),
+  
+  // Exclusive accessories
+  founder_crown: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 50">
+      <G>
+        <Path d="M 10 40 L 20 10 L 30 30 L 50 5 L 70 30 L 80 10 L 90 40 Z" fill="#FFD700" stroke="#FFA500" strokeWidth="3" />
+        <Circle cx="20" cy="10" r="5" fill="#FF1493" stroke="#FFD700" strokeWidth="1" />
+        <Circle cx="50" cy="5" r="6" fill="#FF1493" stroke="#FFD700" strokeWidth="1" />
+        <Circle cx="80" cy="10" r="5" fill="#FF1493" stroke="#FFD700" strokeWidth="1" />
+        <Path d="M 15 40 L 85 40" stroke="#FFA500" strokeWidth="4" />
+      </G>
+    </Svg>
+  ),
+  
+  legend_halo: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 30">
+      <G>
+        <Ellipse cx="50" cy="15" rx="35" ry="10" fill="none" stroke="#FFD700" strokeWidth="5" opacity="0.9" />
+        <Ellipse cx="50" cy="15" rx="32" ry="7" fill="#FFFF00" opacity="0.4" />
+        <Circle cx="20" cy="15" r="3" fill="#FFFFFF" opacity="0.9" />
+        <Circle cx="50" cy="10" r="3" fill="#FFFFFF" opacity="0.9" />
+        <Circle cx="80" cy="15" r="3" fill="#FFFFFF" opacity="0.9" />
+        <Path d="M 35 15 L 37 10 L 39 15" fill="#FFD700" />
+        <Path d="M 61 15 L 63 10 L 65 15" fill="#FFD700" />
+      </G>
+    </Svg>
+  ),
+  
+  ultimate_set: (size: number) => (
+    <Svg width={size} height={size} viewBox="0 0 100 60">
+      <G>
+        {/* Crown */}
+        <Path d="M 10 35 L 20 15 L 30 28 L 50 10 L 70 28 L 80 15 L 90 35 Z" fill="#FFD700" stroke="#FFA500" strokeWidth="2" />
+        {/* Halo */}
+        <Ellipse cx="50" cy="8" rx="25" ry="6" fill="none" stroke="#FFFFFF" strokeWidth="3" opacity="0.8" />
+        {/* Stars */}
+        <Path d="M 25 20 L 27 25 L 32 25 L 28 28 L 30 33 L 25 30 L 20 33 L 22 28 L 18 25 L 23 25 Z" fill="#FFFFFF" />
+        <Path d="M 75 20 L 77 25 L 82 25 L 78 28 L 80 33 L 75 30 L 70 33 L 72 28 L 68 25 L 73 25 Z" fill="#FFFFFF" />
+        {/* Gems */}
+        <Circle cx="50" cy="10" r="4" fill="#FF1493" />
+        <Circle cx="30" cy="18" r="3" fill="#00FFFF" />
+        <Circle cx="70" cy="18" r="3" fill="#00FFFF" />
+      </G>
+    </Svg>
+  ),
 };
 
 export const SKIN_COLORS = {
