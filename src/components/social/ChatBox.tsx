@@ -242,14 +242,20 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
             <View style={styles.inputContainer}>
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={() => setShowQuickChat(true)}
+                onPress={() => {
+                  console.log('💬 Quick chat button pressed!');
+                  setShowQuickChat(true);
+                }}
               >
                 <Text style={styles.iconButtonText}>💬</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={() => { console.log(' Emote button clicked!'); setShowEmotes(true); }}
+                onPress={() => { 
+                  console.log('😊 Emote button pressed!'); 
+                  setShowEmotes(true); 
+                }}
               >
                 <Text style={styles.iconButtonText}>😊</Text>
               </TouchableOpacity>
@@ -259,7 +265,11 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                 placeholder="Type a message..."
                 placeholderTextColor={COLORS.textTertiary}
                 value={inputText}
-                onChangeText={setInputText}
+                onChangeText={(text) => {
+                  console.log('⌨️ Chat input changed:', text);
+                  setInputText(text);
+                }}
+                onFocus={() => console.log('⌨️ Chat input focused')}
                 onSubmitEditing={handleSendMessage}
                 returnKeyType="send"
                 maxLength={200}
@@ -349,7 +359,6 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
               contentContainerStyle={{ paddingBottom: 20 }}
               showsVerticalScrollIndicator={true}
             >
-              {console.log(' Rendering emotes, count:', EMOTES.length, EMOTES)}
               <View style={styles.emotesGrid}>
                 {EMOTES.filter(e => !e.premium && !e.unlockCondition).map(emote => (
                   <TouchableOpacity
@@ -680,7 +689,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   emotesList: {
     flex: 1,
     padding: SPACING.md,
-    backgroundColor: COLORS.surface,
     backgroundColor: COLORS.surface,
   },
   emotesGrid: {

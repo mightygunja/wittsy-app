@@ -1347,17 +1347,20 @@ const GameRoomScreen: React.FC = () => {
               </ScrollView>
               
               {/* In-game Chat */}
-              {user && (
-                <View style={styles.chatContainer}>
-                  <ChatBox
-                    roomId={roomId}
-                    userId={user.uid}
-                    username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
-                    compact={false}
-                    maxHeight={250}
-                  />
-                </View>
-              )}
+              {user && (() => {
+                console.log('💬 Rendering ChatBox for user:', user.uid);
+                return (
+                  <View style={styles.chatContainer} pointerEvents="box-none">
+                    <ChatBox
+                      roomId={roomId}
+                      userId={user.uid}
+                      username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
+                      compact={false}
+                      maxHeight={250}
+                    />
+                  </View>
+                );
+              })()}
             </View>
           </View>
         )}
