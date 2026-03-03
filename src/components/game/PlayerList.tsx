@@ -42,7 +42,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, cur
               <View style={styles.avatarContainer}>
                 {player.avatarConfig ? (
                   <View style={styles.avatar}>
-                    <AvatarDisplay config={player.avatarConfig} size={isLargeTablet ? 80 : isTablet ? 70 : 60} />
+                    <AvatarDisplay config={player.avatarConfig} size={isLargeTablet ? 120 : isTablet ? 110 : 100} />
                   </View>
                 ) : (
                   <View style={[
