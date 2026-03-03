@@ -625,30 +625,51 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
                 onPress={() => {
                   if (!config) return;
                   
-                  console.log('🗑️ Removing all accessories. Current:', config.accessories);
+                  const currentAccessories = [...config.accessories];
+                  console.log('🗑️ BEFORE REMOVAL - Accessories:', currentAccessories);
+                  console.log('🗑️ BEFORE REMOVAL - Draggable features:', draggableFeatures.filter(f => f.id.startsWith('accessory_')).map(f => f.id));
                   
-                  // Clear all accessories from config
-                  setConfig(prev => {
-                    if (!prev) return prev;
-                    return {
-                      ...prev,
-                      accessories: []
-                    };
-                  });
-                  
-                  // Remove all accessory draggable features
-                  setDraggableFeatures(prev => {
-                    const filtered = prev.filter(f => !f.id.startsWith('accessory_'));
-                    console.log('🗑️ Filtered features. Before:', prev.length, 'After:', filtered.length);
-                    return filtered;
-                  });
-                  
-                  // Clear selected feature if it was an accessory
-                  if (selectedFeatureId?.startsWith('accessory_')) {
-                    setSelectedFeatureId(null);
-                  }
-                  
-                  haptics.success();
+                  Alert.alert(
+                    'Remove All Accessories',
+                    `This will remove ${currentAccessories.length} accessory items. Continue?`,
+                    [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel'
+                      },
+                      {
+                        text: 'Remove All',
+                        style: 'destructive',
+                        onPress: () => {
+                          // Force complete reset
+                          const newConfig = {
+                            ...config,
+                            accessories: []
+                          };
+                          
+                          const newFeatures = draggableFeatures.filter(f => !f.id.startsWith('accessory_'));
+                          
+                          console.log('🗑️ AFTER REMOVAL - New config accessories:', newConfig.accessories);
+                          console.log('🗑️ AFTER REMOVAL - New features count:', newFeatures.length);
+                          
+                          setConfig(newConfig);
+                          setDraggableFeatures(newFeatures);
+                          
+                          // Clear selected feature if it was an accessory
+                          if (selectedFeatureId?.startsWith('accessory_')) {
+                            setSelectedFeatureId(null);
+                          }
+                          
+                          haptics.success();
+                          
+                          // Confirm removal
+                          setTimeout(() => {
+                            Alert.alert('Success', `Removed all ${currentAccessories.length} accessories!`);
+                          }, 100);
+                        }
+                      }
+                    ]
+                  );
                 }}
               >
                 <Text style={styles.removeAllButtonText}>🗑️ Remove All Accessories</Text>
