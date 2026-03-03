@@ -1307,8 +1307,8 @@ const GameRoomScreen: React.FC = () => {
 
         {/* Active game */}
         {gameState && (
-          <View style={{ flex: 1 }}>
-            <View style={{ flex: 1 }}>
+          <View style={{ flex: 1 }} pointerEvents="box-none">
+            <View style={{ flex: 1 }} pointerEvents="box-none">
               <ScrollView 
                 style={styles.gameContent}
                 contentContainerStyle={styles.gameContentContainer}
@@ -1350,7 +1350,7 @@ const GameRoomScreen: React.FC = () => {
               {user && (() => {
                 console.log('💬 Rendering ChatBox for user:', user.uid);
                 return (
-                  <View style={styles.chatContainer} pointerEvents="box-none">
+                  <View style={styles.chatContainer}>
                     <ChatBox
                       roomId={roomId}
                       userId={user.uid}
