@@ -650,6 +650,25 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
           ))}
         </ScrollView>
 
+        {/* Remove All Accessories Button */}
+        {selectedCategory === 'accessories' && config && config.accessories.length > 0 && (
+          <View style={styles.removeAllContainer}>
+            <TouchableOpacity
+              style={styles.removeAllButton}
+              onPress={() => {
+                if (!config) return;
+                const newConfig = { ...config, accessories: [] };
+                setConfig(newConfig);
+                // Remove all accessory draggable features
+                setDraggableFeatures(prev => prev.filter(f => !f.id.startsWith('accessory_')));
+                haptics.success();
+              }}
+            >
+              <Text style={styles.removeAllButtonText}>🗑️ Remove All Accessories</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Items Grid */}
         <ScrollView style={styles.itemsContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.itemsGrid}>
@@ -987,18 +1006,30 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     backgroundColor: COLORS.success,
   },
   lockedOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: RADIUS.md,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: RADIUS.medium,
+  },
+  lockIcon: {
+    fontSize: 32,
+  },
+  removeAllContainer: {
+    paddingHorizontal: SPACING.large,
+    paddingVertical: SPACING.medium,
+  },
+  removeAllButton: {
+    backgroundColor: '#FF4757',
+    paddingVertical: SPACING.medium,
+    paddingHorizontal: SPACING.large,
+    borderRadius: RADIUS.medium,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  lockIcon: {
-    fontSize: 24,
+  removeAllButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
-
