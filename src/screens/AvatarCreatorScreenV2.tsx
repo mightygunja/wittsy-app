@@ -624,10 +624,30 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
                 style={styles.removeAllButton}
                 onPress={() => {
                   if (!config) return;
-                  const newConfig = { ...config, accessories: [] };
-                  setConfig(newConfig);
+                  
+                  console.log('🗑️ Removing all accessories. Current:', config.accessories);
+                  
+                  // Clear all accessories from config
+                  setConfig(prev => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      accessories: []
+                    };
+                  });
+                  
                   // Remove all accessory draggable features
-                  setDraggableFeatures(prev => prev.filter(f => !f.id.startsWith('accessory_')));
+                  setDraggableFeatures(prev => {
+                    const filtered = prev.filter(f => !f.id.startsWith('accessory_'));
+                    console.log('🗑️ Filtered features. Before:', prev.length, 'After:', filtered.length);
+                    return filtered;
+                  });
+                  
+                  // Clear selected feature if it was an accessory
+                  if (selectedFeatureId?.startsWith('accessory_')) {
+                    setSelectedFeatureId(null);
+                  }
+                  
                   haptics.success();
                 }}
               >
