@@ -620,78 +620,62 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
             );
           })()}
           
-          {/* Remove All Accessories Button */}
-          {(() => {
-            // DEBUG: Log ALL draggable features to see what we have
-            console.log('🔍 ALL DRAGGABLE FEATURES:', draggableFeatures.map(f => ({ id: f.id, type: f.type })));
-            
-            const accessoryFeatures = draggableFeatures.filter(f => f.type === 'accessory');
-            console.log('🔍 FILTERED ACCESSORY FEATURES:', accessoryFeatures.map(f => f.id));
-            console.log('🔍 ACCESSORY COUNT:', accessoryFeatures.length);
-            
-            return accessoryFeatures.length > 0 && (
-              <View style={styles.removeAllContainer}>
-                <TouchableOpacity
-                  style={styles.removeAllButton}
-                  onPress={() => {
-                    if (!config) return;
-                    
-                    const accessoryFeatureIds = accessoryFeatures.map(f => f.id);
-                    const accessoryCount = accessoryFeatures.length;
-                    
-                    console.log('🗑️ BEFORE REMOVAL - Config accessories:', config.accessories);
-                    console.log('🗑️ BEFORE REMOVAL - Draggable accessory features:', accessoryFeatureIds);
-                    console.log('🗑️ TOTAL ACCESSORIES TO REMOVE:', accessoryCount);
-                    
-                    Alert.alert(
-                      'Remove All Accessories',
-                      `This will remove ${accessoryCount} accessory item${accessoryCount !== 1 ? 's' : ''}. Continue?`,
-                      [
-                        {
-                          text: 'Cancel',
-                          style: 'cancel'
-                        },
-                        {
-                          text: 'Remove All',
-                          style: 'destructive',
-                          onPress: () => {
-                            // Force complete reset of BOTH config and draggable features
-                            const newConfig = {
-                              ...config,
-                              accessories: []
-                            };
-                            
-                            const newFeatures = draggableFeatures.filter(f => f.type !== 'accessory');
-                            
-                            console.log('🗑️ AFTER REMOVAL - New config accessories:', newConfig.accessories);
-                            console.log('🗑️ AFTER REMOVAL - Remaining features:', newFeatures.length);
-                            console.log('🗑️ REMOVED:', accessoryCount, 'accessories');
-                            
-                            setConfig(newConfig);
-                            setDraggableFeatures(newFeatures);
-                            
-                            // Clear selected feature if it was an accessory
-                            if (selectedFeatureId?.startsWith('accessory_')) {
-                              setSelectedFeatureId(null);
-                            }
-                            
-                            haptics.success();
-                            
-                            // Confirm removal
-                            setTimeout(() => {
-                              Alert.alert('Success', `Removed all ${accessoryCount} accessory item${accessoryCount !== 1 ? 's' : ''}!`);
-                            }, 100);
-                          }
+          {/* Remove All Features Button */}
+          {draggableFeatures.length > 0 && (
+            <View style={styles.removeAllContainer}>
+              <TouchableOpacity
+                style={styles.removeAllButton}
+                onPress={() => {
+                  if (!config) return;
+                  
+                  const featureCount = draggableFeatures.length;
+                  
+                  Alert.alert(
+                    'Reset Avatar',
+                    `This will remove all ${featureCount} features (hair, eyes, mouth, accessories) and reset your avatar. Continue?`,
+                    [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel'
+                      },
+                      {
+                        text: 'Reset All',
+                        style: 'destructive',
+                        onPress: () => {
+                          // Reset to default config
+                          const defaultConfig: AvatarConfig = {
+                            skin: 'skin_light',
+                            eyes: 'eyes_normal',
+                            mouth: 'mouth_smile',
+                            hair: 'hair_short',
+                            accessories: [],
+                            clothing: 'clothing_casual',
+                            background: 'bg_white',
+                            effects: [],
+                          };
+                          
+                          setConfig(defaultConfig);
+                          setDraggableFeatures([]);
+                          setSelectedFeatureId(null);
+                          
+                          // Reinitialize with defaults
+                          setTimeout(() => {
+                            initializeDraggableFeatures(defaultConfig);
+                          }, 100);
+                          
+                          haptics.success();
+                          
+                          Alert.alert('Success', 'Avatar reset to defaults!');
                         }
-                      ]
-                    );
-                  }}
-                >
-                  <Text style={styles.removeAllButtonText}>🗑️ Remove All Accessories ({accessoryFeatures.length})</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })()}
+                      }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.removeAllButtonText}>🗑️ Reset Avatar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Category Tabs */}
