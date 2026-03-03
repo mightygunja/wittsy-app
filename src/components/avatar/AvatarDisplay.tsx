@@ -16,8 +16,9 @@ interface AvatarDisplayProps {
 
 // Map avatar item IDs to SVG style names
 const getStyleFromId = (id: string): string => {
+  // Extract style from ID (e.g., 'eyes_happy' -> 'happy', 'hair_short_blue' -> 'short_blue')
   const parts = id.split('_');
-  return parts.length > 1 ? parts[1] : parts[0];
+  return parts.length > 1 ? parts.slice(1).join('_') : parts[0];
 };
 
 export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100 }) => {
