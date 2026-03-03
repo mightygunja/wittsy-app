@@ -217,6 +217,9 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
     const features: DraggableFeature[] = [];
     const savedPositions = avatarConfig.positions || {};
     
+    console.log('🔧 initializeDraggableFeatures - config.accessories:', avatarConfig.accessories);
+    console.log('🔧 initializeDraggableFeatures - accessories count:', avatarConfig.accessories?.length || 0);
+    
     // Hair (if exists)
     if (avatarConfig.hair) {
       const hairItem = DEFAULT_HAIR_STYLES.find(h => h.id === avatarConfig.hair);
