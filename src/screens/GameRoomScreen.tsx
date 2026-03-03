@@ -1347,20 +1347,26 @@ const GameRoomScreen: React.FC = () => {
               </ScrollView>
               
               {/* In-game Chat */}
-              {user && (() => {
-                console.log('💬 Rendering ChatBox for user:', user.uid);
-                return (
-                  <View style={styles.chatContainer}>
-                    <ChatBox
-                      roomId={roomId}
-                      userId={user.uid}
-                      username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
-                      compact={false}
-                      maxHeight={250}
-                    />
-                  </View>
-                );
-              })()}
+              {user && (
+                <View style={styles.chatContainer}>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FF4757',
+                      padding: 20,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      console.log('🔥 TEST BUTTON PRESSED!');
+                      Alert.alert('Chat Test', 'Touch events are working! Now fixing ChatBox...');
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>
+                      TAP HERE TO TEST CHAT
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         )}
