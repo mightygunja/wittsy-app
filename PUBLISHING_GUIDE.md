@@ -260,6 +260,9 @@ eas build --platform ios --profile production
 ```bash
 # Submit the build
 eas submit --platform ios --latest
+eas build --platform ios --profile production 
+--auto-submit
+npx eas-cli build --platform ios --profile production --auto-submit
 ```
 
 Or manually:

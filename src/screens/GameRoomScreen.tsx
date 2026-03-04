@@ -1305,7 +1305,7 @@ const GameRoomScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        {/* FLOATING CHAT - ALWAYS VISIBLE */}
+        {/* COLLAPSIBLE CHAT */}
         {user && (
           <View style={{
             position: 'absolute',
@@ -1319,8 +1319,9 @@ const GameRoomScreen: React.FC = () => {
               roomId={roomId}
               userId={user.uid}
               username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
-              compact={false}
+              compact={true}
               maxHeight={300}
+              userJoinedAt={Date.now()}
             />
           </View>
         )}

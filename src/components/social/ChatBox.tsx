@@ -37,6 +37,7 @@ interface ChatBoxProps {
   username: string;
   compact?: boolean;
   maxHeight?: number;
+  userJoinedAt?: number; // Timestamp when user joined room
 }
 
 export const ChatBox: React.FC<ChatBoxProps> = ({
@@ -45,6 +46,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   username,
   compact = false,
   maxHeight = 400,
+  userJoinedAt,
 }) => {
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
@@ -59,20 +61,27 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
   useEffect(() => {
     const unsubscribe = subscribeToChatMessages(roomId, (newMessages) => {
-      console.log(' ChatBox received messages:', newMessages.length, newMessages);
-      setMessages(newMessages);
+      console.log('💬 ChatBox received messages:', newMessages.length, newMessages);
+      
+      // Filter messages to only show those after user joined
+      const filteredMessages = userJoinedAt 
+        ? newMessages.filter(msg => new Date(msg.timestamp).getTime() >= userJoinedAt)
+        : newMessages;
+      
+      setMessages(filteredMessages);
       setTimeout(() => scrollToBottom(), 100);
     });
 
     return () => unsubscribe();
-  }, [roomId]);
+  }, [roomId, userJoinedAt]);
 
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: isExpanded ? 1 : 0,
       useNativeDriver: false,
-      tension: 50,
-      friction: 7,
+      tension: 65,
+      friction: 8,
+      velocity: 2,
     }).start();
   }, [isExpanded]);
 
