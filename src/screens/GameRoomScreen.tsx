@@ -1519,6 +1519,18 @@ const GameRoomScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Starting game - room active but game state not yet loaded from RTDB */}
+        {room.status === 'active' && !gameState && (
+          <View style={styles.loadingPhase}>
+            <Text style={styles.loadingEmoji}>🎮</Text>
+            <Text style={styles.loadingText}>Starting Game...</Text>
+            <Text style={styles.loadingSubtext}>Get ready! Your prompt is loading</Text>
+            <View style={styles.loadingDotsContainer}>
+              <Text style={styles.loadingDots}>●●●</Text>
+            </View>
+          </View>
+        )}
+
         {/* Active game */}
         {gameState && (
           <View style={{ flex: 1 }} pointerEvents="box-none">
