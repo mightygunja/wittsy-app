@@ -1,4 +1,4 @@
-import { ref, onValue, set, remove, onDisconnect, serverTimestamp } from 'firebase/database';
+import { ref, onValue, set, remove, onDisconnect, serverTimestamp, get } from 'firebase/database';
 import { realtimeDb } from './firebase';
 
 // ==================== PRESENCE OPERATIONS ====================
@@ -155,15 +155,22 @@ export const subscribeToGameState = (
       const elapsed = (Date.now() - state.phaseStart) / 1000;
       const remaining = Math.max(0, Math.floor(duration - elapsed));
       
+      // CRITICAL: Use state.prompt directly - this is the authoritative source
+      // The prompt is set when the round starts and should NOT change during the round
       const transformedState = {
         phase: state.phase,
         timeRemaining: remaining,
-        currentPrompt: state.prompt,
+        currentPrompt: state.prompt, // Use prompt from RTDB, not Firestore
         currentRound: state.round,
         submissions: state.submissions || {},
+        validSubmissions: state.validSubmissions || null, // Filtered submissions (excludes late entries)
         votes: state.votes || {},
         lastWinner: state.lastWinner,
         lastWinningPhrase: state.lastWinningPhrase,
+        lastWinners: state.lastWinners || [],
+        lastWinningPhrases: state.lastWinningPhrases || [],
+        roundVoteCounts: state.roundVoteCounts || {},
+        insufficientSubmissions: state.insufficientSubmissions || false,
         phaseStartTime: state.phaseStart,
         phaseDuration: duration
       };
@@ -197,18 +204,29 @@ export const clearRoomState = (roomId: string): void => {
 /**
  * Mark that a player has submitted their phrase
  */
-export const markSubmission = (roomId: string, userId: string, phraseText: string): void => {
-  // Store in submissions tracking
+export const markSubmission = async (roomId: string, userId: string, phraseText: string): Promise<void> => {
+  // Get current prompt from game state
+  const gameRef = ref(realtimeDb, `rooms/${roomId}/game`);
+  const gameSnapshot = await get(gameRef);
+  const gameData = gameSnapshot.val();
+  const currentPrompt = gameData?.prompt || '';
+  
+  // Store in submissions tracking with prompt
   const submissionRef = ref(realtimeDb, `rooms/${roomId}/submissions/${userId}`);
   set(submissionRef, {
     submitted: true,
+    phrase: phraseText,
+    prompt: currentPrompt,
     timestamp: serverTimestamp()
   });
   
-  // Store the actual phrase in game state (matching subscription path)
+  // Store the actual phrase in game state with timestamp (matching subscription path)
   const gameStateSubmissionRef = ref(realtimeDb, `rooms/${roomId}/game/submissions/${userId}`);
-  set(gameStateSubmissionRef, phraseText);
-  console.log('💾 Saved submission:', phraseText, 'to', `rooms/${roomId}/game/submissions/${userId}`);
+  set(gameStateSubmissionRef, {
+    phrase: phraseText,
+    timestamp: Date.now()
+  });
+  console.log('💾 Saved submission:', phraseText, 'with prompt:', currentPrompt?.substring(0, 40));
 };
 
 /**
@@ -240,7 +258,16 @@ export const subscribeToSubmissions = (
   
   const unsubscribe = onValue(gameSubmissionsRef, (snapshot) => {
     const submissions = snapshot.val() || {};
-    callback(Object.keys(submissions).length);
+    // Filter out null/undefined entries and count valid submissions
+    const validSubmissions = Object.values(submissions).filter(s => {
+      if (!s) return false;
+      // Handle both object format {phrase, timestamp} and string format
+      if (typeof s === 'object') {
+        return (s as any).phrase && (s as any).phrase.trim().length > 0;
+      }
+      return typeof s === 'string' && s.trim().length > 0;
+    });
+    callback(validSubmissions.length);
   });
   
   return unsubscribe;

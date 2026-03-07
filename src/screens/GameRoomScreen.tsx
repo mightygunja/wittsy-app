@@ -7,14 +7,11 @@ import {
   Alert,
   ScrollView,
   TouchableOpacity,
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-  BackHandler,
-  InputAccessoryView,
-  Keyboard,
   RefreshControl,
   Share,
+  BackHandler,
+  Platform,
+  InputAccessoryView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -22,7 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
-import { leaveRoom, startGame, deleteRoom } from '../services/database';
+import { leaveRoom, startGame, deleteRoom, restartGame } from '../services/database';
 import { saveCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { gameTimerService } from '../services/gameTimer';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -36,6 +33,8 @@ import {
   setTyping,
   subscribeToTyping,
 } from '../services/realtime';
+import { ref, remove } from 'firebase/database';
+import { realtimeDb } from '../services/firebase';
 import { Room, GamePhase } from '../types';
 import { ChatBox } from '../components/social/ChatBox';
 import { useTheme } from '../hooks/useTheme';
@@ -46,8 +45,10 @@ import { incrementChallengeProgress } from '../services/challenges';
 import { battlePass } from '../services/battlePassService';
 import { GameEndSummary } from '../components/game/GameEndSummary';
 import { StarCelebration } from '../components/game/StarCelebration';
+import { VictoryCelebration } from '../components/game/VictoryCelebration';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
 import { updatePlayerRating, updateMultiplayerRatings, RatingUpdate } from '../services/eloRatingService';
+import { haptics } from '../services/haptics';
 import { doc as firestoreDoc, setDoc } from 'firebase/firestore';
 
 // Helper function to save match history
@@ -120,6 +121,9 @@ interface GameState {
   votes: { [userId: string]: string };
   lastWinner?: string;
   lastWinningPhrase?: string;
+  lastWinners?: string[]; // Support multiple winners in case of tie
+  lastWinningPhrases?: string[]; // Support multiple winning phrases
+  roundVoteCounts?: { [userId: string]: number }; // Vote counts for this round
   phaseStartTime?: number;
   phaseDuration?: number;
   timeline?: any; // NEW: Complete game timeline for local calculation
@@ -148,6 +152,15 @@ const GameRoomScreen: React.FC = () => {
     phrase: string;
     voteCount: number;
   } | null>(null);
+  const [showVictoryCelebration, setShowVictoryCelebration] = useState(false);
+  const [victoryData, setVictoryData] = useState<Array<{
+    userId: string;
+    username: string;
+    avatarConfig?: any;
+    totalVotes: number;
+  }> | null>(null);
+  const [winStreak, setWinStreak] = useState(0);
+  const [lastRoundWinner, setLastRoundWinner] = useState<string | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [phrase, setPhrase] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -327,7 +340,18 @@ const GameRoomScreen: React.FC = () => {
         battlePassLevelUp: battlePassResult.leveledUp,
         newBattlePassLevel: battlePassResult.newLevel,
       });
-      setShowGameEndSummary(true);
+      
+      // Show vibrant victory celebration for winner(s)
+      const topScore = sortedScores[0]?.score || 0;
+      const winners = sortedScores.filter(s => s.score === topScore).map(s => ({
+        userId: s.userId,
+        username: room.players.find(p => p.userId === s.userId)?.username || 'Unknown',
+        avatarConfig: room.players.find(p => p.userId === s.userId)?.avatarConfig,
+        totalVotes: s.score,
+      }));
+      
+      setVictoryData(winners);
+      setShowVictoryCelebration(true);
 
       console.log('✅ Game end rewards processed');
     } catch (error) {
@@ -335,9 +359,33 @@ const GameRoomScreen: React.FC = () => {
     }
   };
 
-  const handleGameEndContinue = () => {
+  const handleGameEndContinue = async () => {
     setShowGameEndSummary(false);
     gameEndProcessedRef.current = false;
+    
+    // Leave room and go back
+    if (user?.uid && room) {
+      try {
+        await leaveRoom(roomId, user.uid);
+        clearCurrentRoom();
+        navigation.goBack();
+      } catch (error) {
+        console.error('Error leaving room:', error);
+      }
+    }
+  };
+  
+  const handleGameRestart = async () => {
+    setShowGameEndSummary(false);
+    gameEndProcessedRef.current = false;
+    
+    try {
+      await restartGame(roomId);
+      console.log('🔄 Game restarted, waiting for host to start');
+    } catch (error) {
+      console.error('Error restarting game:', error);
+      Alert.alert('Error', 'Failed to restart game');
+    }
   };
 
   // Subscribe to room data updates (Firestore)
@@ -461,6 +509,29 @@ const GameRoomScreen: React.FC = () => {
           setHasVoted(false);
         } else if (state.phase === 'results' && previousPhase !== 'results') {
           console.log('🏆 Entering results phase - calculating winner');
+          
+          // Track win streaks for engagement
+          if (state.lastWinners && state.lastWinners.length > 0 && user?.uid) {
+            const currentWinner = state.lastWinners[0];
+            if (currentWinner === user.uid) {
+              if (lastRoundWinner === user.uid) {
+                setWinStreak(prev => prev + 1);
+                if (winStreak + 1 >= 2) {
+                  haptics.success();
+                  console.log(`🔥 WIN STREAK: ${winStreak + 1}!`);
+                }
+              } else {
+                setWinStreak(1);
+              }
+              setLastRoundWinner(user.uid);
+            } else {
+              if (lastRoundWinner === user.uid) {
+                setWinStreak(0);
+              }
+              setLastRoundWinner(currentWinner);
+            }
+          }
+          
           if (!state.lastWinner && state.votes && state.submissions) {
             const voteCounts: { [userId: string]: number } = {};
             Object.values(state.votes).forEach((votedUserId: any) => {
@@ -545,7 +616,8 @@ const GameRoomScreen: React.FC = () => {
         }
         
         // Advance phase when timer hits 0
-        if (remaining === 0 && !hasAdvanced) {
+        // Skip 'insufficient' — backend already handles the transition via setTimeout
+        if (remaining === 0 && !hasAdvanced && prev.phase !== 'insufficient') {
           hasAdvanced = true;
           advancePhase(roomId);
         }
@@ -573,16 +645,34 @@ const GameRoomScreen: React.FC = () => {
 
   // Shuffle submissions once when entering voting phase
   useEffect(() => {
-    if (gameState?.phase === 'voting' && gameState?.submissions) {
-      const entries = Object.entries(gameState.submissions) as [string, string][];
+    if (gameState?.phase === 'voting') {
+      // CRITICAL: Use validSubmissions (server-filtered, excludes late entries).
+      // Fall back to submissions only if validSubmissions not yet available.
+      const submissionsToUse = (gameState as any)?.validSubmissions || gameState?.submissions || {};
+      // EXPLICIT: Always filter out the current user to prevent self-voting
+      const currentUserId = user?.uid;
+      const entries = Object.entries(submissionsToUse)
+        .filter(([userId]) => {
+          if (!userId || userId === currentUserId) return false; // Never show own phrase
+          return true;
+        })
+        .map(([userId, submission]) => {
+          // Handle both string and {phrase, timestamp} object formats
+          const phraseText = typeof submission === 'object' && submission && 'phrase' in submission
+            ? (submission as any).phrase
+            : submission;
+          return [userId, phraseText as string] as [string, string];
+        })
+        .filter(([, phraseText]) => phraseText && phraseText.trim().length > 0); // Exclude empty phrases
       // Fisher-Yates shuffle for unbiased randomization
       for (let i = entries.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [entries[i], entries[j]] = [entries[j], entries[i]];
       }
+      console.log('🗳️ Voting phase - available phrases:', entries.length, 'own submission excluded:', currentUserId);
       setShuffledSubmissions(entries);
     }
-  }, [gameState?.phase === 'voting' ? 'voting' : 'other']);
+  }, [gameState?.phase, user?.uid]);
 
   // Subscribe to submission count
   useEffect(() => {
@@ -600,7 +690,10 @@ const GameRoomScreen: React.FC = () => {
     if (!roomId || gameState?.phase !== 'voting') return;
 
     const unsubscribe = subscribeToVotes(roomId, (votes) => {
-      setVoteCount(Object.keys(votes).length);
+      // votes is { phraseId: voteCount }, we need total number of voters
+      // Sum up all vote counts to get total voters
+      const totalVoters = Object.values(votes).reduce((sum, count) => sum + count, 0);
+      setVoteCount(totalVoters);
     });
 
     return () => unsubscribe();
@@ -616,7 +709,7 @@ const GameRoomScreen: React.FC = () => {
   };
 
   
-  // Handle phrase submission with optional confirmation
+  // Handle phrase submission - one-time only
   const handleSubmit = async () => {
     if (!user?.uid || !phrase.trim()) {
       Alert.alert('Error', 'Please enter a phrase');
@@ -629,37 +722,21 @@ const GameRoomScreen: React.FC = () => {
       return;
     }
 
-    const submitPhrase = async () => {
-      try {
-        await markSubmission(roomId, user.uid, phrase.trim());
-        
-        setHasSubmitted(true);
-        setTyping(roomId, user.uid, false);
-      } catch (error) {
-        console.error('Error submitting phrase:', error);
-        Alert.alert('Error', 'Failed to submit phrase');
-      }
-    };
-
-    // Show confirmation dialog if enabled
-    if (settings.gameplay.confirmBeforeSubmit) {
-      Alert.alert(
-        'Confirm Submission',
-        `Submit this phrase?\n\n"${phrase.trim()}"`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Submit', onPress: submitPhrase }
-        ]
-      );
-    } else {
-      await submitPhrase();
+    try {
+      await markSubmission(roomId, user.uid, phrase.trim());
+      setHasSubmitted(true);
+      setTyping(roomId, user.uid, false);
+      // Keep phrase visible so user can update before time's up
+    } catch (error) {
+      console.error('Error submitting phrase:', error);
+      Alert.alert('Error', 'Failed to submit phrase');
     }
   };
 
 
-  // Handle vote
+  // Handle vote - allow changing vote by clicking different phrase
   const handleVote = async (phraseId: string) => {
-    if (!user?.uid || hasVoted) return;
+    if (!user?.uid) return;
 
     // Prevent voting for own phrase
     if (phraseId === user.uid) {
@@ -667,12 +744,41 @@ const GameRoomScreen: React.FC = () => {
       return;
     }
 
+    // Check if user is changing their vote
+    const currentVote = gameState?.votes?.[user.uid];
+    if (currentVote === phraseId) {
+      // Clicking same phrase - deselect vote
+      Alert.alert(
+        'Remove Vote?',
+        'Do you want to remove your vote?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // Remove vote from RTDB
+                const voteRef = ref(realtimeDb, `rooms/${roomId}/game/votes/${user.uid}`);
+                await remove(voteRef);
+                setHasVoted(false);
+              } catch (error) {
+                console.error('Error removing vote:', error);
+              }
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     try {
       await markVote(roomId, user.uid, phraseId);
-      
-      // Note: Vote storage is handled by markVote in realtime DB
-
       setHasVoted(true);
+      
+      if (currentVote && currentVote !== phraseId) {
+        console.log(`🔄 Changed vote from ${currentVote} to ${phraseId}`);
+      }
     } catch (error) {
       console.error('Error voting:', error);
       Alert.alert('Error', 'Failed to cast vote');
@@ -773,30 +879,49 @@ const GameRoomScreen: React.FC = () => {
 
   // Handle invite players
   const handleInvitePlayers = async () => {
-    if (!room) return;
+    if (!room || !roomId) {
+      console.error('❌ Cannot share: room or roomId is missing');
+      Alert.alert('Error', 'Unable to share room. Please try again.');
+      return;
+    }
 
     try {
       // Use 6-digit room code for manual entry
       const roomCode = room.roomCode;
-      const inviteUrl = `https://wittz.app/room/${roomId}?code=${roomCode}`;
-      const shareMessage = `🎮 Join my Wittz game room!\n\nTap to join: ${inviteUrl}\n\nOr use room code: ${roomCode}`;
+      if (!roomCode) {
+        console.error('❌ Cannot share: room code is missing');
+        Alert.alert('Error', 'Room code not available. Please try again.');
+        return;
+      }
+
+      const inviteUrl = `https://wittz.app/game/${roomId}?code=${roomCode}`;
+      const shareMessage = Platform.OS === 'ios' 
+        ? `🎮 Join my Wittz game!\n\nRoom Code: ${roomCode}\n\n${inviteUrl}`
+        : `🎮 Join my Wittz game room!\n\nTap to join: ${inviteUrl}\n\nOr use room code: ${roomCode}`;
       
       console.log('📤 ========== SHARE DEBUG ==========');
-      console.log('📤 Room object:', JSON.stringify(room, null, 2));
-      console.log('📤 Room ID from params:', roomId);
-      console.log('📤 Room ID from room object:', room.roomId);
-      console.log('📤 Room code from room object:', room.roomCode);
-      console.log('📤 Room name:', room.name);
-      console.log('📤 Final URL:', inviteUrl);
+      console.log('📤 Room ID:', roomId);
+      console.log('📤 Room code:', roomCode);
+      console.log('📤 Share URL:', inviteUrl);
       console.log('📤 ==================================');
       
-      await Share.share({
-        message: shareMessage,
-        url: inviteUrl,
-      });
-    } catch (error) {
-      console.error('Error sharing invite:', error);
-      Alert.alert('Error', 'Failed to share invite');
+      const shareOptions = Platform.OS === 'ios'
+        ? { message: shareMessage, url: inviteUrl }
+        : { message: shareMessage };
+
+      const result = await Share.share(shareOptions);
+      
+      if (result.action === Share.sharedAction) {
+        console.log('✅ Share successful');
+      } else if (result.action === Share.dismissedAction) {
+        console.log('ℹ️ Share dismissed');
+      }
+    } catch (error: any) {
+      console.error('❌ Error sharing invite:', error);
+      // Only show alert if it's not a user cancellation
+      if (error?.message && !error.message.includes('cancel')) {
+        Alert.alert('Share Failed', 'Unable to share the game room. Please try again.');
+      }
     }
   };
 
@@ -886,115 +1011,146 @@ const GameRoomScreen: React.FC = () => {
 
       case 'submission':
         const inputAccessoryViewID = 'submitButtonAccessory';
-        
+
         return (
           <View style={styles.submissionPhase}>
-            {!hasSubmitted ? (
-              <>
-                <ScrollView
-                  style={styles.submissionScrollView}
-                  contentContainerStyle={styles.submissionScrollContent}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
-                  {/* Compact Prompt */}
-                  <View style={styles.promptContainerCompact}>
-                    <Text style={styles.promptLabelCompact}>PROMPT</Text>
-                    <Text style={styles.promptTextCompact} numberOfLines={2}>{promptText}</Text>
-                  </View>
+            <ScrollView
+              style={styles.submissionScrollView}
+              contentContainerStyle={styles.submissionScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Compact Prompt */}
+              <View style={styles.promptContainerCompact}>
+                <Text style={styles.promptLabelCompact}>PROMPT</Text>
+                <Text style={styles.promptTextCompact} numberOfLines={2}>{promptText}</Text>
+              </View>
 
-                  {/* Progress indicator */}
-                  <View style={styles.submissionInfoCompact}>
-                    <Text style={styles.progressTextCompact}>
-                      {submissionCount}/{room?.players.length || 0} submitted
-                    </Text>
-                    {settings.gameplay.showTypingIndicators && typingUsers.length > 0 && (
-                      <Text style={styles.typingTextCompact}>
-                        ● {typingUsers.length} typing...
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Input area */}
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.phraseInput}
-                      placeholder="Type your witty response here..."
-                      placeholderTextColor={COLORS.textSecondary}
-                      value={phrase}
-                      onChangeText={handlePhraseChange}
-                      onSubmitEditing={() => {
-                        if (phrase.trim()) {
-                          handleSubmit();
-                        }
-                      }}
-                      multiline
-                      maxLength={200}
-                      autoFocus
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      enablesReturnKeyAutomatically={true}
-                      inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
-                    />
-                    <View style={styles.charCountContainer}>
-                      <Text style={[
-                        styles.charCount,
-                        phrase.length > 180 && styles.charCountWarning,
-                        phrase.length === 200 && styles.charCountMax
-                      ]}>
-                        {phrase.length}/200
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Android button - shown in scroll view */}
-                  {Platform.OS === 'android' && (
-                    <View style={styles.androidButtonContainer}>
-                      <Button
-                        title="SUBMIT PHRASE"
-                        onPress={handleSubmit}
-                        disabled={!phrase.trim()}
-                        size="lg"
-                        style={styles.submitButton}
-                      />
-                    </View>
-                  )}
-                </ScrollView>
-
-                {/* iOS InputAccessoryView - button attached to keyboard */}
-                {Platform.OS === 'ios' && (
-                  <InputAccessoryView nativeID={inputAccessoryViewID}>
-                    <View style={styles.inputAccessoryContainer}>
-                      <Button
-                        title="SUBMIT PHRASE"
-                        onPress={handleSubmit}
-                        disabled={!phrase.trim()}
-                        size="lg"
-                        style={styles.submitButton}
-                      />
-                    </View>
-                  </InputAccessoryView>
-                )}
-              </>
-            ) : (
-              <ScrollView
-                contentContainerStyle={styles.submissionScrollContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                <View style={styles.waitingContainer}>
-                  <View style={styles.successIcon}>
-                    <Text style={styles.successEmoji}>✓</Text>
-                  </View>
-                  <Text style={styles.waitingText}>Phrase Submitted!</Text>
-                  <Text style={styles.waitingSubtext}>Waiting for other players...</Text>
-                  <View style={styles.submittedPhrasePreview}>
-                    <Text style={styles.previewLabel}>Your phrase:</Text>
-                    <Text style={styles.previewText}>"{phrase}"</Text>
-                  </View>
+              {/* Submitted badge - shown after first submission */}
+              {hasSubmitted && (
+                <View style={styles.submittedBadge}>
+                  <Text style={styles.submittedBadgeText}>✓ Submitted — update before time's up!</Text>
                 </View>
-              </ScrollView>
+              )}
+
+              {/* Enhanced Progress indicator with visual bar */}
+              <View style={styles.submissionInfoCompact}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressTextCompact}>
+                    {submissionCount}/{room?.players.length || 0} submitted
+                  </Text>
+                  {settings.gameplay.showTypingIndicators && typingUsers.length > 0 && (
+                    <Text style={styles.typingTextCompact}>
+                      {typingUsers.length} typing...
+                    </Text>
+                  )}
+                </View>
+
+                {/* Animated progress bar */}
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${(submissionCount / (room?.players.length || 1)) * 100}%`,
+                        backgroundColor: submissionCount === room?.players.length ? '#4CAF50' : COLORS.primary
+                      }
+                    ]}
+                  />
+                </View>
+
+                {/* Show mini avatars of who submitted */}
+                {submissionCount > 0 && (
+                  <View style={styles.submittedPlayersRow}>
+                    <Text style={styles.submittedLabel}>Submitted:</Text>
+                    <View style={styles.miniAvatarsRow}>
+                      {room?.players
+                        .filter(p => gameState.submissions?.[p.userId])
+                        .slice(0, 5)
+                        .map(p => (
+                          <View key={p.userId} style={styles.miniAvatarContainer}>
+                            {p.avatarConfig && (
+                              <AvatarDisplay config={p.avatarConfig} size={24} />
+                            )}
+                          </View>
+                        ))}
+                      {submissionCount > 5 && (
+                        <Text style={styles.moreCount}>+{submissionCount - 5}</Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Input area — always visible, allows re-submission */}
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.phraseInput}
+                  placeholder="Type your witty response here..."
+                  placeholderTextColor={COLORS.textSecondary}
+                  value={phrase}
+                  onChangeText={handlePhraseChange}
+                  onSubmitEditing={() => {
+                    if (phrase.trim()) {
+                      handleSubmit();
+                    }
+                  }}
+                  multiline
+                  maxLength={200}
+                  autoFocus={!hasSubmitted}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  enablesReturnKeyAutomatically={true}
+                  inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
+                />
+                <View style={styles.charCountContainer}>
+                  <Text style={[
+                    styles.charCount,
+                    phrase.length > 180 && styles.charCountWarning,
+                    phrase.length === 200 && styles.charCountMax
+                  ]}>
+                    {phrase.length}/200
+                  </Text>
+                </View>
+              </View>
+
+              {/* Android button - shown in scroll view */}
+              {Platform.OS === 'android' && (
+                <View style={styles.androidButtonContainer}>
+                  <Button
+                    title={hasSubmitted ? "UPDATE SUBMISSION" : "SUBMIT PHRASE"}
+                    onPress={handleSubmit}
+                    disabled={!phrase.trim()}
+                    size="lg"
+                    style={styles.submitButton}
+                  />
+                </View>
+              )}
+            </ScrollView>
+
+            {/* iOS InputAccessoryView - button attached to keyboard */}
+            {Platform.OS === 'ios' && (
+              <InputAccessoryView nativeID={inputAccessoryViewID}>
+                <View style={styles.inputAccessoryContainer}>
+                  <Button
+                    title={hasSubmitted ? "UPDATE" : "SUBMIT"}
+                    onPress={handleSubmit}
+                    disabled={!phrase.trim()}
+                    size="lg"
+                    style={styles.submitButton}
+                  />
+                </View>
+              </InputAccessoryView>
             )}
+          </View>
+        );
+
+      case 'insufficient':
+        return (
+          <View style={styles.waitingPhase}>
+            <Text style={styles.phaseTitle}>⚠️ NOT ENOUGH SUBMISSIONS</Text>
+            <Text style={styles.waitingText}>Need at least 3 submissions to vote</Text>
+            <Text style={styles.waitingSubtext}>Starting new round...</Text>
           </View>
         );
 
@@ -1007,7 +1163,8 @@ const GameRoomScreen: React.FC = () => {
         );
 
       case 'voting':
-        console.log(' VOTING PHASE - Submissions:', gameState.submissions, 'Count:', Object.keys(gameState.submissions || {}).length);
+        const votingSubmissions = (gameState as any)?.validSubmissions || gameState.submissions || {};
+        console.log('🗳️ VOTING PHASE - Valid submissions:', votingSubmissions, 'Count:', Object.keys(votingSubmissions).length);
         return (
           <View style={styles.votingPhase}>
             <View style={styles.votingHeader}>
@@ -1015,12 +1172,35 @@ const GameRoomScreen: React.FC = () => {
               <Text style={styles.promptText}>{promptText}</Text>
             </View>
             
+            {/* Enhanced vote progress */}
             <View style={styles.voteInfo}>
-              <Text style={styles.infoText}>
-                {voteCount}/{room?.players.length || 0} voted
-              </Text>
-              {hasVoted && (
-                <Text style={styles.votedText}>✓ Vote cast!</Text>
+              <View style={styles.voteProgressHeader}>
+                <Text style={styles.infoText}>
+                  {voteCount}/{room?.players.length || 0} voted
+                </Text>
+                {hasVoted && (
+                  <Text style={styles.votedText}>✓ Vote cast!</Text>
+                )}
+              </View>
+              
+              {/* Vote progress bar */}
+              <View style={styles.progressBarContainer}>
+                <View 
+                  style={[
+                    styles.progressBarFill,
+                    { 
+                      width: `${(voteCount / (room?.players.length || 1)) * 100}%`,
+                      backgroundColor: voteCount === room?.players.length ? '#4CAF50' : '#FF6B6B'
+                    }
+                  ]} 
+                />
+              </View>
+              
+              {/* Pressure text when waiting */}
+              {!hasVoted && voteCount > 0 && (
+                <Text style={styles.pressureText}>
+                  ⏰ {room?.players.length! - voteCount} {room?.players.length! - voteCount === 1 ? 'player' : 'players'} waiting for you!
+                </Text>
               )}
             </View>
 
@@ -1032,9 +1212,9 @@ const GameRoomScreen: React.FC = () => {
                   number={index + 1}
                   phrase={phraseText}
                   onPress={() => handleVote(userId)}
-                  disabled={hasVoted || userId === user?.uid}
+                  disabled={userId === user?.uid}
                   isOwnPhrase={userId === user?.uid}
-                  hasVoted={hasVoted && gameState.votes?.[user?.uid || ''] === userId}
+                  hasVoted={gameState.votes?.[user?.uid || ''] === userId}
                 />
               ))}
             </ScrollView>
@@ -1042,41 +1222,64 @@ const GameRoomScreen: React.FC = () => {
         );
 
       case 'results':
-        console.log('🏆 RESULTS PHASE - Winner:', gameState.lastWinner, 'Phrase:', gameState.lastWinningPhrase);
-        const winnerPlayer = room?.players.find(p => p.userId === gameState.lastWinner);
+        console.log('🏆 RESULTS PHASE - Winners:', gameState.lastWinners || [gameState.lastWinner]);
+        const winners = gameState.lastWinners || (gameState.lastWinner ? [gameState.lastWinner] : []);
+        const winningPhrases = gameState.lastWinningPhrases || (gameState.lastWinningPhrase ? [gameState.lastWinningPhrase] : []);
+        const isTie = winners.length > 1;
+        
         return (
           <View style={styles.resultsPhase}>
-            <Text style={styles.phaseTitle}>WINNER!</Text>
-            
-            {/* Winner Avatar - 2x size for showcase */}
-            {winnerPlayer?.avatarConfig && (
-              <View style={styles.winnerAvatarContainer}>
-                <AvatarDisplay config={winnerPlayer.avatarConfig} size={200} />
+            {/* Show win streak badge if user is on a streak */}
+            {winStreak >= 2 && winners.includes(user?.uid || '') && (
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakEmoji}>🔥</Text>
+                <Text style={styles.streakText}>{winStreak}x WIN STREAK!</Text>
               </View>
             )}
             
-            {gameState.lastWinningPhrase && (
-              <View style={styles.winnerCard}>
-                <Text style={styles.winningPhrase}>"{gameState.lastWinningPhrase}"</Text>
-                {gameState.lastWinner && (
+            <Text style={styles.phaseTitle}>{isTie ? 'TIE!' : 'WINNER!'}</Text>
+            
+            {/* Show all winner avatars in case of tie */}
+            <View style={styles.winnersAvatarRow}>
+              {winners.map((winnerId) => {
+                const winnerPlayer = room?.players.find(p => p.userId === winnerId);
+                return winnerPlayer?.avatarConfig ? (
+                  <View key={winnerId} style={styles.winnerAvatarContainer}>
+                    <AvatarDisplay config={winnerPlayer.avatarConfig} size={isTie ? 120 : 200} />
+                    <Text style={styles.winnerNameBelowAvatar}>{winnerPlayer.username}</Text>
+                  </View>
+                ) : null;
+              })}
+            </View>
+            
+            {/* Show winning phrase(s) */}
+            {winningPhrases.map((phrase, index) => {
+              const winnerId = winners[index];
+              const winnerPlayer = room?.players.find(p => p.userId === winnerId);
+              const voteCount = gameState.roundVoteCounts?.[winnerId] || 
+                               Object.values(gameState.votes || {}).filter(v => v === winnerId).length;
+              
+              return (
+                <View key={winnerId} style={styles.winnerCard}>
+                  <Text style={styles.winningPhrase}>"{phrase}"</Text>
                   <Text style={styles.winnerName}>
                     by {winnerPlayer?.username || 'Unknown'}
                   </Text>
-                )}
-                
-                {/* Show vote count */}
-                {gameState.votes && (
                   <Text style={styles.voteCountText}>
-                    {Object.values(gameState.votes).filter(v => v === gameState.lastWinner).length} votes
+                    {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
                   </Text>
-                )}
-              </View>
-            )}
+                </View>
+              );
+            })}
 
-            {/* Show all phrases with vote counts */}
+            {/* Show all phrases with vote counts — use validSubmissions to exclude late entries */}
             <ScrollView style={styles.allPhrasesList}>
-              {Object.entries(gameState.submissions || {})
-                .map(([userId, phraseText]) => {
+              {Object.entries((gameState as any).validSubmissions || gameState.submissions || {})
+                .map(([userId, submission]) => {
+                  // Handle both string and {phrase, timestamp} object formats
+                  const phraseText = typeof submission === 'object' && submission && 'phrase' in submission
+                    ? (submission as any).phrase
+                    : submission as string;
                   const votes = Object.values(gameState.votes || {}).filter(v => v === userId).length;
                   const player = room?.players.find(p => p.userId === userId);
                   return { userId, phraseText, votes, username: player?.username || 'Unknown' };
@@ -1095,7 +1298,7 @@ const GameRoomScreen: React.FC = () => {
                       </Text>
                       {votes >= STAR_THRESHOLD && (
                         <View style={styles.starBadge}>
-                          <Text style={styles.starBadgeText}>⭐ STARRED</Text>
+                          <Text style={styles.starBadgeText}>STARRED</Text>
                         </View>
                       )}
                     </View>
@@ -1291,22 +1494,11 @@ const GameRoomScreen: React.FC = () => {
                 </View>
               </View>
             )}
-
-            {/* Chat in Lobby */}
-            {user?.uid && (
-              <View style={styles.lobbyChatSection}>
-                <ChatBox 
-                  roomId={roomId} 
-                  userId={user.uid}
-                  username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
-                />
-              </View>
-            )}
           </ScrollView>
         )}
 
-        {/* COLLAPSIBLE CHAT */}
-        {user && (
+        {/* COLLAPSIBLE CHAT - Only show in lobby (waiting status) */}
+        {user && room?.status === 'waiting' && (
           <View style={{
             position: 'absolute',
             bottom: 20,
@@ -1359,12 +1551,7 @@ const GameRoomScreen: React.FC = () => {
                   />
                 }
               >
-                {gameState ? renderPhaseContent() : (
-                  <View style={styles.waitingPhase}>
-                    <Text style={styles.phaseTitle}>Loading game...</Text>
-                    <Text style={styles.waitingSubtext}>Please wait</Text>
-                  </View>
-                )}
+                {renderPhaseContent()}
               </ScrollView>
             </View>
           </View>
@@ -1404,7 +1591,10 @@ const GameRoomScreen: React.FC = () => {
           ratingChanges={ratingChanges}
           multiplayerRatingChanges={multiplayerRatingChanges}
           currentUserId={user?.uid}
+          isHost={room?.hostId === user?.uid}
+          playerCount={room?.players.length}
           onContinue={handleGameEndContinue}
+          onRestart={handleGameRestart}
         />
       )}
 
@@ -1418,6 +1608,19 @@ const GameRoomScreen: React.FC = () => {
           onComplete={() => {
             setShowStarCelebration(false);
             setStarCelebrationData(null);
+          }}
+        />
+      )}
+
+      {/* Victory Celebration - Game End */}
+      {showVictoryCelebration && victoryData && (
+        <VictoryCelebration
+          visible={showVictoryCelebration}
+          winners={victoryData}
+          onComplete={() => {
+            setShowVictoryCelebration(false);
+            setVictoryData(null);
+            setShowGameEndSummary(true);
           }}
         />
       )}
@@ -1717,12 +1920,6 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '300',
   },
-  lobbyChatSection: {
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.md,
-    flex: 1,
-    minHeight: 200,
-  },
   countdownContainer: {
     flex: 1,
     alignItems: 'center',
@@ -1978,8 +2175,22 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   },
   votingHeader: {
     alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  voteProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  pressureText: {
+    fontSize: 13,
+    color: '#FF6B6B',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   promptReminderContainer: {
     backgroundColor: COLORS.surface,
@@ -2049,10 +2260,49 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 12,
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  streakEmoji: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  streakText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  winnersAvatarRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginBottom: 16,
+  },
   winnerAvatarContainer: {
     marginBottom: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  winnerNameBelowAvatar: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginTop: 8,
+    textAlign: 'center',
   },
   winnerCard: {
     backgroundColor: COLORS.gold,
@@ -2265,6 +2515,21 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: COLORS.error,
     fontWeight: '700',
   },
+  // Submitted badge (shown above input after first submission)
+  submittedBadge: {
+    backgroundColor: '#1a7a3a',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  submittedBadgeText: {
+    color: '#a3f0b5',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   // Submission success state
   successIcon: {
     width: 64,
@@ -2303,10 +2568,52 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     lineHeight: 20,
   },
   submissionInfoCompact: {
+    marginBottom: 12,
+  },
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  submittedPlayersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  submittedLabel: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginRight: 8,
+  },
+  miniAvatarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  miniAvatarContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    overflow: 'hidden',
+  },
+  moreCount: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginLeft: 4,
   },
   progressTextCompact: {
     fontSize: 12,

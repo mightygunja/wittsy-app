@@ -100,6 +100,13 @@ async function advancePhase(roomId) {
     return;
   }
   
+  // PRODUCTION FIX: Prevent race conditions - check if phase was already advanced
+  const elapsed = (Date.now() - game.phaseStart) / 1000;
+  if (elapsed < 1) {
+    console.log(`⏸️ Skipping advance - phase just started (${elapsed.toFixed(2)}s ago)`);
+    return;
+  }
+  
   const now = Date.now();
   let nextPhase = null;
   let nextDuration = 0;
@@ -111,33 +118,105 @@ async function advancePhase(roomId) {
     case 'prompt':
       nextPhase = 'submission';
       nextDuration = await getPhaseDurationForRoom(roomId, 'submission');
+      // PRODUCTION FIX: Enforce minimum 10 seconds for submission
+      nextDuration = Math.max(10, nextDuration);
       updates.phase = nextPhase;
       updates.phaseDuration = nextDuration;
+      updates.prompt = game.prompt; // CRITICAL: Preserve prompt across phase transitions
       updates.submissions = {}; // Clear submissions from previous round
       updates.votes = {}; // Clear votes from previous round
       break;
       
     case 'submission':
+      // Get player count from Firestore
+      const roomDoc = await db.collection('rooms').doc(roomId).get();
+      const playerCount = roomDoc.data()?.players?.length || 0;
+      const submissionCount = Object.keys(game.submissions || {}).length;
+      console.log(`📝 ${submissionCount} submissions received from ${playerCount} players`);
+      
+      if (submissionCount === 0) {
+        console.log(`⚠️ No submissions - extending submission phase by 5s`);
+        updates.phaseStart = now;
+        updates.phaseDuration = 5;
+        await gameRef.update(updates);
+        return;
+      }
+      
+      // CRITICAL: Filter out late submissions FIRST - only include submissions made during submission phase
+      const submissionPhaseEnd = game.phaseStart + (game.phaseDuration * 1000);
+      const validSubmissions = {};
+      Object.entries(game.submissions || {}).forEach(([userId, submission]) => {
+        const submissionData = typeof submission === 'object' ? submission : { phrase: submission, timestamp: game.phaseStart };
+        const submissionTime = submissionData.timestamp || game.phaseStart;
+        
+        // Only include if submitted before phase ended
+        if (submissionTime <= submissionPhaseEnd) {
+          validSubmissions[userId] = submissionData.phrase || submission;
+        } else {
+          console.log(`⏰ EXCLUDED late submission from ${userId} (submitted ${Math.round((submissionTime - submissionPhaseEnd) / 1000)}s late)`);
+        }
+      });
+      
+      const validSubmissionCount = Object.keys(validSubmissions).length;
+      console.log(`✅ Valid submissions for voting: ${validSubmissionCount}/${submissionCount}`);
+      
+      // CRITICAL: Check insufficient submissions AFTER filtering late ones
+      // If 3+ players and less than 3 VALID submissions, skip voting and start new round
+      if (playerCount >= 3 && validSubmissionCount < 3) {
+        console.log(`⚠️ Not enough VALID submissions (${validSubmissionCount}/3 minimum) - skipping voting and results`);
+        updates.phase = 'insufficient';
+        updates.phaseDuration = 5; // Show message for 5 seconds
+        updates.prompt = game.prompt;
+        updates.insufficientSubmissions = true;
+        await gameRef.update(updates);
+        
+        // After 5 seconds, start new round
+        setTimeout(() => startNewRound(roomId), 5000);
+        return;
+      }
+      
       nextPhase = 'voting';
       nextDuration = await getPhaseDurationForRoom(roomId, 'voting');
+      // PRODUCTION FIX: Enforce minimum 8 seconds for voting to ensure it shows
+      nextDuration = Math.max(8, nextDuration);
       updates.phase = nextPhase;
       updates.phaseDuration = nextDuration;
-      // Don't process submissions - they're already in RTDB
-      console.log(`📝 ${Object.keys(game.submissions || {}).length} submissions received`);
+      updates.prompt = game.prompt; // CRITICAL: Preserve prompt across phase transitions
+      updates.validSubmissions = validSubmissions; // Store filtered submissions for voting
       break;
       
     case 'voting':
+      // PRODUCTION FIX: Ensure at least 1 vote before advancing
+      const voteCount = Object.keys(game.votes || {}).length;
+      console.log(`🗳️ ${voteCount} votes received`);
+      
+      if (voteCount === 0) {
+        console.log(`⚠️ No votes - extending voting phase by 5s`);
+        updates.phaseStart = now;
+        updates.phaseDuration = 5;
+        await gameRef.update(updates);
+        return;
+      }
+      
       // CRITICAL: Process votes BEFORE advancing to results
       // This ensures winner is calculated before results phase starts
-      await processVotesSync(roomId, game.votes, game.submissions);
+      // Pass validSubmissions so only on-time submissions are used for winner phrase lookup
+      await processVotesSync(roomId, game.votes, game.validSubmissions || game.submissions);
       
       nextPhase = 'results';
       nextDuration = await getPhaseDurationForRoom(roomId, 'results');
+      // PRODUCTION FIX: Enforce minimum 5 seconds for results to show
+      nextDuration = Math.max(5, nextDuration);
       updates.phase = nextPhase;
       updates.phaseDuration = nextDuration;
+      updates.prompt = game.prompt; // CRITICAL: Preserve prompt across phase transitions
       // lastWinner and lastWinningPhrase are set by processVotesSync
       break;
       
+    case 'insufficient':
+      // Client timer fired for insufficient phase - just start a new round
+      return startNewRound(roomId);
+
     case 'results':
       // Check for winner or start new round
       const shouldContinue = await checkWinner(roomId);
@@ -173,6 +252,8 @@ async function startNewRound(roomId) {
     phaseDuration: promptDuration,
     submissions: {},
     votes: {},
+    validSubmissions: null,
+    insufficientSubmissions: null,
     lastWinner: null,
     lastWinningPhrase: null
   });
@@ -220,73 +301,215 @@ async function processVotesSync(roomId, votes, submissions) {
     console.log(`⚠️ No votes to process for ${roomId}`);
     return;
   }
-  
+
   const roomRef = db.collection('rooms').doc(roomId);
   const roomDoc = await roomRef.get();
   const room = roomDoc.data();
   const scores = room?.scores || {};
-  
-  // Count votes
+
+  // Read validSubmissions from RTDB to know which players actually submitted on time
+  const gameSnapshot = await rtdb.ref(`rooms/${roomId}/game`).once('value');
+  const gameData = gameSnapshot.val() || {};
+  const validSubmissions = gameData.validSubmissions || null;
+
+  // CRITICAL: Count votes correctly - each vote should add exactly 1
+  // PREVENT SELF-VOTING: Hard block - voter cannot vote for themselves
+  // PREVENT PHANTOM VOTES: Only count votes for players who had valid (on-time) submissions
   const voteCounts = {};
-  Object.values(votes).forEach(votedFor => {
+  Object.entries(votes).forEach(([voterId, votedFor]) => {
+    // Block self-votes unconditionally
+    if (voterId === votedFor) {
+      console.log(`⚠️ BLOCKED self-vote from ${voterId}`);
+      return;
+    }
+    // If validSubmissions is available, only count votes for players in it
+    if (validSubmissions && !(votedFor in validSubmissions)) {
+      console.log(`⚠️ BLOCKED vote for ${votedFor} - not in validSubmissions (late or no submission)`);
+      return;
+    }
     voteCounts[votedFor] = (voteCounts[votedFor] || 0) + 1;
   });
   
-  console.log(`🗳️ Vote counts:`, voteCounts);
+  console.log(`🗳️ Vote counts for this round:`, voteCounts);
+  console.log(`📊 Current cumulative scores BEFORE update:`, JSON.stringify(scores));
   
-  // Update scores
-  Object.entries(voteCounts).forEach(([userId, count]) => {
+  // CRITICAL: Only add votes from THIS round, not duplicate
+  // Initialize scores for new players
+  Object.keys(voteCounts).forEach(userId => {
     if (!scores[userId]) {
       scores[userId] = { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] };
     }
-    scores[userId].totalVotes += count;
   });
   
-  // Find winner
-  let winnerId = null;
-  let maxVotes = 0;
+  // Add THIS round's votes to cumulative total (1 vote = +1 to total)
   Object.entries(voteCounts).forEach(([userId, count]) => {
-    if (count > maxVotes) {
-      maxVotes = count;
-      winnerId = userId;
+    scores[userId].totalVotes += count;
+    console.log(`➕ Adding ${count} votes to ${userId}, new total: ${scores[userId].totalVotes}`);
+  });
+  
+  console.log(`📊 Updated cumulative scores AFTER update:`, JSON.stringify(scores));
+  
+  // Find winner(s) - handle ties by finding ALL players with max votes
+  let maxVotes = 0;
+  Object.values(voteCounts).forEach(count => {
+    if (count > maxVotes) maxVotes = count;
+  });
+  
+  // Get all winners (in case of tie)
+  const winners = Object.entries(voteCounts)
+    .filter(([userId, count]) => count === maxVotes)
+    .map(([userId]) => userId);
+  
+  console.log(`🏆 Round winners (${maxVotes} votes each):`, winners);
+  
+  // Update round wins for ALL winners and give +2 vote bonus
+  winners.forEach(winnerId => {
+    if (scores[winnerId]) {
+      scores[winnerId].roundWins += 1;
+      scores[winnerId].totalVotes += 2; // +2 vote bonus for winning round
+      console.log(`🏆 Round winner ${winnerId} gets +2 bonus votes, new total: ${scores[winnerId].totalVotes}`);
     }
   });
   
-  // Update round wins
-  if (winnerId && scores[winnerId]) {
-    scores[winnerId].roundWins += 1;
-  }
-  
-  // Get winning phrase
-  const winningPhrase = winnerId && submissions ? submissions[winnerId] : null;
+  // Get winning phrases — use validSubmissions (plain strings) first, then fall back to submissions
+  const winningPhrases = winners.map(winnerId => {
+    // validSubmissions stores plain strings; submissions may store {phrase, timestamp} objects
+    if (validSubmissions && validSubmissions[winnerId]) {
+      return validSubmissions[winnerId];
+    }
+    const sub = submissions[winnerId];
+    if (!sub) return null;
+    return typeof sub === 'object' ? (sub.phrase || null) : sub;
+  }).filter(p => p);
   
   // Update Firestore scores
   await roomRef.update({ scores });
   
-  // Update game state with winner info
+  // Update game state with winner info (support multiple winners)
   await rtdb.ref(`rooms/${roomId}/game`).update({
-    lastWinner: winnerId || null,
-    lastWinningPhrase: winningPhrase || null
+    lastWinners: winners, // Array of winner IDs
+    lastWinner: winners[0] || null, // Keep for backwards compatibility
+    lastWinningPhrases: winningPhrases, // Array of winning phrases
+    lastWinningPhrase: winningPhrases[0] || null, // Keep for backwards compatibility
+    roundVoteCounts: voteCounts // Store vote counts for this round
   });
   
-  console.log(`✅ Votes processed: ${winnerId} won with ${maxVotes} votes - "${winningPhrase?.substring(0, 40)}..."`);
+  if (winners.length > 1) {
+    console.log(`✅ TIE! ${winners.length} winners with ${maxVotes} votes each`);
+  } else {
+    console.log(`✅ Votes processed: ${winners[0]} won with ${maxVotes} votes - "${winningPhrases[0]?.substring(0, 40)}..."`);
+  }
 }
 
 /**
  * End game
  */
 async function endGame(roomId) {
-  await db.collection('rooms').doc(roomId).update({
-    status: 'finished',
-    endedAt: admin.firestore.Timestamp.now()
-  });
-  
-  await rtdb.ref(`rooms/${roomId}/game`).remove();
-  
-  // Clear used prompts for this room
-  clearRoomPrompts(roomId);
-  
-  console.log(`🏁 Game ended: ${roomId}`);
+  try {
+    const roomRef = db.collection('rooms').doc(roomId);
+    const roomDoc = await roomRef.get();
+    const room = roomDoc.data();
+    const scores = room?.scores || {};
+    
+    // Find winner(s) - handle ties at game end too
+    let maxVotes = 0;
+    Object.entries(scores).forEach(([userId, data]) => {
+      const totalVotes = data?.totalVotes || 0;
+      if (totalVotes > maxVotes) {
+        maxVotes = totalVotes;
+      }
+    });
+    
+    // Get all winners with max votes (in case of tie)
+    const winners = Object.entries(scores)
+      .filter(([userId, data]) => (data?.totalVotes || 0) === maxVotes)
+      .map(([userId]) => userId);
+    
+    const winnerId = winners[0] || null;
+    
+    console.log(`🏆 GAME END - Winner(s) with ${maxVotes} votes:`, winners);
+    
+    // Update room status
+    await roomRef.update({
+      status: 'finished',
+      endedAt: admin.firestore.Timestamp.now()
+    });
+    
+    // Save match history for each player with their best phrase and prompt
+    const gameSnapshot = await rtdb.ref(`rooms/${roomId}/game`).once('value');
+    const gameData = gameSnapshot.val();
+    const allSubmissions = {}; // Collect all submissions from all rounds
+    const allPrompts = {}; // Map userId to their prompts
+    
+    // Get submission history from RTDB (if available)
+    const submissionsSnapshot = await rtdb.ref(`rooms/${roomId}/submissions`).once('value');
+    const submissionsData = submissionsSnapshot.val() || {};
+    
+    // Build map of user's best phrase and corresponding prompt
+    Object.entries(submissionsData).forEach(([roundKey, roundData]) => {
+      if (roundData && typeof roundData === 'object') {
+        Object.entries(roundData).forEach(([userId, submission]) => {
+          if (submission && typeof submission === 'object') {
+            const phrase = submission.phrase || submission.text;
+            const prompt = submission.prompt || roundData.prompt;
+            if (phrase && !allSubmissions[userId]) {
+              allSubmissions[userId] = phrase;
+              allPrompts[userId] = prompt;
+            }
+          }
+        });
+      }
+    });
+    
+    // Save match history for each player
+    const batch = db.batch();
+    const players = room?.players || [];
+    
+    for (const player of players) {
+      const userId = player.userId;
+      const userScore = scores[userId] || { totalVotes: 0, roundWins: 0, stars: 0 };
+      const bestPhrase = allSubmissions[userId] || '';
+      const prompt = allPrompts[userId] || room?.currentPrompt || '';
+      const stars = userScore.stars || 0;
+      const won = userId === winnerId;
+      
+      // Only save if player submitted at least one phrase
+      if (bestPhrase) {
+        const matchRef = db.collection('matches').doc();
+        batch.set(matchRef, {
+          roomId: roomId,
+          roomName: room.name || 'Unknown Room',
+          userId: userId,
+          username: player.username || 'Unknown',
+          bestPhrase: bestPhrase,
+          prompt: prompt, // CRITICAL: Save prompt with phrase
+          stars: stars,
+          totalVotes: userScore.totalVotes || 0,
+          roundWins: userScore.roundWins || 0,
+          won: won,
+          rounds: room.currentRound || 1,
+          playedAt: admin.firestore.Timestamp.now(),
+          createdAt: admin.firestore.Timestamp.now(),
+        });
+      }
+    }
+    
+    await batch.commit();
+    
+    // Clear game state
+    await rtdb.ref(`rooms/${roomId}/game`).remove();
+    await rtdb.ref(`rooms/${roomId}/submissions`).remove();
+    
+    // Clear used prompts for this room
+    clearRoomPrompts(roomId);
+    
+    console.log(`🏁 Game ended: ${roomId} - Winner: ${winnerId} with ${maxVotes} votes`);
+  } catch (error) {
+    console.error(`❌ Error ending game ${roomId}:`, error);
+    // Still try to clean up
+    await rtdb.ref(`rooms/${roomId}/game`).remove();
+    clearRoomPrompts(roomId);
+  }
 }
 
 /**

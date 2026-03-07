@@ -74,10 +74,13 @@ export const MainNavigator: React.FC = () => {
         component={CreateRoomScreen}
         options={{ title: 'Create Room' }}
       />
-      <Stack.Screen 
-        name="GameRoom" 
+      <Stack.Screen
+        name="GameRoom"
         component={GameRoomScreen}
-        options={{ title: 'Game Room' }}
+        options={{
+          headerShown: false, // Uses custom header; no back navigation
+          gestureEnabled: false, // Disable swipe back gesture
+        }}
       />
       <Stack.Screen 
         name="Profile" 
