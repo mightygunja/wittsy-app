@@ -1,7 +1,12 @@
 [build]
   publish = "public"
   command = ""
-  
+
+[[redirects]]
+  from = "/game/*"
+  to = "/index.html"
+  status = 200
+
 [[redirects]]
   from = "/room/*"
   to = "/index.html"

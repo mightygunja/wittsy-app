@@ -179,16 +179,17 @@
     </div>
     
     <script>
-        // Extract room ID from URL
+        // Extract room ID from URL - handles both /game/ and /room/ paths
         const path = window.location.pathname;
         const fullUrl = window.location.href;
-        const roomId = path.split('/room/')[1]?.split('?')[0] || '';
-        
+        const gameMatch = path.match(/\/(game|room)\/([^?/]+)/);
+        const roomId = gameMatch ? gameMatch[2] : '';
+
         // Try to get room code from query parameter first, otherwise use full roomId
         const urlParams = new URLSearchParams(window.location.search);
         const codeParam = urlParams.get('code');
         const roomCode = codeParam || roomId.toUpperCase();
-        
+
         // Debug logging
         console.log('🔍 Full URL:', fullUrl);
         console.log('🔍 Path:', path);
@@ -196,17 +197,17 @@
         console.log('🔍 Query params:', window.location.search);
         console.log('🔍 Code param:', codeParam);
         console.log('🔍 Final room code:', roomCode);
-        
+
         // Display room code
         document.getElementById('roomCode').textContent = roomCode || 'Invalid Code';
-        
+
         // Detect platform
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
         const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
         const isAndroid = /android/i.test(userAgent);
-        
-        // Deep link URLs
-        const appSchemeUrl = `wittsy://room/${roomId}`;
+
+        // Deep link URL — triple-slash gives path=/game/{roomId} which matches app parser
+        const appSchemeUrl = `wittz:///game/${roomId}`;
         
         // Try to open the app
         function attemptAppOpen() {
