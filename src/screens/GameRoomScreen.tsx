@@ -1026,13 +1026,6 @@ const GameRoomScreen: React.FC = () => {
                 <Text style={styles.promptTextCompact} numberOfLines={2}>{promptText}</Text>
               </View>
 
-              {/* Submitted badge - shown after first submission */}
-              {hasSubmitted && (
-                <View style={styles.submittedBadge}>
-                  <Text style={styles.submittedBadgeText}>✓ Submitted — update before time's up!</Text>
-                </View>
-              )}
-
               {/* Enhanced Progress indicator with visual bar */}
               <View style={styles.submissionInfoCompact}>
                 <View style={styles.progressHeader}>
@@ -1082,58 +1075,66 @@ const GameRoomScreen: React.FC = () => {
                 )}
               </View>
 
-              {/* Input area — always visible, allows re-submission */}
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.phraseInput}
-                  placeholder="Type your witty response here..."
-                  placeholderTextColor={COLORS.textSecondary}
-                  value={phrase}
-                  onChangeText={handlePhraseChange}
-                  onSubmitEditing={() => {
-                    if (phrase.trim()) {
-                      handleSubmit();
-                    }
-                  }}
-                  multiline
-                  maxLength={200}
-                  autoFocus={!hasSubmitted}
-                  returnKeyType="done"
-                  blurOnSubmit={true}
-                  enablesReturnKeyAutomatically={true}
-                  inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
-                />
-                <View style={styles.charCountContainer}>
-                  <Text style={[
-                    styles.charCount,
-                    phrase.length > 180 && styles.charCountWarning,
-                    phrase.length === 200 && styles.charCountMax
-                  ]}>
-                    {phrase.length}/200
-                  </Text>
+              {hasSubmitted ? (
+                /* After submitting: show phrase read-only, waiting for others */
+                <View style={styles.submittedPhrasePreview}>
+                  <Text style={styles.submittedBadgeText}>✓ Submitted — waiting for others</Text>
+                  <Text style={styles.previewText}>"{phrase}"</Text>
                 </View>
-              </View>
-
-              {/* Android button - shown in scroll view */}
-              {Platform.OS === 'android' && (
-                <View style={styles.androidButtonContainer}>
-                  <Button
-                    title={hasSubmitted ? "UPDATE SUBMISSION" : "SUBMIT PHRASE"}
-                    onPress={handleSubmit}
-                    disabled={!phrase.trim()}
-                    size="lg"
-                    style={styles.submitButton}
+              ) : (
+                /* Input area — only shown before submitting */
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.phraseInput}
+                    placeholder="Type your witty response here..."
+                    placeholderTextColor={COLORS.textSecondary}
+                    value={phrase}
+                    onChangeText={handlePhraseChange}
+                    onSubmitEditing={() => {
+                      if (phrase.trim()) {
+                        handleSubmit();
+                      }
+                    }}
+                    multiline
+                    maxLength={200}
+                    autoFocus
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    enablesReturnKeyAutomatically={true}
+                    inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
                   />
+                  <View style={styles.charCountContainer}>
+                    <Text style={[
+                      styles.charCount,
+                      phrase.length > 180 && styles.charCountWarning,
+                      phrase.length === 200 && styles.charCountMax
+                    ]}>
+                      {phrase.length}/200
+                    </Text>
+                  </View>
+
+                  {/* Android button - shown in scroll view */}
+                  {Platform.OS === 'android' && (
+                    <View style={styles.androidButtonContainer}>
+                      <Button
+                        title="SUBMIT PHRASE"
+                        onPress={handleSubmit}
+                        disabled={!phrase.trim()}
+                        size="lg"
+                        style={styles.submitButton}
+                      />
+                    </View>
+                  )}
                 </View>
               )}
             </ScrollView>
 
-            {/* iOS InputAccessoryView - button attached to keyboard */}
-            {Platform.OS === 'ios' && (
+            {/* iOS InputAccessoryView - only shown before submitting */}
+            {Platform.OS === 'ios' && !hasSubmitted && (
               <InputAccessoryView nativeID={inputAccessoryViewID}>
                 <View style={styles.inputAccessoryContainer}>
                   <Button
-                    title={hasSubmitted ? "UPDATE" : "SUBMIT"}
+                    title="SUBMIT"
                     onPress={handleSubmit}
                     disabled={!phrase.trim()}
                     size="lg"
