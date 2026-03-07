@@ -106,23 +106,29 @@ class DeepLinkingService {
     console.log('🎯 Scheme:', parsed.scheme);
     console.log('🎯 Hostname:', parsed.hostname);
 
+    // Handle custom scheme wittz://game/{roomId} where Expo Linking parses
+    // hostname='game' and path='/{roomId}'
+    if ((parsed.scheme === 'wittz' || parsed.scheme === 'wittz-dev') && parsed.hostname === 'game') {
+      const roomId = path.replace(/^\//, '');
+      if (roomId) {
+        console.log('✅ Matched: GameRoom via scheme hostname, roomId:', roomId);
+        return { screen: 'GameRoom', params: { roomId } };
+      }
+    }
+
     // Match path to screen
     if (path === '/' || path === '/home') {
       console.log('✅ Matched: Home');
       return { screen: 'Home' };
     }
 
-    // Handle both /game/ and /room/ paths
-    if (path.startsWith('/game/') || path.startsWith('game/')) {
+    // Handle both /game/ and /room/ paths (covers wittz:///game/{roomId} and https://wittz.app/game/{roomId})
+    if (path.startsWith('/game/') || path.startsWith('game/') || path.startsWith('/room/') || path.startsWith('room/')) {
       const roomId = path.replace(/^\/?(game|room)\//, '');
-      console.log('✅ Matched: GameRoom with roomId:', roomId);
-      return { screen: 'GameRoom', params: { roomId } };
-    }
-
-    if (path.startsWith('/room/') || path.startsWith('room/')) {
-      const roomId = path.replace(/^\/?(game|room)\//, '');
-      console.log('✅ Matched: GameRoom with roomId:', roomId);
-      return { screen: 'GameRoom', params: { roomId } };
+      if (roomId) {
+        console.log('✅ Matched: GameRoom with roomId:', roomId);
+        return { screen: 'GameRoom', params: { roomId } };
+      }
     }
 
     if (path.startsWith('/profile/')) {
