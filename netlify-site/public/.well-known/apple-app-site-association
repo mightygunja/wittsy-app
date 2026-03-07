@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TODO_APPLE_TEAM_ID.com.wittsy.app",
+        "appID": "NWGXDCFAU7.com.wittsy.app",
         "paths": ["/game/*", "/room/*"]
       }
     ]
