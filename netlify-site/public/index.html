@@ -206,8 +206,8 @@
         const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
         const isAndroid = /android/i.test(userAgent);
 
-        // Deep link URL — triple-slash gives path=/game/{roomId} which matches app parser
-        const appSchemeUrl = `wittz:///game/${roomId}`;
+        // Deep link URL — wittsy:// is the scheme registered in app.config.js
+        const appSchemeUrl = `wittsy://game/${roomId}`;
         
         // Try to open the app
         function attemptAppOpen() {

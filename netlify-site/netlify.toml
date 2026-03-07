@@ -2,6 +2,13 @@
   publish = "public"
   command = ""
 
+# Serve well-known files as JSON (must come before the catch-all redirect)
+[[headers]]
+  for = "/.well-known/*"
+  [headers.values]
+    Content-Type = "application/json"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
 [[redirects]]
   from = "/game/*"
   to = "/index.html"
