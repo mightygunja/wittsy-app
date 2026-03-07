@@ -106,12 +106,12 @@ class DeepLinkingService {
     console.log('🎯 Scheme:', parsed.scheme);
     console.log('🎯 Hostname:', parsed.hostname);
 
-    // Handle custom scheme wittz://game/{roomId} where Expo Linking parses
-    // hostname='game' and path='/{roomId}'
-    if ((parsed.scheme === 'wittz' || parsed.scheme === 'wittz-dev') && parsed.hostname === 'game') {
+    // Handle custom scheme wittsy://game/{roomId}
+    // Expo Linking parses this as hostname='game', path='/{roomId}'
+    if (parsed.hostname === 'game' && path && path !== '/') {
       const roomId = path.replace(/^\//, '');
       if (roomId) {
-        console.log('✅ Matched: GameRoom via scheme hostname, roomId:', roomId);
+        console.log('✅ Matched: GameRoom via custom scheme, roomId:', roomId);
         return { screen: 'GameRoom', params: { roomId } };
       }
     }
