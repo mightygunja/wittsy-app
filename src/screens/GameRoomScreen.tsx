@@ -1338,16 +1338,16 @@ const GameRoomScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        {/* Back arrow — lobby only; navigates away without leaving the room */}
-        {room.status === 'waiting' && (
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backArrowButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.backArrowText}>‹</Text>
-          </TouchableOpacity>
-        )}
+        {/* Back arrow — always rendered to keep layout consistent.
+            Visible in lobby only; invisible (non-interactive) during active game. */}
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.backArrowButton, room.status !== 'waiting' && { opacity: 0 }]}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          disabled={room.status !== 'waiting'}
+        >
+          <Text style={styles.backArrowText}>‹</Text>
+        </TouchableOpacity>
         <View style={styles.headerLeft}>
           <Text style={styles.roomName}>{room.name}</Text>
           <Text style={styles.roomCode}>Room ID: {room.roomCode}</Text>
