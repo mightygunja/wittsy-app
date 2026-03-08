@@ -142,36 +142,36 @@ async function advancePhase(roomId) {
         return;
       }
       
-      // CRITICAL: Filter out late submissions FIRST - only include submissions made during submission phase
-      const submissionPhaseEnd = game.phaseStart + (game.phaseDuration * 1000);
+      // Filter late submissions — add 3s grace period for client/server clock drift and network latency.
+      // Submissions use client Date.now(); phaseStart uses server Date.now() — there can be drift.
+      const GRACE_MS = 3000;
+      const submissionPhaseEnd = game.phaseStart + (game.phaseDuration * 1000) + GRACE_MS;
       const validSubmissions = {};
       Object.entries(game.submissions || {}).forEach(([userId, submission]) => {
         const submissionData = typeof submission === 'object' ? submission : { phrase: submission, timestamp: game.phaseStart };
         const submissionTime = submissionData.timestamp || game.phaseStart;
-        
-        // Only include if submitted before phase ended
+
         if (submissionTime <= submissionPhaseEnd) {
           validSubmissions[userId] = submissionData.phrase || submission;
         } else {
-          console.log(`⏰ EXCLUDED late submission from ${userId} (submitted ${Math.round((submissionTime - submissionPhaseEnd) / 1000)}s late)`);
+          console.log(`⏰ EXCLUDED submission from ${userId} (${Math.round((submissionTime - submissionPhaseEnd) / 1000)}s past grace period)`);
         }
       });
-      
+
       const validSubmissionCount = Object.keys(validSubmissions).length;
       console.log(`✅ Valid submissions for voting: ${validSubmissionCount}/${submissionCount}`);
-      
-      // CRITICAL: Check insufficient submissions AFTER filtering late ones
-      // If 3+ players and less than 3 VALID submissions, skip voting and start new round
+
+      // If 3+ players and fewer than 3 valid submissions, show "not enough" for 5s then new round.
+      // IMPORTANT: Do NOT use setTimeout here — Cloud Function containers can be terminated before
+      // a deferred callback fires. Instead, set phaseDuration=5 and let the client timer call
+      // advancePhase when it hits 0, which then calls startNewRound via case 'insufficient'.
       if (playerCount >= 3 && validSubmissionCount < 3) {
-        console.log(`⚠️ Not enough VALID submissions (${validSubmissionCount}/3 minimum) - skipping voting and results`);
+        console.log(`⚠️ Not enough valid submissions (${validSubmissionCount}/3) - insufficient phase`);
         updates.phase = 'insufficient';
-        updates.phaseDuration = 5; // Show message for 5 seconds
+        updates.phaseDuration = 5;
         updates.prompt = game.prompt;
         updates.insufficientSubmissions = true;
         await gameRef.update(updates);
-        
-        // After 5 seconds, start new round
-        setTimeout(() => startNewRound(roomId), 5000);
         return;
       }
       

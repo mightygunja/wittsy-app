@@ -615,9 +615,10 @@ const GameRoomScreen: React.FC = () => {
           }
         }
         
-        // Advance phase when timer hits 0
-        // Skip 'insufficient' — backend already handles the transition via setTimeout
-        if (remaining === 0 && !hasAdvanced && prev.phase !== 'insufficient') {
+        // Advance phase when timer hits 0 — including 'insufficient' phase.
+        // Do NOT rely on server-side setTimeout (Cloud Function containers can be killed).
+        // The 'insufficient' case in gameEngine calls startNewRound directly.
+        if (remaining === 0 && !hasAdvanced) {
           hasAdvanced = true;
           advancePhase(roomId);
         }
