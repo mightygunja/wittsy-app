@@ -1036,18 +1036,19 @@ const GameRoomScreen: React.FC = () => {
 
         return (
           <View style={styles.submissionPhase}>
+            {/* Prompt is OUTSIDE the ScrollView so it is always fully visible
+                and never competes with the keyboard or input for space */}
+            <View style={styles.promptContainerCompact}>
+              <Text style={styles.promptLabelCompact}>PROMPT</Text>
+              <Text style={styles.promptTextCompact}>{promptText}</Text>
+            </View>
+
             <ScrollView
               style={styles.submissionScrollView}
               contentContainerStyle={styles.submissionScrollContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Compact Prompt */}
-              <View style={styles.promptContainerCompact}>
-                <Text style={styles.promptLabelCompact}>PROMPT</Text>
-                <Text style={styles.promptTextCompact} numberOfLines={2}>{promptText}</Text>
-              </View>
-
               {/* Enhanced Progress indicator with visual bar */}
               <View style={styles.submissionInfoCompact}>
                 <View style={styles.progressHeader}>
@@ -2085,7 +2086,7 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
   },
   submissionScrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 20,
   },
   androidButtonContainer: {
@@ -2586,6 +2587,9 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRadius: 8,
     padding: 12,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 8,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
