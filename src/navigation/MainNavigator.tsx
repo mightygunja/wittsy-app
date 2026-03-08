@@ -78,8 +78,8 @@ export const MainNavigator: React.FC = () => {
         name="GameRoom"
         component={GameRoomScreen}
         options={{
-          headerShown: false, // Uses custom header; no back navigation
-          gestureEnabled: false, // Disable swipe back gesture
+          headerShown: false, // Uses custom header
+          gestureEnabled: true, // Screen sets this to false once game goes active
         }}
       />
       <Stack.Screen 
