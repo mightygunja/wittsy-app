@@ -300,7 +300,10 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                   console.log('⌨️ Chat input changed:', text);
                   setInputText(text);
                 }}
-                onFocus={() => console.log('⌨️ Chat input focused')}
+                onFocus={() => {
+                  // Scroll to latest message when keyboard appears so the input stays visible
+                  setTimeout(() => scrollToBottom(), 150);
+                }}
                 onSubmitEditing={handleSendMessage}
                 returnKeyType="send"
                 maxLength={200}

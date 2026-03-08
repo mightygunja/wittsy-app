@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   BackHandler,
   Platform,
   InputAccessoryView,
+  Keyboard,
+  KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -171,6 +173,7 @@ const GameRoomScreen: React.FC = () => {
   const [shuffledSubmissions, setShuffledSubmissions] = useState<[string, string][]>([]);
   const [multiplayerRatingChanges, setMultiplayerRatingChanges] = useState<Record<string, RatingUpdate> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [chatKeyboardHeight, setChatKeyboardHeight] = useState(0);
   const [showGameEndSummary, setShowGameEndSummary] = useState(false);
   const [gameEndRewards, setGameEndRewards] = useState<{
     coins: number;
@@ -944,6 +947,24 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
+  // Track keyboard height so the chat box floats above the keyboard when expanded
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e: KeyboardEvent) => {
+      setChatKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setChatKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   // Save current room on mount
   useEffect(() => {
     if (user?.uid && room?.name) {
@@ -1500,10 +1521,11 @@ const GameRoomScreen: React.FC = () => {
         )}
 
         {/* COLLAPSIBLE CHAT - Only show in lobby (waiting status) */}
+        {/* bottom offset increases by keyboard height so chat rides above the keyboard */}
         {user && room?.status === 'waiting' && (
           <View style={{
             position: 'absolute',
-            bottom: 20,
+            bottom: 20 + chatKeyboardHeight,
             left: 20,
             right: 20,
             zIndex: 9999,
