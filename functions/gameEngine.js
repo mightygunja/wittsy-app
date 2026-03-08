@@ -189,7 +189,7 @@ async function advancePhase(roomId) {
       // PRODUCTION FIX: Ensure at least 1 vote before advancing
       const voteCount = Object.keys(game.votes || {}).length;
       console.log(`🗳️ ${voteCount} votes received`);
-      
+
       if (voteCount === 0) {
         console.log(`⚠️ No votes - extending voting phase by 5s`);
         updates.phaseStart = now;
@@ -197,11 +197,17 @@ async function advancePhase(roomId) {
         await gameRef.update(updates);
         return;
       }
-      
-      // CRITICAL: Process votes BEFORE advancing to results
-      // This ensures winner is calculated before results phase starts
-      // Pass validSubmissions so only on-time submissions are used for winner phrase lookup
-      await processVotesSync(roomId, game.votes, game.validSubmissions || game.submissions);
+
+      // Re-read to catch concurrent advances (stale-read guard)
+      const freshVotingSnap = await gameRef.once('value');
+      const freshVotingGame = freshVotingSnap.val();
+      if (!freshVotingGame || freshVotingGame.phase !== 'voting') {
+        console.log(`⏸️ Voting phase already advanced (${freshVotingGame?.phase}) — skipping`);
+        return;
+      }
+
+      // Process votes — transaction inside ensures exactly-once execution
+      await processVotesSync(roomId, freshVotingGame.votes, freshVotingGame.validSubmissions || freshVotingGame.submissions);
       
       nextPhase = 'results';
       nextDuration = await getPhaseDurationForRoom(roomId, 'results');
@@ -337,6 +343,13 @@ async function processSubmissions(roomId, submissions) {
 
 /**
  * Process votes and update scores (SYNCHRONOUS - must complete before results phase)
+ *
+ * Uses a Firestore TRANSACTION with round-based idempotency tracking.
+ * Root cause of double-counting: all clients call advancePhase simultaneously.
+ * Multiple Cloud Function instances all reach processVotesSync, read the same
+ * Firestore scores, and each writes votes back — the second write adds votes
+ * a second time. The transaction + lastProcessedRound guard prevents any
+ * second call from committing for the same round.
  */
 async function processVotesSync(roomId, votes, submissions) {
   if (!votes || Object.keys(votes).length === 0) {
@@ -345,94 +358,92 @@ async function processVotesSync(roomId, votes, submissions) {
   }
 
   const roomRef = db.collection('rooms').doc(roomId);
-  const roomDoc = await roomRef.get();
-  const room = roomDoc.data();
-  const scores = room?.scores || {};
 
-  // Read validSubmissions from RTDB to know which players actually submitted on time
+  // Read validSubmissions and current round from RTDB
   const gameSnapshot = await rtdb.ref(`rooms/${roomId}/game`).once('value');
   const gameData = gameSnapshot.val() || {};
   const validSubmissions = gameData.validSubmissions || null;
+  const currentRound = gameData.round || 0;
 
-  // CRITICAL: Count votes correctly - each vote should add exactly 1
-  // Rules enforced server-side (frontend also enforces, but backend is the source of truth):
-  //   1. No self-voting
-  //   2. Voter must have submitted on time (non-submitters cannot vote)
-  //   3. Cannot vote for a player who didn't submit on time
+  // Build vote counts outside the transaction (read-only, safe to compute once)
   const voteCounts = {};
   Object.entries(votes).forEach(([voterId, votedFor]) => {
-    // Block self-votes unconditionally
     if (voterId === votedFor) {
       console.log(`⚠️ BLOCKED self-vote from ${voterId}`);
       return;
     }
-    // Block votes FROM players who didn't submit on time
     if (validSubmissions && !(voterId in validSubmissions)) {
-      console.log(`⚠️ BLOCKED vote from ${voterId} - did not submit on time (non-submitters cannot vote)`);
+      console.log(`⚠️ BLOCKED vote from ${voterId} - did not submit on time`);
       return;
     }
-    // Block votes FOR players who didn't submit on time
     if (validSubmissions && !(votedFor in validSubmissions)) {
-      console.log(`⚠️ BLOCKED vote for ${votedFor} - not in validSubmissions (late or no submission)`);
+      console.log(`⚠️ BLOCKED vote for ${votedFor} - not in validSubmissions`);
       return;
     }
     voteCounts[votedFor] = (voteCounts[votedFor] || 0) + 1;
   });
-  
-  console.log(`🗳️ Vote counts for this round:`, voteCounts);
-  console.log(`📊 Current cumulative scores BEFORE update:`, JSON.stringify(scores));
-  
-  // CRITICAL: Only add votes from THIS round, not duplicate
-  // Initialize scores for new players
-  Object.keys(voteCounts).forEach(userId => {
-    if (!scores[userId]) {
-      scores[userId] = { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] };
-    }
-  });
-  
-  // Add THIS round's votes to cumulative total (1 vote = +1 to total)
-  Object.entries(voteCounts).forEach(([userId, count]) => {
-    scores[userId].totalVotes += count;
-    console.log(`➕ Adding ${count} votes to ${userId}, new total: ${scores[userId].totalVotes}`);
-  });
-  
-  console.log(`📊 Updated cumulative scores AFTER update:`, JSON.stringify(scores));
-  
-  // Find winner(s) - handle ties by finding ALL players with max votes
+
+  // Find winner(s)
   let maxVotes = 0;
-  Object.values(voteCounts).forEach(count => {
-    if (count > maxVotes) maxVotes = count;
-  });
-  
-  // Get all winners (in case of tie)
+  Object.values(voteCounts).forEach(count => { if (count > maxVotes) maxVotes = count; });
   const winners = Object.entries(voteCounts)
-    .filter(([userId, count]) => count === maxVotes)
+    .filter(([, count]) => count === maxVotes)
     .map(([userId]) => userId);
-  
-  console.log(`🏆 Round winners (${maxVotes} votes each):`, winners);
-  
-  // Update round wins for ALL winners and give +2 vote bonus
-  winners.forEach(winnerId => {
-    if (scores[winnerId]) {
-      scores[winnerId].roundWins += 1;
-      scores[winnerId].totalVotes += 2; // +2 vote bonus for winning round
-      console.log(`🏆 Round winner ${winnerId} gets +2 bonus votes, new total: ${scores[winnerId].totalVotes}`);
-    }
-  });
-  
-  // Get winning phrases — use validSubmissions (plain strings) first, then fall back to submissions
+
+  console.log(`🗳️ Vote counts:`, voteCounts, '| Winners:', winners);
+
+  // Winning phrases (computed outside transaction, no Firestore reads needed)
   const winningPhrases = winners.map(winnerId => {
-    // validSubmissions stores plain strings; submissions may store {phrase, timestamp} objects
-    if (validSubmissions && validSubmissions[winnerId]) {
-      return validSubmissions[winnerId];
-    }
+    if (validSubmissions && validSubmissions[winnerId]) return validSubmissions[winnerId];
     const sub = submissions[winnerId];
     if (!sub) return null;
     return typeof sub === 'object' ? (sub.phrase || null) : sub;
   }).filter(p => p);
-  
-  // Update Firestore scores
-  await roomRef.update({ scores });
+
+  // ATOMIC TRANSACTION: read scores, check idempotency key, write once
+  let transactionCommitted = false;
+  await db.runTransaction(async (transaction) => {
+    const roomDoc = await transaction.get(roomRef);
+    const room = roomDoc.data();
+
+    // IDEMPOTENCY CHECK: if this round was already processed, abort
+    if (room?.lastProcessedRound === currentRound) {
+      console.log(`⏸️ Round ${currentRound} already processed for ${roomId} — skipping duplicate`);
+      return; // abort transaction
+    }
+
+    const scores = { ...(room?.scores || {}) };
+
+    // Initialize scores for players receiving votes this round
+    Object.keys(voteCounts).forEach(userId => {
+      if (!scores[userId]) {
+        scores[userId] = { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] };
+      }
+    });
+
+    // Add raw vote counts
+    Object.entries(voteCounts).forEach(([userId, count]) => {
+      scores[userId].totalVotes += count;
+    });
+
+    // Add +2 bonus for round winner(s)
+    winners.forEach(winnerId => {
+      if (scores[winnerId]) {
+        scores[winnerId].roundWins += 1;
+        scores[winnerId].totalVotes += 2;
+        console.log(`🏆 ${winnerId}: ${maxVotes} votes + 2 bonus = total ${scores[winnerId].totalVotes}`);
+      }
+    });
+
+    // Write scores AND idempotency key atomically
+    transaction.update(roomRef, { scores, lastProcessedRound: currentRound });
+    transactionCommitted = true;
+  });
+
+  if (!transactionCommitted) {
+    console.log(`⏸️ processVotesSync: transaction aborted (already processed)`);
+    return;
+  }
   
   // Update game state with winner info (support multiple winners)
   await rtdb.ref(`rooms/${roomId}/game`).update({
