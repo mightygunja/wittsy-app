@@ -1188,15 +1188,17 @@ const GameRoomScreen: React.FC = () => {
 
       case 'voting':
         const votingSubmissions = (gameState as any)?.validSubmissions || gameState.submissions || {};
-        console.log('🗳️ VOTING PHASE - Valid submissions:', votingSubmissions, 'Count:', Object.keys(votingSubmissions).length);
+        // Check if current user submitted on time — non-submitters cannot vote
+        const currentUserCanVote = user?.uid ? (user.uid in votingSubmissions) : false;
+        console.log('🗳️ VOTING PHASE - validSubmissions:', Object.keys(votingSubmissions).length, 'canVote:', currentUserCanVote);
         return (
           <View style={styles.votingPhase}>
             <View style={styles.votingHeader}>
               <Text style={styles.phaseTitle}>VOTE FOR THE BEST!</Text>
               <Text style={styles.promptText}>{promptText}</Text>
             </View>
-            
-            {/* Enhanced vote progress */}
+
+            {/* Vote progress */}
             <View style={styles.voteInfo}>
               <View style={styles.voteProgressHeader}>
                 <Text style={styles.infoText}>
@@ -1206,42 +1208,49 @@ const GameRoomScreen: React.FC = () => {
                   <Text style={styles.votedText}>✓ Vote cast!</Text>
                 )}
               </View>
-              
-              {/* Vote progress bar */}
+
               <View style={styles.progressBarContainer}>
-                <View 
+                <View
                   style={[
                     styles.progressBarFill,
-                    { 
+                    {
                       width: `${(voteCount / (room?.players.length || 1)) * 100}%`,
                       backgroundColor: voteCount === room?.players.length ? '#4CAF50' : '#FF6B6B'
                     }
-                  ]} 
+                  ]}
                 />
               </View>
-              
-              {/* Pressure text when waiting */}
-              {!hasVoted && voteCount > 0 && (
+
+              {!hasVoted && currentUserCanVote && voteCount > 0 && (
                 <Text style={styles.pressureText}>
                   ⏰ {room?.players.length! - voteCount} {room?.players.length! - voteCount === 1 ? 'player' : 'players'} waiting for you!
                 </Text>
               )}
             </View>
 
-            <ScrollView style={styles.phrasesList} showsVerticalScrollIndicator={false}>
-              {shuffledSubmissions
-                .map(([userId, phraseText], index) => (
-                <PhraseCard
-                  key={userId}
-                  number={index + 1}
-                  phrase={phraseText}
-                  onPress={() => handleVote(userId)}
-                  disabled={userId === user?.uid}
-                  isOwnPhrase={userId === user?.uid}
-                  hasVoted={gameState.votes?.[user?.uid || ''] === userId}
-                />
-              ))}
-            </ScrollView>
+            {currentUserCanVote ? (
+              /* User submitted — show voting cards */
+              <ScrollView style={styles.phrasesList} showsVerticalScrollIndicator={false}>
+                {shuffledSubmissions.map(([userId, phraseText], index) => (
+                  <PhraseCard
+                    key={userId}
+                    number={index + 1}
+                    phrase={phraseText}
+                    onPress={() => handleVote(userId)}
+                    disabled={userId === user?.uid}
+                    isOwnPhrase={userId === user?.uid}
+                    hasVoted={gameState.votes?.[user?.uid || ''] === userId}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              /* User did not submit — cannot vote this round */
+              <View style={styles.noVoteContainer}>
+                <Text style={styles.noVoteIcon}>⏱️</Text>
+                <Text style={styles.noVoteTitle}>You didn't submit this round</Text>
+                <Text style={styles.noVoteSubtitle}>Only players who submitted on time can vote. Watch how others vote!</Text>
+              </View>
+            )}
           </View>
         );
 
@@ -2220,6 +2229,30 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  noVoteContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 40,
+  },
+  noVoteIcon: {
+    fontSize: 52,
+    marginBottom: 16,
+  },
+  noVoteTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  noVoteSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   pressureText: {
     fontSize: 13,

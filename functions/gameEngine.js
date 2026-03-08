@@ -355,8 +355,10 @@ async function processVotesSync(roomId, votes, submissions) {
   const validSubmissions = gameData.validSubmissions || null;
 
   // CRITICAL: Count votes correctly - each vote should add exactly 1
-  // PREVENT SELF-VOTING: Hard block - voter cannot vote for themselves
-  // PREVENT PHANTOM VOTES: Only count votes for players who had valid (on-time) submissions
+  // Rules enforced server-side (frontend also enforces, but backend is the source of truth):
+  //   1. No self-voting
+  //   2. Voter must have submitted on time (non-submitters cannot vote)
+  //   3. Cannot vote for a player who didn't submit on time
   const voteCounts = {};
   Object.entries(votes).forEach(([voterId, votedFor]) => {
     // Block self-votes unconditionally
@@ -364,7 +366,12 @@ async function processVotesSync(roomId, votes, submissions) {
       console.log(`⚠️ BLOCKED self-vote from ${voterId}`);
       return;
     }
-    // If validSubmissions is available, only count votes for players in it
+    // Block votes FROM players who didn't submit on time
+    if (validSubmissions && !(voterId in validSubmissions)) {
+      console.log(`⚠️ BLOCKED vote from ${voterId} - did not submit on time (non-submitters cannot vote)`);
+      return;
+    }
+    // Block votes FOR players who didn't submit on time
     if (validSubmissions && !(votedFor in validSubmissions)) {
       console.log(`⚠️ BLOCKED vote for ${votedFor} - not in validSubmissions (late or no submission)`);
       return;
