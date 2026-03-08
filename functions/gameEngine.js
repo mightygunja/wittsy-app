@@ -213,11 +213,26 @@ async function advancePhase(roomId) {
       // lastWinner and lastWinningPhrase are set by processVotesSync
       break;
       
-    case 'insufficient':
-      // Client timer fired for insufficient phase - just start a new round
+    case 'insufficient': {
+      // Re-read state to prevent concurrent advance from another client
+      const insuffSnap = await gameRef.once('value');
+      const insuffGame = insuffSnap.val();
+      if (!insuffGame || insuffGame.phase !== 'insufficient') {
+        console.log(`⏸️ Insufficient phase already advanced (phase: ${insuffGame?.phase}) — skipping`);
+        return;
+      }
       return startNewRound(roomId);
+    }
 
     case 'results':
+      // Re-read the CURRENT game state immediately before acting — the snapshot
+      // at the top of this function may be stale if another client already advanced.
+      const freshSnap = await gameRef.once('value');
+      const freshGame = freshSnap.val();
+      if (!freshGame || freshGame.phase !== 'results') {
+        console.log(`⏸️ Results already advanced by another client (phase: ${freshGame?.phase}) — skipping`);
+        return;
+      }
       // Check for winner or start new round
       const shouldContinue = await checkWinner(roomId);
       if (shouldContinue) {
@@ -231,20 +246,28 @@ async function advancePhase(roomId) {
 }
 
 /**
- * Start a new round
+ * Start a new round.
+ *
+ * Uses a RTDB transaction to guarantee only ONE concurrent call commits.
+ * Root cause of prompt-flip bug: all clients call advancePhase when their
+ * timer hits 0. Multiple Cloud Function instances run concurrently, each
+ * picks a different random prompt, and the last writer wins — causing the
+ * visible prompt to change. The transaction ensures only the first call
+ * that sees phase='results'|'insufficient' commits; subsequent calls abort.
  */
 async function startNewRound(roomId) {
+  const gameRef = rtdb.ref(`rooms/${roomId}/game`);
   const roomDoc = await db.collection('rooms').doc(roomId).get();
   const room = roomDoc.data();
-  
+
   const prompt = await getRandomPrompt(roomId);
   if (!prompt) return;
-  
+
   const newRound = (room.currentRound || 0) + 1;
   const now = Date.now();
   const promptDuration = await getPhaseDurationForRoom(roomId, 'prompt');
-  
-  await rtdb.ref(`rooms/${roomId}/game`).update({
+
+  const newState = {
     phase: 'prompt',
     round: newRound,
     prompt: prompt.text,
@@ -256,14 +279,33 @@ async function startNewRound(roomId) {
     insufficientSubmissions: null,
     lastWinner: null,
     lastWinningPhrase: null
+  };
+
+  // Transaction: only commit if still in a phase that should trigger a new round.
+  // If another client already set phase='prompt', this aborts — preventing the flip.
+  const result = await gameRef.transaction((currentGame) => {
+    if (!currentGame) return newState; // No existing state — safe to write
+    const phase = currentGame.phase;
+    if (phase === 'results' || phase === 'insufficient' || phase === null) {
+      return newState; // Commit: we are the first to advance
+    }
+    // Already in 'prompt' or another phase — someone beat us here, abort
+    console.log(`⏸️ startNewRound transaction aborted — phase already '${phase}', skipping`);
+    return; // Returning undefined aborts the transaction
   });
-  
+
+  if (!result.committed) {
+    console.log(`⏸️ startNewRound: skipped for ${roomId} (concurrent call already started round)`);
+    return;
+  }
+
+  // Only update Firestore if we won the transaction
   await db.collection('rooms').doc(roomId).update({
     currentRound: newRound,
     currentPrompt: prompt.text
   });
-  
-  console.log(`🔄 Round ${newRound} started: ${roomId} - "${prompt.text?.substring(0, 40)}..."`);
+
+  console.log(`🔄 Round ${newRound} started: ${roomId} - "${prompt.text?.substring(0, 40)}..." (prompt locked via transaction)`);
 }
 
 /**
