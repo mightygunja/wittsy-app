@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { Text, TextInput } from 'react-native';
 import { AuthProvider } from './src/context/AuthContext';
 import { SettingsProvider } from './src/contexts/SettingsContext';
 import { ThemeProvider } from './src/contexts/ThemeProvider';
@@ -13,6 +14,14 @@ import { audioService } from './src/services/audioService';
 import { configureGoogleSignIn } from './src/services/auth';
 import { isExpoGo } from './src/utils/platform';
 import './src/utils/adminHelpers'; // Load admin helpers
+
+// Cap OS font scaling at 15% growth across the entire app.
+// Allows accessibility font settings to have a visible effect without
+// exploding card layouts. Applies globally — no per-component changes needed.
+// (allowFontScaling={false} was rejected: ignores accessibility entirely)
+const MAX_FONT_SCALE = 1.15;
+(Text as any).defaultProps = { ...(Text as any).defaultProps, maxFontSizeMultiplier: MAX_FONT_SCALE };
+(TextInput as any).defaultProps = { ...(TextInput as any).defaultProps, maxFontSizeMultiplier: MAX_FONT_SCALE };
 
 export default function App() {
   const navigationRef = useRef(null);
