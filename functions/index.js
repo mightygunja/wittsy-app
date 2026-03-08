@@ -18,6 +18,9 @@ exports.advanceGamePhase = gameFunctions.advanceGamePhase;
 // Scheduler function commented out due to deployment error - backup not critical
 // exports.checkGamePhases = gameFunctions.checkGamePhases;
 
+const simulate = require('./simulateGame');
+exports.simulateGame = simulate.simulateGame;
+
 // One-time initialization
 exports.initializeCollections = initCollections.initializeCollections;
 
