@@ -21,7 +21,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
-import { leaveRoom, startGame, deleteRoom, restartGame } from '../services/database';
+import { leaveRoom, startGame, deleteRoom, restartGame, createRematchRoom } from '../services/database';
 import { saveCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { gameTimerService } from '../services/gameTimer';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -46,6 +46,7 @@ import { rewards, REWARD_AMOUNTS } from '../services/rewardsService';
 import { incrementChallengeProgress } from '../services/challenges';
 import { battlePass } from '../services/battlePassService';
 import { GameEndSummary } from '../components/game/GameEndSummary';
+import { FinalResultsScreen, FinalPlayer } from '../components/game/FinalResultsScreen';
 import { StarCelebration } from '../components/game/StarCelebration';
 import { VictoryCelebration } from '../components/game/VictoryCelebration';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
@@ -187,6 +188,9 @@ const GameRoomScreen: React.FC = () => {
     loser: RatingUpdate;
   } | null>(null);
   const [finalScores, setFinalScores] = useState<{ userId: string; username: string; score: number }[]>([]);
+  const [showFinalResults, setShowFinalResults] = useState(false);
+  const [finalPlayers, setFinalPlayers] = useState<FinalPlayer[]>([]);
+  const [playAgainLoading, setPlayAgainLoading] = useState(false);
   const gameEndProcessedRef = useRef(false);
   
   // Track previous phase to detect actual phase changes
@@ -356,6 +360,15 @@ const GameRoomScreen: React.FC = () => {
       setVictoryData(winners);
       setShowVictoryCelebration(true);
 
+      // Build final players list for the FinalResultsScreen (sorted by score)
+      const finalPlayersList: FinalPlayer[] = sortedScores.map(s => ({
+        userId: s.userId,
+        username: room.players.find(p => p.userId === s.userId)?.username || 'Unknown',
+        score: s.score,
+        avatarConfig: room.players.find(p => p.userId === s.userId)?.avatarConfig,
+      }));
+      setFinalPlayers(finalPlayersList);
+
       console.log('✅ Game end rewards processed');
     } catch (error) {
       console.error('Failed to process game end:', error);
@@ -378,10 +391,39 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
+  // Host taps "Play Again" on FinalResultsScreen
+  const handlePlayAgain = async () => {
+    if (!user?.uid) return;
+    setPlayAgainLoading(true);
+    try {
+      // Create a brand-new room with same players — new room ID
+      await createRematchRoom(roomId, user.uid);
+      // All clients (including host) will detect nextRoomId and navigate via the room listener
+    } catch (error) {
+      console.error('Error creating rematch room:', error);
+      Alert.alert('Error', 'Failed to create rematch. Please try again.');
+      setPlayAgainLoading(false);
+    }
+  };
+
+  const handleFinalResultsLeave = async () => {
+    setShowFinalResults(false);
+    gameEndProcessedRef.current = false;
+    if (user?.uid && room) {
+      try {
+        await leaveRoom(roomId, user.uid);
+        clearCurrentRoom();
+        navigation.goBack();
+      } catch (error) {
+        console.error('Error leaving room:', error);
+      }
+    }
+  };
+
   const handleGameRestart = async () => {
     setShowGameEndSummary(false);
     gameEndProcessedRef.current = false;
-    
+
     try {
       await restartGame(roomId);
       console.log('🔄 Game restarted, waiting for host to start');
@@ -412,6 +454,18 @@ const GameRoomScreen: React.FC = () => {
         });
         setRoom(roomData);
         setLoading(false);
+
+        // If host created a rematch room, all clients navigate there automatically
+        if (roomData.nextRoomId && roomData.status === 'finished') {
+          const nextId = roomData.nextRoomId as string;
+          console.log('🔄 nextRoomId detected — navigating to rematch room:', nextId);
+          if (roomUnsubscribeRef.current) {
+            roomUnsubscribeRef.current();
+            roomUnsubscribeRef.current = null;
+          }
+          clearCurrentRoom();
+          navigation.replace('GameRoom' as never, { roomId: nextId } as never);
+        }
       } else {
         Alert.alert('Error', 'Room not found', [
           {
@@ -1628,7 +1682,18 @@ const GameRoomScreen: React.FC = () => {
 
       {/* Scoreboard sidebar (during active game) - Hidden on mobile */}
 
-      {/* Game End Summary Modal */}
+      {/* Final Results Screen — shown after VictoryCelebration */}
+      <FinalResultsScreen
+        visible={showFinalResults}
+        players={finalPlayers}
+        currentUserId={user?.uid}
+        isHost={room?.hostId === user?.uid}
+        onPlayAgain={handlePlayAgain}
+        onLeave={handleFinalResultsLeave}
+        playAgainLoading={playAgainLoading}
+      />
+
+      {/* Game End Summary Modal (rewards/XP — kept for reference, shown after FinalResults) */}
       {showGameEndSummary && gameEndRewards && (
         <GameEndSummary
           visible={showGameEndSummary}
@@ -1666,7 +1731,8 @@ const GameRoomScreen: React.FC = () => {
           onComplete={() => {
             setShowVictoryCelebration(false);
             setVictoryData(null);
-            setShowGameEndSummary(true);
+            // Show the full final results screen (all players, quips, Play Again)
+            setShowFinalResults(true);
           }}
         />
       )}

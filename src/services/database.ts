@@ -464,6 +464,49 @@ export const updateRoomSettings = async (
 // Client-side game loop removed - all game progression is now handled by Cloud Functions
 
 /**
+ * Create a rematch room — new room ID, same players, same settings.
+ * Host calls this. The old room gets a nextRoomId field written so
+ * all other clients can detect it and navigate to the new room.
+ */
+export const createRematchRoom = async (
+  originalRoomId: string,
+  hostId: string,
+): Promise<string> => {
+  const originalRef = doc(firestore, 'rooms', originalRoomId);
+  const originalDoc = await getDoc(originalRef);
+  if (!originalDoc.exists()) throw new Error('Original room not found');
+
+  const original = originalDoc.data() as any;
+  const roomCode = generateRoomCode();
+
+  const newRoomData = {
+    roomCode,
+    name:     original.name,
+    hostId,
+    isRanked: false, // Rematches are always casual
+    settings: original.settings || {},
+    players:  original.players || [],
+    status:   'waiting',
+    scores:   {},
+    createdAt: Timestamp.now(),
+    isRematch: true,
+    originalRoomId,
+    currentRound: 0,
+    currentPrompt: null,
+  };
+
+  const { addDoc, collection: col } = await import('firebase/firestore');
+  const newRef = await addDoc(col(firestore, 'rooms'), newRoomData);
+  const newRoomId = newRef.id;
+
+  // Signal all clients in the old room to navigate to the new one
+  await updateDoc(originalRef, { nextRoomId: newRoomId });
+
+  console.log(`🔄 Rematch room created: ${newRoomId} (from ${originalRoomId})`);
+  return newRoomId;
+};
+
+/**
  * Restart the game (reset room for new game with same players)
  */
 export const restartGame = async (roomId: string): Promise<void> => {
