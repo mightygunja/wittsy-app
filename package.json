@@ -1,6 +1,6 @@
 {
   "name": "wittz-app",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Wittz - Real-time witty phrase battle game",
   "main": "expo/AppEntry.js",
   "scripts": {
@@ -37,6 +37,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-store-review": "~9.0.9",
+    "expo-updates": "~29.0.16",
     "firebase": "^12.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

@@ -464,6 +464,30 @@ export const updateRoomSettings = async (
 // Client-side game loop removed - all game progression is now handled by Cloud Functions
 
 /**
+ * Restart the game (reset room for new game with same players)
+ */
+export const restartGame = async (roomId: string): Promise<void> => {
+  const roomRef = doc(firestore, 'rooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+  
+  if (!roomDoc.exists()) {
+    throw new Error('Room not found');
+  }
+  
+  // Reset room to waiting state with same players
+  await updateDoc(roomRef, {
+    status: 'waiting',
+    currentRound: 0,
+    currentPrompt: null,
+    scores: {},
+    gameStartedAt: null,
+    endedAt: null,
+  });
+  
+  console.log(`🔄 Room ${roomId} restarted - ready for new game`);
+};
+
+/**
  * Start the game
  */
 export const startGame = async (roomId: string): Promise<void> => {

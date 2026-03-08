@@ -3,7 +3,7 @@
  * Ensures proper formatting on both phones and iPads
  */
 
-import { Dimensions, Platform } from 'react-native';
+import { Dimensions, PixelRatio } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -103,18 +103,24 @@ export const tabletHorizontalPadding = isTablet
 
 /**
  * Responsive font scaling for accessibility and different screen sizes
- * Scales text based on screen width to ensure readability without breaking layouts
+ * Scales text based on screen width AND system font size settings
+ * Respects user's accessibility preferences while maintaining layout integrity
  */
 export const scaleFontSize = (baseSize: number): number => {
+  // Get system font scale (1.0 = normal, >1.0 = enlarged)
+  const systemFontScale = PixelRatio.getFontScale();
+  
   // Base scale factor for different device sizes
-  const scaleFactor = isLargeTablet ? 1.3 : isTablet ? 1.15 : 1.0;
+  const deviceScaleFactor = isLargeTablet ? 1.3 : isTablet ? 1.15 : 1.0;
   
-  // Apply scale but cap maximum growth to prevent oversized text
-  const scaled = baseSize * scaleFactor;
+  // Combine system font scale with device scale
+  // Use a dampening factor to prevent extreme scaling that breaks layouts
+  const dampenedSystemScale = 1 + (systemFontScale - 1) * 0.7;
+  const combinedScale = baseSize * deviceScaleFactor * dampenedSystemScale;
   
-  // Cap maximum size to prevent breaking layouts
-  const maxSize = baseSize * 1.5;
-  return Math.min(scaled, maxSize);
+  // Cap maximum size to prevent breaking layouts (2x base size max)
+  const maxSize = baseSize * 2.0;
+  return Math.min(combinedScale, maxSize);
 };
 
 /**
@@ -127,8 +133,24 @@ export const scaleIconSize = (baseSize: number): number => {
 
 /**
  * Get responsive line height based on font size
- * Ensures text doesn't wrap awkwardly
+ * Ensures text doesn't wrap awkwardly and respects scaled fonts
  */
 export const getLineHeight = (fontSize: number): number => {
-  return Math.ceil(fontSize * 1.3);
+  // Use 1.4 multiplier for better readability with scaled fonts
+  return Math.ceil(fontSize * 1.4);
+};
+
+/**
+ * Get current system font scale
+ * Returns 1.0 for normal, >1.0 for enlarged fonts
+ */
+export const getSystemFontScale = (): number => {
+  return PixelRatio.getFontScale();
+};
+
+/**
+ * Check if user has enlarged fonts enabled
+ */
+export const hasEnlargedFonts = (): boolean => {
+  return PixelRatio.getFontScale() > 1.0;
 };

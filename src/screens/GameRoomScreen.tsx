@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -943,14 +943,6 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
-  // Enable swipe-back and back button only in lobby; lock them out once game starts
-  useLayoutEffect(() => {
-    const isWaiting = room?.status === 'waiting';
-    navigation.setOptions({
-      gestureEnabled: isWaiting,
-    });
-  }, [room?.status, navigation]);
-
   // Save current room on mount
   useEffect(() => {
     if (user?.uid && room?.name) {
@@ -1338,16 +1330,6 @@ const GameRoomScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        {/* Back arrow — always rendered to keep layout consistent.
-            Visible in lobby only; invisible (non-interactive) during active game. */}
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={[styles.backArrowButton, room.status !== 'waiting' && { opacity: 0 }]}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          disabled={room.status !== 'waiting'}
-        >
-          <Text style={styles.backArrowText}>‹</Text>
-        </TouchableOpacity>
         <View style={styles.headerLeft}>
           <Text style={styles.roomName}>{room.name}</Text>
           <Text style={styles.roomCode}>Room ID: {room.roomCode}</Text>
@@ -1674,17 +1656,6 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     minHeight: 48,
-  },
-  backArrowButton: {
-    paddingRight: 6,
-    paddingVertical: 4,
-    justifyContent: 'center',
-  },
-  backArrowText: {
-    fontSize: 32,
-    color: COLORS.text,
-    lineHeight: 32,
-    fontWeight: '300',
   },
   headerLeft: {
     flex: 1,

@@ -78,8 +78,9 @@ export const MainNavigator: React.FC = () => {
         name="GameRoom"
         component={GameRoomScreen}
         options={{
-          headerShown: false, // Uses custom header
-          gestureEnabled: true, // Screen sets this to false once game goes active
+          title: 'Game Room',
+          headerLeft: () => null,
+          gestureEnabled: false,
         }}
       />
       <Stack.Screen 

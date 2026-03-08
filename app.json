@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Wittz",
+    "name": "Wittz - Party Word Game",
     "slug": "wittsy-app",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wittsy.app",
-      "buildNumber": "5",
+      "buildNumber": "35",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "Wittz needs to send you notifications about game invites, challenges, and events."

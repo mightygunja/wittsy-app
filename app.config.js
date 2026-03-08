@@ -1,8 +1,8 @@
 export default {
   expo: {
-    name: "Wittz",
+    name: "Wittz - Party Word Game",
     slug: "wittsy-app",
-    version: "1.0.4",
+    version: "1.0.5",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -18,7 +18,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wittsy.app",
-      buildNumber: "33",
+      buildNumber: "38",
       infoPlist: {
         NSCameraUsageDescription: "Wittz needs access to your camera to take profile photos.",
         NSPhotoLibraryUsageDescription: "Wittz needs access to your photo library to select profile photos.",
@@ -98,7 +98,7 @@ export default {
     ],
     extra: {
       eas: {
-        projectId: "1836a769-48db-4dc3-bffb-6487530c5daa"
+        projectId: "947483cc-b065-449a-b8fd-7e0da17d1ed2"
       },
       // Firebase configuration
       firebaseApiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyBJf4239QrQhCtd4ivB-fNPZ358dYIEG6M",
@@ -112,7 +112,7 @@ export default {
       revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
       revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
     },
-    owner: "mightygunja",
+    owner: "adilgunja",
     updates: {
       enabled: false
     }

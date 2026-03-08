@@ -14,6 +14,7 @@ import { CurrencyDisplay } from '../components/common/CurrencyDisplay';
 import { GameplayTutorial } from '../components/tutorial/GameplayTutorial';
 import { DailyRewardModal } from '../components/DailyRewardModal';
 import { dailyRewardsService } from '../services/dailyRewardsService';
+import { deepLinking } from '../services/deepLinking';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
 import { getActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom } from '../services/database';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -119,6 +120,46 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     
     checkTutorial();
   }, [user, userProfile]);
+
+  // Handle deep links for game room invites
+  useEffect(() => {
+    if (!user || !userProfile) return;
+
+    const handleDeepLinkConfig = async (config: any) => {
+      console.log('🔗 HomeScreen received deep link:', config);
+      
+      // Only handle GameRoom deep links
+      if (config.screen === 'GameRoom' && config.params?.roomId) {
+        const roomId = config.params.roomId;
+        console.log('🎮 Attempting to join room from deep link:', roomId);
+        
+        try {
+          // Join the room first
+          await joinRoom(roomId, user.uid, userProfile.username);
+          console.log('✅ Successfully joined room, navigating...');
+          
+          // Then navigate
+          navigation.navigate('GameRoom', { roomId });
+        } catch (error: any) {
+          console.error('❌ Failed to join room from deep link:', error);
+          
+          // If already in room, just navigate
+          if (error.message === 'Already in room') {
+            console.log('ℹ️ Already in room, navigating anyway...');
+            navigation.navigate('GameRoom', { roomId });
+          } else {
+            Alert.alert('Error', error.message || 'Failed to join room');
+          }
+        }
+      }
+    };
+
+    deepLinking.addListener(handleDeepLinkConfig);
+
+    return () => {
+      deepLinking.removeListener(handleDeepLinkConfig);
+    };
+  }, [user, userProfile, navigation]);
 
   // Reload rooms when screen comes into focus
   useFocusEffect(
@@ -965,7 +1006,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     position: 'relative',
   },
   bellIcon: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
   },
   notificationBadge: {
     position: 'absolute',
@@ -981,7 +1022,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   notificationBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: scaleFontSize(10),
     fontWeight: 'bold',
   },
   userInfoCompact: {
@@ -1003,7 +1044,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingVertical: 0,
   },
   battleOfText: {
-    fontSize: 28,
+    fontSize: scaleFontSize(28),
     fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
     fontStyle: 'italic',
     color: COLORS.text,
@@ -1013,7 +1054,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     left: '10%',
   },
   battleOfTextInner: {
-    fontSize: 28,
+    fontSize: scaleFontSize(28),
     fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
     fontStyle: 'italic',
     color: COLORS.text,
@@ -1056,19 +1097,19 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center',
   },
   welcomeText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.xs),
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.textTertiary,
     letterSpacing: 1,
     marginBottom: SPACING.xxs,
   },
   username: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize['2xl']),
     fontWeight: TYPOGRAPHY.fontWeight.extrabold,
     color: COLORS.text,
   },
   viewProfile: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.xs),
     color: COLORS.primary,
     marginTop: SPACING.xs,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
@@ -1131,12 +1172,12 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flex: 1,
   },
   roomCardName: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   roomCardPlayers: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: 'rgba(255, 255, 255, 0.8)',
   },
   roomCardFooter: {
@@ -1146,12 +1187,12 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginTop: SPACING.xs,
   },
   roomCardStatus: {
-    fontSize: 13,
+    fontSize: scaleFontSize(13),
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
   },
   roomCardCountdown: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#FFD700',
     fontWeight: '600',
   },
@@ -1161,7 +1202,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     padding: SPACING.lg,
   },
   emptyRoomsText: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: SPACING.md,
     textAlign: 'center',
@@ -1171,7 +1212,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     alignSelf: 'center',
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
     padding: SPACING.lg,
@@ -1289,11 +1330,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   navIcon: {
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     marginBottom: SPACING.xxs,
   },
   navLabel: {
-    fontSize: 10,
+    fontSize: scaleFontSize(10),
     color: COLORS.text,
     fontWeight: '600',
   },
@@ -1305,7 +1346,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     gap: SPACING.sm,
   },
   joinByCodeIcon: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
   },
   joinByCodeTextContainer: {
     flex: 1,
@@ -1322,7 +1363,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     lineHeight: getLineHeight(scaleFontSize(TYPOGRAPHY.fontSize.sm)),
   },
   joinByCodeArrow: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     color: COLORS.textTertiary,
   },
 });

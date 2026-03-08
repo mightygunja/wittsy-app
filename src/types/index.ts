@@ -22,7 +22,7 @@ export interface User {
 }
 
 // Game Phase Types
-export type GamePhase = 'prompt' | 'submission' | 'waiting' | 'voting' | 'results';
+export type GamePhase = 'prompt' | 'submission' | 'waiting' | 'voting' | 'results' | 'insufficient';
 
 // UserProfile is an alias for User, used in contexts where we explicitly reference the full profile
 export interface UserProfile extends Omit<User, 'createdAt' | 'lastActive'> {

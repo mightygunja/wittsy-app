@@ -34,7 +34,10 @@ interface GameEndSummaryProps {
   } | null;
   multiplayerRatingChanges?: Record<string, RatingUpdate> | null;
   currentUserId?: string;
+  isHost?: boolean;
+  playerCount?: number;
   onContinue: () => void;
+  onRestart?: () => void;
 }
 
 export const GameEndSummary: React.FC<GameEndSummaryProps> = ({
@@ -44,7 +47,10 @@ export const GameEndSummary: React.FC<GameEndSummaryProps> = ({
   ratingChanges,
   multiplayerRatingChanges,
   currentUserId,
+  isHost,
+  playerCount,
   onContinue,
+  onRestart,
 }) => {
   const { colors: COLORS } = useTheme();
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -234,22 +240,44 @@ export const GameEndSummary: React.FC<GameEndSummaryProps> = ({
             </View>
           </ScrollView>
 
-          {/* Continue Button */}
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={() => {
-              haptics.light();
-              onContinue();
-            }}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#A855F7', '#7C3AED']}
-              style={styles.continueGradient}
+          {/* Action Buttons */}
+          <View style={styles.buttonContainer}>
+            {/* Restart button for host if 3+ players */}
+            {isHost && playerCount && playerCount >= 3 && onRestart && (
+              <TouchableOpacity
+                style={styles.restartButton}
+                onPress={() => {
+                  haptics.light();
+                  onRestart();
+                }}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#10B981', '#059669']}
+                  style={styles.buttonGradient}
+                >
+                  <Text style={styles.buttonText}>🔄 Play Again</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            
+            {/* Continue/Leave button */}
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={() => {
+                haptics.light();
+                onContinue();
+              }}
+              activeOpacity={0.8}
             >
-              <Text style={styles.continueText}>Continue</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#A855F7', '#7C3AED']}
+                style={styles.buttonGradient}
+              >
+                <Text style={styles.buttonText}>Leave Room</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </LinearGradient>
       </Animated.View>
     </View>
@@ -405,22 +433,39 @@ const createStyles = (COLORS: any) =>
       fontWeight: 'bold',
       color: COLORS.primary,
     },
-    continueButton: {
-      margin: SPACING.lg,
-      borderRadius: 16,
-      overflow: 'hidden',
+    buttonContainer: {
+      flexDirection: 'row',
+      marginTop: 20,
+      marginBottom: 20,
+      marginHorizontal: 20,
+      gap: 12,
     },
-    continueGradient: {
-      paddingVertical: SPACING.md,
+    restartButton: {
+      flex: 1,
+    },
+    continueButton: {
+      flex: 1,
+    },
+    continueButtonSmall: {
+      flex: 1,
+    },
+    buttonGradient: {
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      borderRadius: 12,
       alignItems: 'center',
     },
-    continueText: {
-      fontSize: 18,
-      fontWeight: 'bold',
+    buttonText: {
+      fontSize: 16,
+      fontWeight: '700',
       color: '#FFFFFF',
     },
     ratingSection: {
-      marginBottom: SPACING.lg,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderRadius: 16,
+      padding: SPACING.lg,
+      borderWidth: 2,
+      borderColor: 'rgba(168, 85, 247, 0.3)',
     },
     ratingCard: {
       backgroundColor: 'rgba(255, 255, 255, 0.1)',

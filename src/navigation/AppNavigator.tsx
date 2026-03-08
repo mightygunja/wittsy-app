@@ -26,11 +26,13 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ navigationRef }) => 
       console.log('👤 User authenticated, checking for pending deep link');
       console.log('👤 User ID:', user.uid);
       console.log('👤 Navigation ref available:', !!navigationRef?.current);
-      // Small delay to ensure navigation is fully ready
-      setTimeout(() => {
-        console.log('⏰ Timeout complete, handling pending deep link now');
-        deepLinking.handlePendingDeepLink(navigationRef);
-      }, 500);
+      console.log('👤 Navigation state:', navigationRef?.current?.getRootState());
+      
+      // Handle pending deep link immediately - no delay needed
+      deepLinking.handlePendingDeepLink(navigationRef);
+      
+      // Also re-initialize to catch any new deep links
+      deepLinking.initialize(navigationRef);
     } else {
       console.log('⏸️ Not handling pending deep link - user:', !!user, 'navRef:', !!navigationRef?.current);
     }

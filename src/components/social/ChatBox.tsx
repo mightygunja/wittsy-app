@@ -12,8 +12,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
-  KeyboardAvoidingView,
-  Platform,
   Modal,
 } from 'react-native';
 import { ChatMessage } from '../../types/social';
@@ -26,7 +24,6 @@ import {
   subscribeToChatMessages,
   QUICK_CHAT_OPTIONS,
   EMOTES,
-  REACTIONS,
 } from '../../services/chat';
 import { SPACING } from '../../utils/constants'
 import { useTheme } from '../../hooks/useTheme';;
@@ -212,21 +209,50 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
   const chatHeight = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [60, maxHeight],
+    outputRange: [0, maxHeight],
   });
 
+  const buttonOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const chatOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  if (compact && !isExpanded) {
+    // Show floating button when collapsed
+    return (
+      <Animated.View style={[styles.floatingButton, { opacity: buttonOpacity }]}>
+        <TouchableOpacity
+          style={styles.chatButton}
+          onPress={() => setIsExpanded(true)}
+        >
+          <Text style={styles.chatButtonIcon}>💬</Text>
+          {messages.length > 0 && (
+            <View style={styles.chatBadge}>
+              <Text style={styles.chatBadgeText}>{messages.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+
   return (
-    <Animated.View style={[styles.container, { height: chatHeight }]}>
+    <Animated.View style={[styles.container, { height: chatHeight, opacity: chatOpacity }]}>
       {/* Header */}
       <TouchableOpacity
         style={styles.header}
         onPress={() => compact && setIsExpanded(!isExpanded)}
       >
-        <Text style={styles.headerTitle}>💬 Chat {compact && !isExpanded && '(Tap to expand)'}</Text>
+        <Text style={styles.headerTitle}>💬 Chat</Text>
         <View style={styles.headerActions}>
           <Text style={styles.messageCount}>{messages.length}</Text>
           {compact && (
-            <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▲'}</Text>
+            <Text style={styles.expandIcon}>✕</Text>
           )}
         </View>
       </TouchableOpacity>
@@ -243,12 +269,8 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
             {messages.map(renderMessage)}
           </ScrollView>
 
-          {/* Input Area */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={100}
-          >
-            <View style={styles.inputContainer}>
+          {/* Input Area - Fixed at bottom, doesn't cover messages */}
+          <View style={styles.inputContainer}>
               <TouchableOpacity
                 style={styles.iconButton}
                 onPress={() => {
@@ -284,6 +306,15 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                 maxLength={200}
               />
 
+              {inputText.length > 0 && (
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => setInputText('')}
+                >
+                  <Text style={styles.clearButtonText}>✕</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
                 onPress={handleSendMessage}
@@ -292,7 +323,6 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                 <Text style={styles.sendButtonText}>➤</Text>
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
         </>
       )}
 
@@ -613,6 +643,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     maxHeight: 80,
   },
+  clearButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  clearButtonText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    fontWeight: 'bold',
+  },
   sendButton: {
     width: 36,
     height: 36,
@@ -743,6 +787,46 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textTertiary,
     textAlign: 'center',
     marginTop: 2,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+  },
+  chatButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+  chatButtonIcon: {
+    fontSize: 28,
+  },
+  chatBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: COLORS.error,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: COLORS.background,
+  },
+  chatBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
 });
 
