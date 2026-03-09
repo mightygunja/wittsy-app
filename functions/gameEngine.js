@@ -218,8 +218,14 @@ async function advancePhase(roomId) {
         return;
       }
 
-      // Process votes — transaction inside ensures exactly-once execution
-      await processVotesSync(roomId, freshVotingGame.votes, freshVotingGame.validSubmissions || freshVotingGame.submissions);
+      // Process votes — pass validSubmissions and round directly so processVotesSync
+      // does NOT re-read RTDB (avoids stale/concurrent data causing wrong vote counts)
+      await processVotesSync(
+        roomId,
+        freshVotingGame.votes,
+        freshVotingGame.validSubmissions || null,
+        freshVotingGame.round || 0
+      );
       
       nextPhase = 'results';
       nextDuration = await getPhaseDurationForRoom(roomId, 'results');
@@ -363,7 +369,12 @@ async function processSubmissions(roomId, submissions) {
  * a second time. The transaction + lastProcessedRound guard prevents any
  * second call from committing for the same round.
  */
-async function processVotesSync(roomId, votes, submissions) {
+/**
+ * validSubmissions: the filtered set of on-time submissions (plain string map userId→phrase)
+ *                  passed directly from the caller — do NOT re-read RTDB to avoid stale data.
+ * currentRound:    round number, also passed from caller for the same reason.
+ */
+async function processVotesSync(roomId, votes, validSubmissions, currentRound) {
   if (!votes || Object.keys(votes).length === 0) {
     console.log(`⚠️ No votes to process for ${roomId}`);
     return;
@@ -371,23 +382,21 @@ async function processVotesSync(roomId, votes, submissions) {
 
   const roomRef = db.collection('rooms').doc(roomId);
 
-  // Read validSubmissions and current round from RTDB
-  const gameSnapshot = await rtdb.ref(`rooms/${roomId}/game`).once('value');
-  const gameData = gameSnapshot.val() || {};
-  const validSubmissions = gameData.validSubmissions || null;
-  const currentRound = gameData.round || 0;
-
-  // Build vote counts outside the transaction (read-only, safe to compute once)
+  // Build vote counts using the caller-provided validSubmissions (no extra RTDB read).
+  // Using fresh data from the same snapshot that confirmed we're in voting phase
+  // eliminates any chance of stale/concurrent data producing wrong vote counts.
   const voteCounts = {};
   Object.entries(votes).forEach(([voterId, votedFor]) => {
     if (voterId === votedFor) {
       console.log(`⚠️ BLOCKED self-vote from ${voterId}`);
       return;
     }
+    // If validSubmissions is available, only count votes FROM players who submitted on time
     if (validSubmissions && !(voterId in validSubmissions)) {
       console.log(`⚠️ BLOCKED vote from ${voterId} - did not submit on time`);
       return;
     }
+    // Only count votes FOR players who submitted on time
     if (validSubmissions && !(votedFor in validSubmissions)) {
       console.log(`⚠️ BLOCKED vote for ${votedFor} - not in validSubmissions`);
       return;
@@ -395,45 +404,50 @@ async function processVotesSync(roomId, votes, submissions) {
     voteCounts[votedFor] = (voteCounts[votedFor] || 0) + 1;
   });
 
-  // Find winner(s)
+  // Find winner(s) from vote counts
   let maxVotes = 0;
   Object.values(voteCounts).forEach(count => { if (count > maxVotes) maxVotes = count; });
   const winners = Object.entries(voteCounts)
     .filter(([, count]) => count === maxVotes)
     .map(([userId]) => userId);
 
-  console.log(`🗳️ Vote counts:`, voteCounts, '| Winners:', winners);
+  console.log(`🗳️ Vote counts:`, voteCounts, '| Round winners:', winners, `(${maxVotes} votes each)`);
 
-  // Winning phrases (computed outside transaction, no Firestore reads needed)
+  // Winning phrases — validSubmissions stores plain strings
   const winningPhrases = winners.map(winnerId => {
     if (validSubmissions && validSubmissions[winnerId]) return validSubmissions[winnerId];
-    const sub = submissions[winnerId];
-    if (!sub) return null;
-    return typeof sub === 'object' ? (sub.phrase || null) : sub;
+    return null;
   }).filter(p => p);
 
-  // ATOMIC TRANSACTION: read scores, check idempotency key, write once
+  // ATOMIC TRANSACTION: read-modify-write scores with idempotency key.
+  // The transaction callback may be retried by Firestore on conflict, so we track
+  // success with a flag that is reset at the START of each callback invocation
+  // (not after) to avoid false-positive from a prior failed attempt.
   let transactionCommitted = false;
+
   await db.runTransaction(async (transaction) => {
+    // Reset flag at start of each invocation — Firestore may retry the callback
+    transactionCommitted = false;
+
     const roomDoc = await transaction.get(roomRef);
     const room = roomDoc.data();
 
-    // IDEMPOTENCY CHECK: if this round was already processed, abort
+    // IDEMPOTENCY: if another concurrent call already processed this round, abort
     if (room?.lastProcessedRound === currentRound) {
       console.log(`⏸️ Round ${currentRound} already processed for ${roomId} — skipping duplicate`);
-      return; // abort transaction
+      return; // abort (no writes)
     }
 
     const scores = { ...(room?.scores || {}) };
 
-    // Initialize scores for players receiving votes this round
+    // Initialize score entry for any player receiving votes this round
     Object.keys(voteCounts).forEach(userId => {
       if (!scores[userId]) {
         scores[userId] = { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] };
       }
     });
 
-    // Add raw vote counts
+    // Add raw votes
     Object.entries(voteCounts).forEach(([userId, count]) => {
       scores[userId].totalVotes += count;
     });
@@ -443,17 +457,17 @@ async function processVotesSync(roomId, votes, submissions) {
       if (scores[winnerId]) {
         scores[winnerId].roundWins += 1;
         scores[winnerId].totalVotes += 2;
-        console.log(`🏆 ${winnerId}: ${maxVotes} votes + 2 bonus = total ${scores[winnerId].totalVotes}`);
+        console.log(`🏆 ${winnerId}: ${maxVotes} votes + 2 bonus = ${scores[winnerId].totalVotes} total`);
       }
     });
 
-    // Write scores AND idempotency key atomically
+    // Atomic write: scores + idempotency key together
     transaction.update(roomRef, { scores, lastProcessedRound: currentRound });
     transactionCommitted = true;
   });
 
   if (!transactionCommitted) {
-    console.log(`⏸️ processVotesSync: transaction aborted (already processed)`);
+    console.log(`⏸️ processVotesSync: transaction aborted for round ${currentRound} (already processed by concurrent call)`);
     return;
   }
   
