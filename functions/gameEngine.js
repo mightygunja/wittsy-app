@@ -127,13 +127,24 @@ async function advancePhase(roomId) {
       updates.votes = {}; // Clear votes from previous round
       break;
       
-    case 'submission':
+    case 'submission': {
+      // SERVER-SIDE CLOCK GUARD: reject early advances from clock-skewed clients.
+      // Client clocks can run ahead of the server. A client whose clock is 10s fast
+      // will call advancePhase before the server-side deadline, triggering 'insufficient'
+      // while other players still see time on their countdown.
+      // Allow the advance only if the server clock shows <= 3s remaining.
+      const serverRemaining = game.phaseDuration - elapsed;
+      if (serverRemaining > 3) {
+        console.log(`⏸️ Submission phase: ${serverRemaining.toFixed(1)}s still remaining on server clock — ignoring early advance from client`);
+        return;
+      }
+
       // Get player count from Firestore
       const roomDoc = await db.collection('rooms').doc(roomId).get();
       const playerCount = roomDoc.data()?.players?.length || 0;
       const submissionCount = Object.keys(game.submissions || {}).length;
       console.log(`📝 ${submissionCount} submissions received from ${playerCount} players`);
-      
+
       if (submissionCount === 0) {
         console.log(`⚠️ No submissions - extending submission phase by 5s`);
         updates.phaseStart = now;
@@ -184,7 +195,8 @@ async function advancePhase(roomId) {
       updates.prompt = game.prompt; // CRITICAL: Preserve prompt across phase transitions
       updates.validSubmissions = validSubmissions; // Store filtered submissions for voting
       break;
-      
+    } // end case 'submission'
+
     case 'voting':
       // PRODUCTION FIX: Ensure at least 1 vote before advancing
       const voteCount = Object.keys(game.votes || {}).length;
