@@ -54,15 +54,14 @@ async function getPhaseDurationForRoom(roomId, phase) {
  */
 async function startGame(roomId) {
   console.log(`🎮 Starting game: ${roomId}`);
-  
-  // Get first prompt from cache (pass roomId for tracking)
-  const prompt = await getRandomPrompt(roomId);
+
+  // No previously-used prompts at game start
+  const prompt = await getRandomPrompt([]);
   if (!prompt) throw new Error('No prompts available');
-  
+
   const now = Date.now();
   const promptDuration = await getPhaseDurationForRoom(roomId, 'prompt');
-  
-  // Set game state - client will calculate timers from this
+
   await rtdb.ref(`rooms/${roomId}/game`).set({
     phase: 'prompt',
     round: 1,
@@ -74,16 +73,17 @@ async function startGame(roomId) {
     lastWinner: null,
     lastWinningPhrase: null
   });
-  
-  // Update Firestore
+
+  // Store usedPromptIds in Firestore so all CF instances share the same list
   await db.collection('rooms').doc(roomId).update({
     status: 'active',
     currentRound: 1,
     currentPrompt: prompt.text,
+    usedPromptIds: [prompt.id],
     gameStartedAt: admin.firestore.Timestamp.now()
   });
-  
-  console.log(`✅ Game started: ${roomId} - Prompt phase (${promptDuration}s)`);
+
+  console.log(`✅ Game started: ${roomId} - prompt "${prompt.text?.substring(0, 40)}" (id: ${prompt.id})`);
 }
 
 /**
@@ -284,7 +284,11 @@ async function startNewRound(roomId) {
   const roomDoc = await db.collection('rooms').doc(roomId).get();
   const room = roomDoc.data();
 
-  const prompt = await getRandomPrompt(roomId);
+  // Read usedPromptIds from Firestore — shared across ALL Cloud Function instances.
+  // This is the ONLY reliable way to prevent prompt repetition since in-memory state
+  // is not shared between concurrent CF instances.
+  const usedPromptIds = room?.usedPromptIds || [];
+  const prompt = await getRandomPrompt(usedPromptIds);
   if (!prompt) return;
 
   const newRound = (room.currentRound || 0) + 1;
@@ -305,17 +309,16 @@ async function startNewRound(roomId) {
     lastWinningPhrase: null
   };
 
-  // Transaction: only commit if still in a phase that should trigger a new round.
-  // If another client already set phase='prompt', this aborts — preventing the flip.
+  // RTDB transaction: only ONE concurrent call commits (prompt-flip prevention).
+  // The loser calls return here without updating Firestore, so only one prompt is used.
   const result = await gameRef.transaction((currentGame) => {
-    if (!currentGame) return newState; // No existing state — safe to write
+    if (!currentGame) return newState;
     const phase = currentGame.phase;
     if (phase === 'results' || phase === 'insufficient' || phase === null) {
       return newState; // Commit: we are the first to advance
     }
-    // Already in 'prompt' or another phase — someone beat us here, abort
     console.log(`⏸️ startNewRound transaction aborted — phase already '${phase}', skipping`);
-    return; // Returning undefined aborts the transaction
+    return; // Abort
   });
 
   if (!result.committed) {
@@ -323,10 +326,12 @@ async function startNewRound(roomId) {
     return;
   }
 
-  // Only update Firestore if we won the transaction
+  // Only update Firestore if we won the RTDB transaction.
+  // Append this prompt's ID to usedPromptIds using arrayUnion (atomic, safe for concurrent writes).
   await db.collection('rooms').doc(roomId).update({
     currentRound: newRound,
-    currentPrompt: prompt.text
+    currentPrompt: prompt.text,
+    usedPromptIds: admin.firestore.FieldValue.arrayUnion(prompt.id)
   });
 
   console.log(`🔄 Round ${newRound} started: ${roomId} - "${prompt.text?.substring(0, 40)}..." (prompt locked via transaction)`);
@@ -599,58 +604,48 @@ async function endGame(roomId) {
 }
 
 /**
- * Get random prompt (with caching and session-based deduplication)
+ * Get a random prompt that has NOT been used in this game session.
+ *
+ * usedPromptIds: string[] read from Firestore room.usedPromptIds.
+ * Stored in Firestore (not in-memory) so ALL concurrent CF instances
+ * see the same history and cannot repeat prompts across instances.
  */
 let promptsCache = [];
 let cacheTime = 0;
-const usedPromptsPerRoom = new Map(); // Track used prompts per room session
 
-async function getRandomPrompt(roomId) {
+async function getRandomPrompt(usedPromptIds = []) {
   const now = Date.now();
-  
-  // Refresh cache every 5 minutes
+
+  // Refresh prompt cache every 5 minutes
   if (promptsCache.length === 0 || (now - cacheTime) > 300000) {
     const snapshot = await db.collection('prompts')
       .where('status', '==', 'active')
-      .limit(200)
+      .limit(500)
       .get();
     promptsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     cacheTime = now;
     console.log(`📚 Loaded ${promptsCache.length} prompts into cache`);
   }
-  
-  // Get used prompts for this room session
-  const usedPrompts = usedPromptsPerRoom.get(roomId) || new Set();
-  
-  // Filter out used prompts
-  const availablePrompts = promptsCache.filter(p => !usedPrompts.has(p.id));
-  
-  // If all prompts used, reset for this room
-  if (availablePrompts.length === 0) {
-    console.log(`🔄 All prompts used in room ${roomId}, resetting...`);
-    usedPrompts.clear();
-    usedPromptsPerRoom.set(roomId, usedPrompts);
+
+  const usedSet = new Set(usedPromptIds);
+  const available = promptsCache.filter(p => !usedSet.has(p.id));
+
+  if (available.length === 0) {
+    // All prompts have been used — start over (very long game)
+    console.log(`🔄 All ${promptsCache.length} prompts used — resetting and picking randomly`);
     return promptsCache[Math.floor(Math.random() * promptsCache.length)];
   }
-  
-  // Select random prompt from available
-  const selectedPrompt = availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
-  
-  // Mark as used for this room
-  usedPrompts.add(selectedPrompt.id);
-  usedPromptsPerRoom.set(roomId, usedPrompts);
-  
-  console.log(`✅ Selected prompt for room ${roomId}: "${selectedPrompt.text?.substring(0, 40)}..." (${usedPrompts.size}/${promptsCache.length} used)`);
-  
-  return selectedPrompt;
+
+  const selected = available[Math.floor(Math.random() * available.length)];
+  console.log(`✅ Selected prompt: "${selected.text?.substring(0, 40)}" (${usedSet.size + 1}/${promptsCache.length} used this game)`);
+  return selected;
 }
 
 /**
- * Clear used prompts for a room (call when game ends)
+ * No-op kept for backwards compatibility — tracking is now in Firestore.
  */
 function clearRoomPrompts(roomId) {
-  usedPromptsPerRoom.delete(roomId);
-  console.log(`🧹 Cleared prompt history for room ${roomId}`);
+  console.log(`🧹 Prompt tracking for ${roomId} stored in Firestore (auto-cleared with room)`);
 }
 
 /**
