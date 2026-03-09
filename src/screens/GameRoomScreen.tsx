@@ -640,7 +640,12 @@ const GameRoomScreen: React.FC = () => {
         previousPhaseRef.current = state.phase;
         setGameState(state as GameState);
       } else {
-        console.log('⚠️ Game state is null');
+        // CRITICAL: RTDB game state was removed (endGame clears it after game ends).
+        // Must call setGameState(null) so the handleGameEnd effect can fire.
+        // Without this, gameState stays at the last round's state forever and
+        // VictoryCelebration + FinalResultsScreen never appear — game hangs.
+        console.log('✅ Game state cleared — triggering handleGameEnd flow');
+        setGameState(null);
       }
     });
 
