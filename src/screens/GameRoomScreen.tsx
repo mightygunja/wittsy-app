@@ -49,6 +49,8 @@ import { GameEndSummary } from '../components/game/GameEndSummary';
 import { FinalResultsScreen, FinalPlayer } from '../components/game/FinalResultsScreen';
 import { StarCelebration } from '../components/game/StarCelebration';
 import { VictoryCelebration } from '../components/game/VictoryCelebration';
+import * as StoreReview from 'expo-store-review';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
 import { updatePlayerRating, updateMultiplayerRatings, RatingUpdate } from '../services/eloRatingService';
 import { haptics } from '../services/haptics';
@@ -359,6 +361,24 @@ const GameRoomScreen: React.FC = () => {
       
       setVictoryData(winners);
       setShowVictoryCelebration(true);
+
+      // Prompt for App Store review at peak excitement — after 2+ completed games.
+      // Apple's API rate-limits this to 3 times per year per user regardless of
+      // how often we call it, so it's safe to call here on every game end.
+      try {
+        const raw = await AsyncStorage.getItem('wittz_games_completed');
+        const gamesCompleted = parseInt(raw || '0', 10) + 1;
+        await AsyncStorage.setItem('wittz_games_completed', String(gamesCompleted));
+
+        // Request after 2nd completed game and every 5 games after that
+        const shouldRequest = gamesCompleted === 2 || gamesCompleted % 5 === 0;
+        if (shouldRequest && await StoreReview.isAvailableAsync()) {
+          // Delay so VictoryCelebration animation is fully visible first
+          setTimeout(() => StoreReview.requestReview(), 3000);
+        }
+      } catch (_) {
+        // Never let review logic crash the game end flow
+      }
 
       // Build final players list for the FinalResultsScreen (sorted by score)
       const finalPlayersList: FinalPlayer[] = sortedScores.map(s => ({
