@@ -389,72 +389,93 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         break;
         
       case 'eyes':
-        newConfig.eyes = itemId;
-        const eyesItem = DEFAULT_EYES.find(e => e.id === itemId);
-        const eyesIndex = newFeatures.findIndex(f => f.id === 'eyes');
-        if (eyesItem) {
-          if (eyesIndex >= 0) {
-            newFeatures[eyesIndex].emoji = eyesItem.emoji;
-            newFeatures[eyesIndex].style = getStyleFromId(itemId);
-          } else {
-            newFeatures.push({
-              id: 'eyes',
-              type: 'eyes',
-              style: getStyleFromId(itemId),
-              emoji: eyesItem.emoji,
-              x: AVATAR_SIZE / 2 - 25,
-              y: AVATAR_SIZE / 2 - 20,
-              scale: 1,
-              rotation: 0,
-            });
+        if (newConfig.eyes === itemId) {
+          // Tap already-selected item → remove it
+          newConfig.eyes = '';
+          const removeIdx = newFeatures.findIndex(f => f.id === 'eyes');
+          if (removeIdx >= 0) newFeatures.splice(removeIdx, 1);
+        } else {
+          newConfig.eyes = itemId;
+          const eyesItem = DEFAULT_EYES.find(e => e.id === itemId);
+          const eyesIndex = newFeatures.findIndex(f => f.id === 'eyes');
+          if (eyesItem) {
+            if (eyesIndex >= 0) {
+              newFeatures[eyesIndex].emoji = eyesItem.emoji;
+              newFeatures[eyesIndex].style = getStyleFromId(itemId);
+            } else {
+              newFeatures.push({
+                id: 'eyes',
+                type: 'eyes',
+                style: getStyleFromId(itemId),
+                emoji: eyesItem.emoji,
+                x: AVATAR_SIZE / 2 - 25,
+                y: AVATAR_SIZE / 2 - 20,
+                scale: 1,
+                rotation: 0,
+              });
+            }
           }
         }
         break;
-        
+
       case 'mouth':
-        newConfig.mouth = itemId;
-        const mouthItem = DEFAULT_MOUTHS.find(m => m.id === itemId);
-        const mouthIndex = newFeatures.findIndex(f => f.id === 'mouth');
-        if (mouthItem) {
-          if (mouthIndex >= 0) {
-            newFeatures[mouthIndex].emoji = mouthItem.emoji;
-            newFeatures[mouthIndex].style = getStyleFromId(itemId);
-          } else {
-            newFeatures.push({
-              id: 'mouth',
-              type: 'mouth',
-              style: getStyleFromId(itemId),
-              emoji: mouthItem.emoji,
-              x: AVATAR_SIZE / 2 - 20,
-              y: AVATAR_SIZE / 2 + 30,
-              scale: 1,
-              rotation: 0,
-            });
+        if (newConfig.mouth === itemId) {
+          // Tap already-selected item → remove it
+          newConfig.mouth = '';
+          const removeIdx = newFeatures.findIndex(f => f.id === 'mouth');
+          if (removeIdx >= 0) newFeatures.splice(removeIdx, 1);
+        } else {
+          newConfig.mouth = itemId;
+          const mouthItem = DEFAULT_MOUTHS.find(m => m.id === itemId);
+          const mouthIndex = newFeatures.findIndex(f => f.id === 'mouth');
+          if (mouthItem) {
+            if (mouthIndex >= 0) {
+              newFeatures[mouthIndex].emoji = mouthItem.emoji;
+              newFeatures[mouthIndex].style = getStyleFromId(itemId);
+            } else {
+              newFeatures.push({
+                id: 'mouth',
+                type: 'mouth',
+                style: getStyleFromId(itemId),
+                emoji: mouthItem.emoji,
+                x: AVATAR_SIZE / 2 - 20,
+                y: AVATAR_SIZE / 2 + 30,
+                scale: 1,
+                rotation: 0,
+              });
+            }
           }
         }
         break;
-        
+
       case 'hair':
-        newConfig.hair = itemId;
-        const hairItem = DEFAULT_HAIR_STYLES.find(h => h.id === itemId);
-        const hairIndex = newFeatures.findIndex(f => f.id === 'hair');
-        if (hairItem) {
-          if (hairIndex >= 0) {
-            newFeatures[hairIndex].emoji = hairItem.emoji;
-            newFeatures[hairIndex].style = getStyleFromId(itemId);
-            newFeatures[hairIndex].color = getHairColor(itemId); // Update color when changing hair
-          } else {
-            newFeatures.push({
-              id: 'hair',
-              type: 'hair',
-              style: getStyleFromId(itemId),
-              emoji: hairItem.emoji,
-              x: AVATAR_SIZE / 2 - 30,
-              y: 20,
-              scale: 1.2,
-              rotation: 0,
-              color: getHairColor(itemId), // Extract color from hair ID
-            });
+        if (newConfig.hair === itemId) {
+          // Tap already-selected item → remove it
+          newConfig.hair = '';
+          const removeIdx = newFeatures.findIndex(f => f.id === 'hair');
+          if (removeIdx >= 0) newFeatures.splice(removeIdx, 1);
+        } else {
+          newConfig.hair = itemId;
+          const hairItem = DEFAULT_HAIR_STYLES.find(h => h.id === itemId);
+          const hairIndex = newFeatures.findIndex(f => f.id === 'hair');
+          if (hairItem) {
+            if (hairIndex >= 0) {
+              newFeatures[hairIndex].emoji = hairItem.emoji;
+              newFeatures[hairIndex].style = getStyleFromId(itemId);
+              newFeatures[hairIndex].color = getHairColor(itemId);
+            } else {
+              newFeatures.push({
+                id: 'hair',
+                type: 'hair',
+                style: getStyleFromId(itemId),
+                emoji: hairItem.emoji,
+                x: AVATAR_SIZE / 2 - 30,
+                y: 20,
+                scale: 1.2,
+                rotation: 0,
+                color: getHairColor(itemId),
+              });
+            }
           }
         }
         break;

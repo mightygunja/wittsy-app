@@ -21,20 +21,15 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ navigationRef }) => 
   }, [navigationRef]);
 
   useEffect(() => {
-    // Handle pending deep link after user authentication
+    // Handle pending non-GameRoom deep links after user authentication.
+    // GameRoom pending links are handled automatically by deepLinking.addListener()
+    // the moment HomeScreen registers its listener, so no extra work needed here.
     if (user && navigationRef?.current) {
       console.log('👤 User authenticated, checking for pending deep link');
-      console.log('👤 User ID:', user.uid);
-      console.log('👤 Navigation ref available:', !!navigationRef?.current);
-      console.log('👤 Navigation state:', navigationRef?.current?.getRootState());
-      
-      // Handle pending deep link immediately - no delay needed
       deepLinking.handlePendingDeepLink(navigationRef);
-      
-      // Also re-initialize to catch any new deep links
-      deepLinking.initialize(navigationRef);
-    } else {
-      console.log('⏸️ Not handling pending deep link - user:', !!user, 'navRef:', !!navigationRef?.current);
+      // NOTE: Do NOT call deepLinking.initialize() again here — it was already called
+      // when navigationRef became ready. A second call adds duplicate event listeners
+      // and re-processes getInitialURL(), causing double join attempts.
     }
   }, [user, navigationRef]);
 

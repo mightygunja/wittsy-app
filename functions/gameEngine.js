@@ -638,6 +638,12 @@ async function getRandomPrompt(usedPromptIds = []) {
 
   const selected = available[Math.floor(Math.random() * available.length)];
   console.log(`✅ Selected prompt: "${selected.text?.substring(0, 40)}" (${usedSet.size + 1}/${promptsCache.length} used this game)`);
+
+  // Increment timesUsed in Firestore (fire-and-forget, don't block game start)
+  db.collection('prompts').doc(selected.id).update({
+    timesUsed: admin.firestore.FieldValue.increment(1)
+  }).catch(err => console.error(`⚠️ Failed to increment timesUsed for ${selected.id}:`, err));
+
   return selected;
 }
 

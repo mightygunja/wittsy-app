@@ -872,9 +872,10 @@ const GameRoomScreen: React.FC = () => {
   const handleStartGame = async () => {
     if (!room) return;
     
-    // Ranked games can only auto-start (no manual start)
-    // Casual games require host to manually start
-    if (!room.isRanked && room.hostId !== user?.uid) return;
+    // Only the host triggers startGame — prevents a race condition where all
+    // ranked players would fire handleStartGame simultaneously at countdown expiry.
+    // The host is always present in both ranked and casual rooms.
+    if (room.hostId !== user?.uid) return;
 
     // Both casual and ranked games require 3 players
     const minPlayers = 3;
@@ -988,9 +989,10 @@ const GameRoomScreen: React.FC = () => {
       console.log('📤 Share URL:', inviteUrl);
       console.log('📤 ==================================');
       
-      const shareOptions = Platform.OS === 'ios'
-        ? { message: shareMessage, url: inviteUrl }
-        : { message: shareMessage };
+      // Do NOT pass `url` separately on iOS — it creates an iMessage rich link preview
+      // that opens only the base domain (wittz.app) when tapped, stripping the path.
+      // The full URL is already in shareMessage as plain text; tapping it opens correctly.
+      const shareOptions = { message: shareMessage };
 
       const result = await Share.share(shareOptions);
       
@@ -1508,6 +1510,13 @@ const GameRoomScreen: React.FC = () => {
                 <View style={styles.countdownCard}>
                   <Text style={styles.countdownTitle}>🚀 Game Starting In</Text>
                   <Text style={styles.countdownNumber}>{countdownRemaining}</Text>
+                  <Text style={styles.countdownSubtitle}>Get ready to play!</Text>
+                </View>
+              </View>
+            ) : countdownRemaining === 0 ? (
+              <View style={styles.countdownContainer}>
+                <View style={styles.countdownCard}>
+                  <Text style={styles.countdownTitle}>🎮 Game Starting...</Text>
                   <Text style={styles.countdownSubtitle}>Get ready to play!</Text>
                 </View>
               </View>

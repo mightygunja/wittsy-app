@@ -52,10 +52,24 @@ class DeepLinkingService {
 
       console.log('🔗 Deep link config:', config);
 
-      // Notify listeners
-      this.notifyListeners(config);
+      // GameRoom links MUST go through the HomeScreen listener so joinRoom() is called
+      // before navigation — otherwise the user arrives as a ghost (not in the players list).
+      // addListener() will fire pendingDeepLink immediately when HomeScreen registers.
+      if (config.screen === 'GameRoom') {
+        if (this.listeners.length > 0) {
+          // HomeScreen is already listening — let it handle joinRoom + navigate
+          this.notifyListeners(config);
+        } else {
+          // HomeScreen not yet registered (cold start, profile still loading).
+          // Save so addListener() fires it the moment HomeScreen registers.
+          console.log('⏳ No listeners yet, saving GameRoom link as pending');
+          this.pendingDeepLink = config;
+        }
+        return;
+      }
 
-      // Navigate if ready, otherwise store for later
+      // Non-GameRoom links: notify listeners and navigate directly as before
+      this.notifyListeners(config);
       if (navigationRef?.current) {
         this.navigate(navigationRef, config);
       } else {
@@ -200,10 +214,25 @@ class DeepLinkingService {
   }
 
   /**
-   * Add deep link listener
+   * Add deep link listener.
+   * If there is a pending GameRoom deep link (saved during cold-start before the
+   * listener was registered), fire it immediately so joinRoom is called properly.
    */
   addListener(callback: (config: DeepLinkConfig) => void) {
     this.listeners.push(callback);
+
+    if (this.pendingDeepLink?.screen === 'GameRoom') {
+      const pending = this.pendingDeepLink;
+      this.pendingDeepLink = null;
+      // Defer by one tick so the caller finishes its own setup before we fire
+      setTimeout(() => {
+        try {
+          callback(pending);
+        } catch (error) {
+          console.error('Deep link listener error (pending):', error);
+        }
+      }, 0);
+    }
   }
 
   /**
