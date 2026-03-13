@@ -215,28 +215,26 @@
                 document.getElementById('status').innerHTML = '<span style="color: #e74c3c;">Invalid room link</span>';
                 return;
             }
-            
-            // Create hidden iframe to trigger app
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = appSchemeUrl;
-            document.body.appendChild(iframe);
-            
-            // Set timeout to show fallback options
+
+            // Set up the "Open Wittz App" button before attempting anything
+            document.getElementById('openApp').href = appSchemeUrl;
+
+            // iOS: iframes cannot trigger custom URL schemes (blocked since iOS 14).
+            // Use window.location.href instead — iOS intercepts this and opens the app
+            // if installed, or shows a native "app not found" prompt.
+            // We show the fallback UI first so it's already visible if the user returns.
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('actions').style.display = 'block';
+            if (isIOS) {
+                document.getElementById('appStore').style.display = 'inline-block';
+            } else if (isAndroid) {
+                document.getElementById('playStore').style.display = 'inline-block';
+            }
+
+            // Short delay so the fallback UI renders before we attempt to leave the page
             setTimeout(() => {
-                document.getElementById('status').style.display = 'none';
-                document.getElementById('actions').style.display = 'block';
-                
-                // Show appropriate store link
-                if (isIOS) {
-                    document.getElementById('appStore').style.display = 'inline-block';
-                } else if (isAndroid) {
-                    document.getElementById('playStore').style.display = 'inline-block';
-                }
-                
-                // Update open app button
-                document.getElementById('openApp').href = appSchemeUrl;
-            }, 2000);
+                window.location.href = appSchemeUrl;
+            }, 300);
         }
         
         // Attempt to open app on page load
