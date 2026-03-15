@@ -258,6 +258,38 @@ export interface UserContent {
   reviewNotes?: string;
 }
 
+// ==================== GROUPS ====================
+
+export type GroupRole = 'admin' | 'member';
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy: string;
+  createdAt: string;
+  inviteCode: string;
+  memberCount: number;
+  members: string[]; // userIds array (for security rule checks)
+}
+
+export interface GroupMember {
+  userId: string;
+  username: string;
+  avatar?: any;
+  role: GroupRole;
+  joinedAt: string;
+}
+
+export interface GroupMemberStats {
+  userId: string;
+  username: string;
+  gamesPlayed: number;
+  wins: number;
+  totalPoints: number;
+  placements: { [place: string]: number }; // "1" -> count, "2" -> count, etc.
+}
+
 // ==================== SOCIAL STATS ====================
 
 export interface SocialStats {

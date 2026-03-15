@@ -16,13 +16,18 @@ let IAPProduct: any = null;
 let IAPPurchase: any = null;
 let PurchaseError: any = null;
 
-try {
-  const iapModule = require('react-native-iap');
-  RNIap = iapModule;
-  IAPProduct = iapModule.Product;
-  IAPPurchase = iapModule.Purchase;
-  PurchaseError = iapModule.PurchaseError;
-} catch (e) {
+// Only load IAP module if not in Expo Go to prevent NativeEventEmitter errors
+if (isIAPAvailable()) {
+  try {
+    const iapModule = require('react-native-iap');
+    RNIap = iapModule;
+    IAPProduct = iapModule.Product;
+    IAPPurchase = iapModule.Purchase;
+    PurchaseError = iapModule.PurchaseError;
+  } catch (e) {
+    console.log('⏭️ Failed to load IAP module:', e);
+  }
+} else {
   console.log('⏭️ Skipping IAP import (Expo Go)');
 }
 

@@ -28,7 +28,8 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
         const userElo = userProfile?.rating || 1000;
         activeRooms = await getBrowsableRankedRooms(userElo);
       } else {
-        activeRooms = await getActiveRooms({ isPrivate: false, maxResults: 50 });
+        const all = await getActiveRooms({ isPrivate: false, maxResults: 50 });
+        activeRooms = all.filter((r: any) => !r.groupId);
       }
       setRooms(activeRooms);
     } catch (error: any) {

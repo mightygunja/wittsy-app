@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,12 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Share,
   BackHandler,
   Platform,
   InputAccessoryView,
   Keyboard,
   KeyboardEvent,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -51,6 +51,7 @@ import { StarCelebration } from '../components/game/StarCelebration';
 import { VictoryCelebration } from '../components/game/VictoryCelebration';
 import * as StoreReview from 'expo-store-review';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateGroupStats } from '../services/groups';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
 import { updatePlayerRating, updateMultiplayerRatings, RatingUpdate } from '../services/eloRatingService';
 import { haptics } from '../services/haptics';
@@ -156,6 +157,7 @@ const GameRoomScreen: React.FC = () => {
     username: string;
     phrase: string;
     voteCount: number;
+    isOwnStar: boolean;
   } | null>(null);
   const [showVictoryCelebration, setShowVictoryCelebration] = useState(false);
   const [victoryData, setVictoryData] = useState<Array<{
@@ -361,6 +363,21 @@ const GameRoomScreen: React.FC = () => {
       
       setVictoryData(winners);
       setShowVictoryCelebration(true);
+
+      // Update group standings if this was a group game
+      if ((room as any).groupId) {
+        try {
+          const groupResults = sortedScores.map((s, idx) => ({
+            userId: s.userId,
+            username: s.username,
+            place: idx + 1,
+            points: s.score,
+          }));
+          await updateGroupStats((room as any).groupId, groupResults);
+        } catch (groupError) {
+          console.error('Failed to update group stats:', groupError);
+        }
+      }
 
       // Prompt for App Store review at peak excitement — after 2+ completed games.
       // Apple's API rate-limits this to 3 times per year per user regardless of
@@ -633,6 +650,7 @@ const GameRoomScreen: React.FC = () => {
                     username: winnerPlayer.username,
                     phrase: state.submissions[winnerId],
                     voteCount: maxVotes,
+                    isOwnStar: winnerId === user?.uid,
                   });
                   setShowStarCelebration(true);
                 }
@@ -994,19 +1012,28 @@ const GameRoomScreen: React.FC = () => {
       // The full URL is already in shareMessage as plain text; tapping it opens correctly.
       const shareOptions = { message: shareMessage };
 
-      const result = await Share.share(shareOptions);
-      
-      if (result.action === Share.sharedAction) {
-        console.log('✅ Share successful');
-      } else if (result.action === Share.dismissedAction) {
-        console.log('ℹ️ Share dismissed');
+      try {
+        const result = await Share.share(shareOptions);
+        if (result.action === Share.sharedAction) {
+          console.log('✅ Share successful');
+        } else if (result.action === Share.dismissedAction) {
+          console.log('ℹ️ Share dismissed');
+        }
+      } catch (shareError: any) {
+        console.log('⚠️ Share not available, showing room code instead');
+        Alert.alert(
+          'Room Code',
+          `Share this room code with friends:\n\n${room.roomCode}\n\nOr share this link:\n${inviteUrl}`,
+          [{ text: 'OK' }]
+        );
       }
     } catch (error: any) {
       console.error('❌ Error sharing invite:', error);
-      // Only show alert if it's not a user cancellation
-      if (error?.message && !error.message.includes('cancel')) {
-        Alert.alert('Share Failed', 'Unable to share the game room. Please try again.');
-      }
+      Alert.alert(
+        'Error',
+        'Unable to share room. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -1343,54 +1370,112 @@ const GameRoomScreen: React.FC = () => {
         
         return (
           <View style={styles.resultsPhase}>
-            {/* Show win streak badge if user is on a streak */}
+            {/* Win streak badge */}
             {winStreak >= 2 && winners.includes(user?.uid || '') && (
               <View style={styles.streakBadge}>
                 <Text style={styles.streakEmoji}>🔥</Text>
                 <Text style={styles.streakText}>{winStreak}x WIN STREAK!</Text>
               </View>
             )}
-            
-            <Text style={styles.phaseTitle}>{isTie ? 'TIE!' : 'WINNER!'}</Text>
-            
-            {/* Show all winner avatars in case of tie */}
-            <View style={styles.winnersAvatarRow}>
-              {winners.map((winnerId) => {
-                const winnerPlayer = room?.players.find(p => p.userId === winnerId);
-                return winnerPlayer?.avatarConfig ? (
-                  <View key={winnerId} style={styles.winnerAvatarContainer}>
-                    <AvatarDisplay config={winnerPlayer.avatarConfig} size={isTie ? 120 : 200} />
-                    <Text style={styles.winnerNameBelowAvatar}>{winnerPlayer.username}</Text>
-                  </View>
-                ) : null;
-              })}
-            </View>
-            
-            {/* Show winning phrase(s) */}
-            {winningPhrases.map((phrase, index) => {
-              const winnerId = winners[index];
-              const winnerPlayer = room?.players.find(p => p.userId === winnerId);
-              const voteCount = gameState.roundVoteCounts?.[winnerId] || 
-                               Object.values(gameState.votes || {}).filter(v => v === winnerId).length;
-              
-              return (
-                <View key={winnerId} style={styles.winnerCard}>
-                  <Text style={styles.winningPhrase}>"{phrase}"</Text>
-                  <Text style={styles.winnerName}>
-                    by {winnerPlayer?.username || 'Unknown'}
-                  </Text>
-                  <Text style={styles.voteCountText}>
-                    {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+
+            {isTie ? (
+              /* ── TIE layout ── */
+              <>
+                <View style={styles.tieTitleRow}>
+                  <Text style={styles.tieTitleEmoji}>🤝</Text>
+                  <Text style={styles.tieTitleText}>
+                    {winners.length === 2 ? "IT'S A TIE" : `${winners.length}-WAY TIE`}
                   </Text>
                 </View>
-              );
-            })}
 
-            {/* Show all phrases with vote counts — use validSubmissions to exclude late entries */}
+                {/* Compact avatar row — scales down for many winners */}
+                <View style={styles.winnersAvatarRow}>
+                  {winners.map((winnerId) => {
+                    const winnerPlayer = room?.players.find(p => p.userId === winnerId);
+                    const avatarSize = winners.length <= 2 ? 80 : winners.length <= 4 ? 60 : 48;
+                    return (
+                      <View key={winnerId} style={styles.winnerAvatarContainer}>
+                        {winnerPlayer?.avatarConfig ? (
+                          <AvatarDisplay config={winnerPlayer.avatarConfig} size={avatarSize} />
+                        ) : (
+                          <View style={[styles.winnerAvatarFallback, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
+                            <Text style={styles.winnerAvatarFallbackText}>
+                              {(winnerPlayer?.username || '?').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.winnerNameBelowAvatar}>
+                          {winnerPlayer?.username || 'Unknown'}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Single unified tie card */}
+                {(() => {
+                  const tieVotes = gameState.roundVoteCounts?.[winners[0]] ||
+                    Object.values(gameState.votes || {}).filter(v => v === winners[0]).length;
+                  return (
+                    <View style={styles.tieCard}>
+                      <Text style={styles.tieCardVotes}>
+                        {tieVotes} {tieVotes === 1 ? 'vote' : 'votes'} each
+                      </Text>
+                      {winningPhrases.map((phrase, index) => {
+                        const winnerId = winners[index];
+                        const winnerPlayer = room?.players.find(p => p.userId === winnerId);
+                        return (
+                          <View key={winnerId} style={[styles.tieCardRow, index > 0 && styles.tieCardRowBorder]}>
+                            <Text style={styles.tieCardAuthor}>{winnerPlayer?.username || 'Unknown'}</Text>
+                            <Text style={styles.tieCardPhrase}>"{phrase}"</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+              </>
+            ) : (
+              /* ── Single winner layout ── */
+              <>
+                <Text style={styles.winnerTitle}>🏆 ROUND WINNER</Text>
+                {(() => {
+                  const winnerId = winners[0];
+                  const winnerPlayer = room?.players.find(p => p.userId === winnerId);
+                  const voteCount = gameState.roundVoteCounts?.[winnerId] ||
+                    Object.values(gameState.votes || {}).filter(v => v === winnerId).length;
+                  return (
+                    <>
+                      <View style={styles.winnerAvatarContainer}>
+                        {winnerPlayer?.avatarConfig ? (
+                          <AvatarDisplay config={winnerPlayer.avatarConfig} size={140} />
+                        ) : (
+                          <View style={[styles.winnerAvatarFallback, { width: 140, height: 140, borderRadius: 70 }]}>
+                            <Text style={[styles.winnerAvatarFallbackText, { fontSize: 56 }]}>
+                              {(winnerPlayer?.username || '?').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.winnerNameBelowAvatar}>{winnerPlayer?.username || 'Unknown'}</Text>
+                      </View>
+                      <View style={styles.winnerCard}>
+                        <Text style={styles.winningPhrase}>"{winningPhrases[0]}"</Text>
+                        <View style={styles.winnerCardFooter}>
+                          <Text style={styles.winnerCardVotes}>
+                            {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+                          </Text>
+                        </View>
+                      </View>
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* All phrases ranked — use validSubmissions to exclude late entries */}
             <ScrollView style={styles.allPhrasesList}>
               {Object.entries((gameState as any).validSubmissions || gameState.submissions || {})
                 .map(([userId, submission]) => {
-                  // Handle both string and {phrase, timestamp} object formats
                   const phraseText = typeof submission === 'object' && submission && 'phrase' in submission
                     ? (submission as any).phrase
                     : submission as string;
@@ -1472,7 +1557,10 @@ const GameRoomScreen: React.FC = () => {
       {/* In-game scoreboard - shows during active game */}
       {room.status === 'active' && room.scores && (
         <View style={styles.inGameScoreboard}>
-          <Text style={styles.scoreboardTitle}>SCORES</Text>
+          <View style={styles.scoreboardHeader}>
+            <Text style={styles.scoreboardTitle}>SCORES</Text>
+            <Text style={styles.scoreboardGoal}>🏆 First to {room.settings?.winningVotes ?? 20} votes wins</Text>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scoresList}>
             {Object.entries(room.scores)
               .sort(([, a], [, b]) => {
@@ -1486,7 +1574,7 @@ const GameRoomScreen: React.FC = () => {
                 const displayScore = typeof score === 'object' ? (score.totalVotes || 0) : 0;
                 return (
                   <View key={userId} style={styles.scoreItem}>
-                    <Text style={styles.playerName} numberOfLines={1}>
+                    <Text style={styles.playerName}>
                       {player?.username || 'Unknown'}
                     </Text>
                     <Text style={styles.playerScore}>{displayScore} votes</Text>
@@ -1594,27 +1682,45 @@ const GameRoomScreen: React.FC = () => {
               <PlayerList players={room.players} currentUserId={user?.uid} />
             </View>
             
-            {!room.isRanked && room.hostId === user?.uid && (
-              <View style={styles.lobbyActionSection}>
-                <Button
-                  title="START GAME"
-                  onPress={handleStartGame}
-                  disabled={room.players.length < 3}
-                  size="lg"
-                  variant="primary"
-                  style={styles.startButton}
-                />
-              </View>
-            )}
-            
-            {!room.isRanked && room.hostId !== user?.uid && (
-              <View style={styles.lobbyActionSection}>
-                <View style={styles.waitingCard}>
-                  <Text style={styles.waitingIcon}>⏳</Text>
-                  <Text style={styles.waitingCardText}>Waiting for host to start the game...</Text>
+            {!room.isRanked && room.hostId === user?.uid && (() => {
+              const minPlayers = room.settings?.minPlayers || 3;
+              const needed = Math.max(0, minPlayers - room.players.length);
+              return (
+                <View style={styles.lobbyActionSection}>
+                  <Button
+                    title="START GAME"
+                    onPress={handleStartGame}
+                    disabled={needed > 0}
+                    size="lg"
+                    variant="primary"
+                    style={styles.startButton}
+                  />
+                  {needed > 0 && (
+                    <Text style={styles.needMorePlayersText}>
+                      {needed} more player{needed !== 1 ? 's' : ''} needed to start
+                    </Text>
+                  )}
                 </View>
-              </View>
-            )}
+              );
+            })()}
+
+            {!room.isRanked && room.hostId !== user?.uid && (() => {
+              const minPlayers = room.settings?.minPlayers || 3;
+              const needed = Math.max(0, minPlayers - room.players.length);
+              return (
+                <View style={styles.lobbyActionSection}>
+                  <View style={styles.waitingCard}>
+                    <Text style={styles.waitingIcon}>⏳</Text>
+                    <Text style={styles.waitingCardText}>Waiting for host to start the game...</Text>
+                    {needed > 0 && (
+                      <Text style={styles.waitingCardSubtext}>
+                        {needed} more player{needed !== 1 ? 's' : ''} needed to start
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })()}
           </ScrollView>
         )}
 
@@ -1750,10 +1856,12 @@ const GameRoomScreen: React.FC = () => {
           username={starCelebrationData.username}
           phrase={starCelebrationData.phrase}
           voteCount={starCelebrationData.voteCount}
+          isOwnStar={starCelebrationData.isOwnStar}
           onComplete={() => {
             setShowStarCelebration(false);
             setStarCelebrationData(null);
           }}
+          onViewStarred={() => navigation.navigate('StarredPhrases')}
         />
       )}
 
@@ -1858,12 +1966,22 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  scoreboardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   scoreboardTitle: {
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.textSecondary,
-    marginBottom: 6,
     letterSpacing: 1,
+  },
+  scoreboardGoal: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
   },
   scoresList: {
     flexDirection: 'row',
@@ -1874,7 +1992,6 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginRight: 8,
-    minWidth: 80,
     alignItems: 'center',
   },
   playerName: {
@@ -2124,6 +2241,13 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  waitingCardSubtext: {
+    fontSize: 13,
+    color: COLORS.primary,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginTop: 8,
   },
   gameContent: {
     flex: 1,
@@ -2454,41 +2578,135 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1,
   },
+  // Single winner
+  winnerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.gold || '#FFD700',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 16,
+  },
+  winnerCard: {
+    backgroundColor: COLORS.gold || '#FFD700',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    width: '100%',
+    marginTop: 4,
+    alignItems: 'center',
+    shadowColor: COLORS.gold || '#FFD700',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  winningPhrase: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  winnerCardFooter: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  winnerCardVotes: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    opacity: 0.7,
+  },
+  // Tie
+  tieTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  tieTitleEmoji: {
+    fontSize: 22,
+  },
+  tieTitleText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.text,
+    letterSpacing: 1,
+  },
+  tieCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    width: '100%',
+    marginTop: 4,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  tieCardVotes: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+    textAlign: 'center',
+    paddingVertical: 8,
+    backgroundColor: COLORS.primary + '14',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  tieCardRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  tieCardRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  tieCardAuthor: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  tieCardPhrase: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.text,
+    lineHeight: 22,
+  },
+  // Shared avatar styles
   winnersAvatarRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 12,
     marginBottom: 16,
   },
   winnerAvatarContainer: {
-    marginBottom: 16,
+    alignItems: 'center',
+    maxWidth: 80,
+  },
+  winnerAvatarFallback: {
+    backgroundColor: COLORS.primary + '30',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  winnerAvatarFallbackText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
   winnerNameBelowAvatar: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.text,
-    marginTop: 8,
+    marginTop: 6,
     textAlign: 'center',
   },
-  winnerCard: {
-    backgroundColor: COLORS.gold,
-    borderRadius: 12,
-    padding: 16,
-    width: '100%',
-    marginVertical: 12,
-    alignItems: 'center',
-  },
-  winningPhrase: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.background,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
+  // kept for compatibility (voteCountText removed — replaced by winnerCardVotes/tieCardVotes)
   winnerName: {
     fontSize: 15,
     color: COLORS.background,
@@ -2576,6 +2794,13 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     marginTop: 16,
     alignSelf: 'center',
     width: '80%',
+  },
+  needMorePlayersText: {
+    fontSize: 13,
+    color: COLORS.primary,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginTop: 10,
   },
   backButton: {
     height: 48,

@@ -359,6 +359,49 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     
+    // ==================== GROUPS ====================
+
+    match /groups/{groupId} {
+      // Any signed-in user can read a group (needed to look up invite codes)
+      allow read: if isSignedIn();
+      // Any signed-in user can create a group
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.createdBy &&
+        isValidString(request.resource.data.name, 1, 50) &&
+        request.resource.data.memberCount == 1 &&
+        request.resource.data.members.size() == 1 &&
+        request.resource.data.members.hasAll([request.auth.uid]);
+      // Members can update limited fields; only count/member array changes allowed for joins/leaves
+      allow update: if isSignedIn() &&
+        resource.data.members.hasAny([request.auth.uid]);
+      allow delete: if isSignedIn() &&
+        resource.data.createdBy == request.auth.uid;
+
+      match /groupMembers/{memberId} {
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+        allow write: if isSignedIn();
+      }
+
+      match /groupStats/{memberId} {
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+        allow write: if isSignedIn();
+      }
+    }
+
+    // userGroups index: each user's list of groups they belong to
+    match /userGroups/{userId}/groups/{groupId} {
+      // The user themselves can always read/write their own index.
+      // A group member (e.g. admin adding a friend) can also write the target
+      // user's index entry for that specific group.
+      allow read: if isSignedIn() && isOwner(userId);
+      allow write: if isSignedIn() && (
+        isOwner(userId) ||
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid])
+      );
+    }
+
     // ==================== ADMIN ONLY ====================
     
     // System Configuration

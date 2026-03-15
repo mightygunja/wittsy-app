@@ -61,7 +61,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onlineStatus = {}, cur
                 ]} />
               </View>
               
-              <Text style={styles.username} numberOfLines={1}>
+              <Text style={styles.username}>
                 {player.username}
               </Text>
               
@@ -100,7 +100,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   playerCard: {
     alignItems: 'center',
-    width: isLargeTablet ? 120 : isTablet ? 100 : 80,
+    minWidth: isLargeTablet ? 120 : isTablet ? 100 : 80,
+    maxWidth: 130,
     marginBottom: 12,
   },
   avatarContainer: {

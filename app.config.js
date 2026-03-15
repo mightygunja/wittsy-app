@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "Wittz - Party Word Game",
     slug: "wittsy-app",
-    version: "1.0.5",
+    version: "1.0.6",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -18,7 +18,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wittsy.app",
-      buildNumber: "42",
+      buildNumber: "43",
       infoPlist: {
         NSCameraUsageDescription: "Wittz needs access to your camera to take profile photos.",
         NSPhotoLibraryUsageDescription: "Wittz needs access to your photo library to select profile photos.",

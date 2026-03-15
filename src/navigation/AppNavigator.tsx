@@ -4,7 +4,9 @@ import { useAuth } from '../hooks/useAuth';
 import { AuthNavigator } from './AuthNavigator';
 import { MainNavigator } from './MainNavigator';
 import { Loading } from '../components/common/Loading';
+import { ForceUpdateScreen } from '../components/common/ForceUpdateScreen';
 import { deepLinking } from '../services/deepLinking';
+import { useForceUpdate } from '../hooks/useForceUpdate';
 
 interface AppNavigatorProps {
   navigationRef?: any;
@@ -12,6 +14,7 @@ interface AppNavigatorProps {
 
 export const AppNavigator: React.FC<AppNavigatorProps> = ({ navigationRef }) => {
   const { user, loading } = useAuth();
+  const { checking: checkingUpdate, updateRequired, minimumVersion, storeUrl } = useForceUpdate();
 
   useEffect(() => {
     // Initialize deep linking when navigation is ready
@@ -33,8 +36,12 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ navigationRef }) => 
     }
   }, [user, navigationRef]);
 
-  if (loading) {
+  if (loading || checkingUpdate) {
     return <Loading />;
+  }
+
+  if (updateRequired) {
+    return <ForceUpdateScreen minimumVersion={minimumVersion} storeUrl={storeUrl} />;
   }
 
   return (

@@ -10,15 +10,17 @@ import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES } from '../
 import { useTheme } from '../hooks/useTheme';;
 import { tabletHorizontalPadding } from '../utils/responsive';
 
-export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { colors: COLORS } = useTheme();
   const { userProfile } = useAuth();
+  // Optional group context passed from GroupDetailScreen or GroupsScreen
+  const groupId: string | undefined = route?.params?.groupId;
+  const groupName: string | undefined = route?.params?.groupName;
   const [roomName, setRoomName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState('12');
   const [submissionTime, setSubmissionTime] = useState(DEFAULT_SUBMISSION_TIME.toString());
   const [votingTime, setVotingTime] = useState(DEFAULT_VOTING_TIME.toString());
   const [isPrivate, setIsPrivate] = useState(false);
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -78,15 +80,6 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
     // Winning votes is now fixed at 20 (WINNING_VOTES constant)
 
-    // Validate password for private rooms
-    if (isPrivate && (!password || password.trim().length === 0)) {
-      const error = 'Password is required for private rooms';
-      console.log('Password validation failed:', error);
-      setErrors({ password: error });
-      Alert.alert('Validation Error', error);
-      return;
-    }
-
     console.log('All validations passed, creating room...');
     setLoading(true);
 
@@ -106,16 +99,14 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         countdownTriggerPlayers: 0
       };
       
-      if (isPrivate) {
-        settings.password = password;
-      }
-      
       const roomId = await createRoom(
         userProfile.uid,
         userProfile.username,
         roomName,
         settings,
-        false // isRanked = false for casual games
+        false, // isRanked = false for casual games
+        groupId,
+        groupName
       );
 
       console.log('Room created successfully with ID:', roomId);
@@ -144,6 +135,11 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           showsVerticalScrollIndicator={false}
         >
         <Text style={styles.title}>Create Your Room</Text>
+        {!!groupId && !!groupName && (
+          <View style={styles.groupBanner}>
+            <Text style={styles.groupBannerText}>🏘️ Creating for group: <Text style={styles.groupBannerName}>{groupName}</Text></Text>
+          </View>
+        )}
 
         <Input
           label="Room Name"
@@ -166,10 +162,10 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           />
         </View>
         <View style={styles.halfInput}>
-          <Text style={styles.infoLabel}>Winning Votes</Text>
-          <View style={styles.fixedValueContainer}>
-            <Text style={styles.fixedValue}>20 votes</Text>
-            <Text style={styles.fixedValueSubtext}>Fixed</Text>
+          <Text style={styles.fixedInputLabel}>Winning Votes</Text>
+          <View style={styles.fixedInput}>
+            <Text style={styles.fixedInputValue}>20</Text>
+            <Text style={styles.fixedInputSuffix}>fixed</Text>
           </View>
         </View>
       </View>
@@ -200,7 +196,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       <View style={styles.switchRow}>
         <View>
           <Text style={styles.switchLabel}>Private Room</Text>
-          <Text style={styles.switchSubtext}>Requires password to join</Text>
+          <Text style={styles.switchSubtext}>Hidden from browse — invite only</Text>
         </View>
         <Switch
           value={isPrivate}
@@ -209,17 +205,6 @@ export const CreateRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           thumbColor="#FFFFFF"
         />
       </View>
-
-      {isPrivate && (
-        <Input
-          label="Password (Required)"
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Enter password for your room"
-          secureTextEntry
-          error={errors.password}
-        />
-      )}
 
       <Button
         title={loading ? "Creating..." : "Create Room"}
@@ -260,6 +245,23 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginBottom: 16,
     color: COLORS.text
   },
+  groupBanner: {
+    backgroundColor: '#3949AB18',
+    borderWidth: 1,
+    borderColor: '#3949AB40',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  groupBannerText: {
+    fontSize: 14,
+    color: COLORS.text,
+  },
+  groupBannerName: {
+    fontWeight: '700',
+    color: '#3949AB',
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -293,30 +295,32 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   cancelButton: {
     height: 48
   },
-  infoLabel: {
-    fontSize: 14,
+  fixedInputLabel: {
+    fontSize: 13,
     fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: 8
+    marginBottom: 4,
+    color: COLORS.text,
   },
-  fixedValueContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 8,
-    padding: 12,
+  fixedInput: {
     borderWidth: 1,
     borderColor: COLORS.border,
-    alignItems: 'center'
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    backgroundColor: COLORS.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  fixedValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 4
+  fixedInputValue: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
   },
-  fixedValueSubtext: {
+  fixedInputSuffix: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1
+    fontStyle: 'italic',
   }
 });

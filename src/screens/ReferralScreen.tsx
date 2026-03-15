@@ -8,12 +8,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Share,
-  Alert,
   Animated,
-  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -79,9 +75,14 @@ export const ReferralScreen: React.FC = () => {
 
   const handleCopyCode = async () => {
     if (!referralCode) return;
-
-    haptics.light();
-    Clipboard.setString(referralCode);
+    try {
+      const { Clipboard } = await import('react-native');
+      Clipboard.setString(referralCode);
+      haptics.light();
+    } catch (error) {
+      console.error('Clipboard not available:', error);
+      return;
+    }
     setCopied(true);
 
     analytics.logEvent('referral_code_copied', {
@@ -99,6 +100,7 @@ export const ReferralScreen: React.FC = () => {
     try {
       const message = `🎮 Join me on Wittsy - the funniest party game!\n\nUse my code: ${referralCode}\n\nYou'll get ${REFERRAL_REWARDS.INVITEE_BONUS} free coins when you sign up! 🎁`;
 
+      const { Share } = await import('react-native');
       await Share.share({
         message,
         title: 'Join Wittsy!',

@@ -4,6 +4,7 @@
  */
 
 import * as Linking from 'expo-linking';
+import { Share } from 'react-native';
 import { DeepLinkConfig, DeepLinkURL, DEEP_LINK_SCHEMES, DEEP_LINK_PATHS } from '../types/platform';
 
 class DeepLinkingService {
@@ -52,23 +53,24 @@ class DeepLinkingService {
 
       console.log('🔗 Deep link config:', config);
 
-      // GameRoom links MUST go through the HomeScreen listener so joinRoom() is called
-      // before navigation — otherwise the user arrives as a ghost (not in the players list).
-      // addListener() will fire pendingDeepLink immediately when HomeScreen registers.
-      if (config.screen === 'GameRoom') {
+      // GameRoom and Groups invite links MUST go through the HomeScreen listener:
+      // - GameRoom: so joinRoom() is called before navigation (avoids ghost-player bug)
+      // - Groups: so joinGroupViaInviteCode() is called before navigating to GroupDetail
+      // addListener() will fire the pendingDeepLink immediately when HomeScreen registers.
+      if (config.screen === 'GameRoom' || (config.screen === 'Groups' && config.params?.inviteCode)) {
         if (this.listeners.length > 0) {
-          // HomeScreen is already listening — let it handle joinRoom + navigate
+          // HomeScreen is already listening — let it handle join + navigate
           this.notifyListeners(config);
         } else {
           // HomeScreen not yet registered (cold start, profile still loading).
           // Save so addListener() fires it the moment HomeScreen registers.
-          console.log('⏳ No listeners yet, saving GameRoom link as pending');
+          console.log('⏳ No listeners yet, saving pending link for screen:', config.screen);
           this.pendingDeepLink = config;
         }
         return;
       }
 
-      // Non-GameRoom links: notify listeners and navigate directly as before
+      // All other links: notify listeners and navigate directly
       this.notifyListeners(config);
       if (navigationRef?.current) {
         this.navigate(navigationRef, config);
@@ -179,6 +181,15 @@ class DeepLinkingService {
       return { screen: 'PromptLibrary' };
     }
 
+    // Handle /group/{inviteCode} — group invite links
+    if (path.startsWith('/group/') || path.startsWith('group/')) {
+      const inviteCode = path.replace(/^\/?group\//, '').toUpperCase();
+      if (inviteCode) {
+        console.log('✅ Matched: Group invite, code:', inviteCode);
+        return { screen: 'Groups', params: { inviteCode } };
+      }
+    }
+
     return null;
   }
 
@@ -221,8 +232,12 @@ class DeepLinkingService {
   addListener(callback: (config: DeepLinkConfig) => void) {
     this.listeners.push(callback);
 
-    if (this.pendingDeepLink?.screen === 'GameRoom') {
-      const pending = this.pendingDeepLink;
+    const isListenerPending =
+      this.pendingDeepLink?.screen === 'GameRoom' ||
+      (this.pendingDeepLink?.screen === 'Groups' && this.pendingDeepLink?.params?.inviteCode);
+
+    if (isListenerPending) {
+      const pending = this.pendingDeepLink!;
       this.pendingDeepLink = null;
       // Defer by one tick so the caller finishes its own setup before we fire
       setTimeout(() => {
@@ -293,7 +308,7 @@ class DeepLinkingService {
     const message = `Join me in ${roomName}! ${url}`;
 
     try {
-      const { Share } = await import('react-native');
+
       await Share.share({
         message,
         url,
@@ -312,7 +327,7 @@ class DeepLinkingService {
     const message = `Check out ${username}'s profile! ${url}`;
 
     try {
-      const { Share } = await import('react-native');
+
       await Share.share({
         message,
         url,
@@ -331,7 +346,7 @@ class DeepLinkingService {
     const message = `Join the ${eventName} event! ${url}`;
 
     try {
-      const { Share } = await import('react-native');
+
       await Share.share({
         message,
         url,

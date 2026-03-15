@@ -4,8 +4,8 @@ export const APP_NAME = 'Wittz';
 export const APP_VERSION = '1.0.0';
 
 // Game Settings
-export const DEFAULT_SUBMISSION_TIME = 20; // seconds
-export const DEFAULT_VOTING_TIME = 15; // seconds
+export const DEFAULT_SUBMISSION_TIME = 30; // seconds
+export const DEFAULT_VOTING_TIME = 20; // seconds
 export const WINNING_VOTES = 20; // FIXED - total votes needed to win (not adjustable)
 export const JOIN_LOCK_THRESHOLD = 8; // FIXED - votes at which joins are locked
 export const MAX_PLAYERS = 12;

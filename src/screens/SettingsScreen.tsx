@@ -4,10 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';;
 import { tabletHorizontalPadding } from '../utils/responsive';
+import { useAuth } from '../hooks/useAuth';
+import { isUserAdmin } from '../utils/adminCheck';
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+  const { user } = useAuth();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -42,17 +45,19 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </TouchableOpacity>
         </View>
 
-        {/* Admin Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔧 Admin</Text>
-          <TouchableOpacity
-            style={styles.adminButton}
-            onPress={() => navigation.navigate('AdminConsole')}
-          >
-            <Text style={styles.adminButtonText}>🎯 Season Management</Text>
-            <Text style={styles.adminButtonSubtext}>Create and manage competitive seasons</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Admin Section - Only for admins */}
+        {isUserAdmin(user) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🔧 Admin</Text>
+            <TouchableOpacity
+              style={styles.adminButton}
+              onPress={() => navigation.navigate('AdminConsole')}
+            >
+              <Text style={styles.adminButtonText}>🎯 Season Management</Text>
+              <Text style={styles.adminButtonSubtext}>Create and manage competitive seasons</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );

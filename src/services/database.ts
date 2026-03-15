@@ -122,7 +122,9 @@ export const createRoom = async (
   hostUsername: string,
   roomName: string,
   settings: Partial<RoomSettings> = {},
-  isRanked: boolean = false
+  isRanked: boolean = false,
+  groupId?: string,
+  groupName?: string
 ): Promise<string> => {
   const defaultSettings: RoomSettings = {
     maxPlayers: 12,
@@ -168,7 +170,8 @@ export const createRoom = async (
     gameState: 'lobby' as const,
     createdAt: Timestamp.now(),
     startedAt: null,
-    isRanked: isRanked // Use the parameter instead of hardcoding false
+    isRanked: isRanked, // Use the parameter instead of hardcoding false
+    ...(groupId ? { groupId, groupName: groupName || '' } : {}),
   };
 
   console.log('✨ Room created with host avatar:', { roomName, hasHostAvatarConfig: !!roomData.players[0].avatarConfig });

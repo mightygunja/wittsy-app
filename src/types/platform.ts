@@ -90,7 +90,9 @@ export type DeepLinkScreen =
   | 'Events'
   | 'Leaderboard'
   | 'Settings'
-  | 'PromptLibrary';
+  | 'PromptLibrary'
+  | 'Groups'
+  | 'GroupDetail';
 
 export interface DeepLinkConfig {
   screen: DeepLinkScreen;
@@ -99,6 +101,8 @@ export interface DeepLinkConfig {
     userId?: string;
     eventId?: string;
     challengeId?: string;
+    groupId?: string;
+    inviteCode?: string;
     [key: string]: any;
   };
 }
@@ -277,4 +281,5 @@ export const DEEP_LINK_PATHS = {
   leaderboard: '/leaderboard',
   settings: '/settings',
   prompts: '/prompts',
+  group: '/group/:inviteCode',
 };

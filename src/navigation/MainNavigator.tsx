@@ -34,6 +34,9 @@ import { BattlePassScreen } from '../screens/BattlePassScreen';
 import { AdminEventsScreen } from '../screens/AdminEventsScreen';
 import { StarredPhrasesScreen } from '../screens/StarredPhrasesScreen';
 import { ReferralScreen } from '../screens/ReferralScreen';
+import { GroupsScreen } from '../screens/GroupsScreen';
+import { GroupDetailScreen } from '../screens/GroupDetailScreen';
+import { CreateGroupScreen } from '../screens/CreateGroupScreen';
 
 const Stack = createStackNavigator();
 
@@ -229,10 +232,25 @@ export const MainNavigator: React.FC = () => {
         component={StarredPhrasesScreen}
         options={{ title: 'Starred Phrases' }}
       />
-      <Stack.Screen 
-        name="Referral" 
+      <Stack.Screen
+        name="Referral"
         component={ReferralScreen}
         options={{ title: 'Invite Friends' }}
+      />
+      <Stack.Screen
+        name="Groups"
+        component={GroupsScreen}
+        options={{ title: 'Groups' }}
+      />
+      <Stack.Screen
+        name="GroupDetail"
+        component={GroupDetailScreen}
+        options={{ title: 'Group' }}
+      />
+      <Stack.Screen
+        name="CreateGroup"
+        component={CreateGroupScreen}
+        options={{ title: 'New Group' }}
       />
     </Stack.Navigator>
   );

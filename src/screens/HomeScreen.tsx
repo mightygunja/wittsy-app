@@ -17,6 +17,7 @@ import { dailyRewardsService } from '../services/dailyRewardsService';
 import { deepLinking } from '../services/deepLinking';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
 import { getActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom } from '../services/database';
+import { getUserGroups, subscribeToGroupActiveRooms, joinGroupViaInviteCode } from '../services/groups';
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 import { isUserAdmin } from '../utils/adminCheck';
@@ -44,6 +45,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [dailyRewardClaimedThisSession, setDailyRewardClaimedThisSession] = useState(false);
   const dailyRewardCheckedRef = useRef(false);
+  const [userGroups, setUserGroups] = useState<any[]>([]);
+  const [groupActiveRooms, setGroupActiveRooms] = useState<{ [groupId: string]: any[] }>({});
+  const groupRoomUnsubscribers = useRef<(() => void)[]>([]);
   
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   
@@ -128,6 +132,22 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const handleDeepLinkConfig = async (config: any) => {
       console.log('🔗 HomeScreen received deep link:', config);
       
+      // Handle group invite deep links
+      if (config.screen === 'Groups' && config.params?.inviteCode) {
+        const { inviteCode } = config.params;
+        try {
+          const result = await joinGroupViaInviteCode(inviteCode, user.uid, userProfile.username);
+          if (result.success && result.groupId) {
+            navigation.navigate('GroupDetail', { groupId: result.groupId });
+          } else {
+            Alert.alert('Error', result.error || 'Invalid group invite code');
+          }
+        } catch (error: any) {
+          Alert.alert('Error', error.message || 'Failed to join group');
+        }
+        return;
+      }
+
       // Only handle GameRoom deep links
       if (config.screen === 'GameRoom' && config.params?.roomId) {
         const roomId = config.params.roomId;
@@ -174,7 +194,27 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       } else if (selectedRoomType === 'casual') {
         loadCasualRooms();
       }
-    }, [selectedRoomType])
+      // Load groups and subscribe to their active rooms
+      if (user) {
+        getUserGroups(user.uid).then((groups) => {
+          setUserGroups(groups);
+          // Tear down previous subscriptions
+          groupRoomUnsubscribers.current.forEach((unsub) => unsub());
+          groupRoomUnsubscribers.current = [];
+          // Subscribe to active rooms per group
+          groups.forEach((group) => {
+            const unsub = subscribeToGroupActiveRooms(group.id, (rooms) => {
+              setGroupActiveRooms((prev) => ({ ...prev, [group.id]: rooms }));
+            });
+            groupRoomUnsubscribers.current.push(unsub);
+          });
+        });
+      }
+      return () => {
+        groupRoomUnsubscribers.current.forEach((unsub) => unsub());
+        groupRoomUnsubscribers.current = [];
+      };
+    }, [selectedRoomType, user])
   );
 
   const checkDailyReward = async () => {
@@ -246,7 +286,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const loadActiveRooms = async () => {
     try {
       const rooms = await getActiveRooms({ isPrivate: false });
-      setActiveRooms(rooms.slice(0, 5));
+      setActiveRooms(rooms.filter((r: any) => !r.groupId).slice(0, 5));
     } catch (error) {
       console.error('Error loading rooms:', error);
     }
@@ -291,7 +331,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setLoadingRooms(true);
     try {
       const rooms = await getActiveRooms({ isPrivate: false, maxResults: 50 });
-      setCasualRooms(rooms);
+      setCasualRooms(rooms.filter((r: any) => !r.groupId));
     } catch (error) {
       console.error('Error loading casual rooms:', error);
     } finally {
@@ -410,8 +450,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       });
 
       const availableRoom = rooms.find(
-        room => room.players.length < room.settings.maxPlayers &&
-        !room.players.find((p: any) => p.userId === user.uid) // Don't join if already in room
+        room => !room.groupId &&
+        room.players.length < room.settings.maxPlayers &&
+        !room.players.find((p: any) => p.userId === user.uid)
       );
 
       if (availableRoom) {
@@ -568,7 +609,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           ]}
         >
           <Button
-            title="➕ CREATE PRIVATE"
+            title="➕ CREATE ROOM"
             onPress={() => navigation.navigate('CreateRoom')}
             variant="gold"
             size="xl"
@@ -648,7 +689,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.secondaryScroll}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.secondaryCard}
               onPress={() => navigation.navigate('StarredPhrases')}
             >
@@ -661,98 +702,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('AvatarCreator')}
-            >
-              <LinearGradient
-                colors={['#E74C3C', '#C0392B']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>🎨</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Creator</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('BattlePass')}
-            >
-              <LinearGradient
-                colors={['#9B59B6', '#8E44AD']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>⚔️</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Battle Pass</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('PromptLibrary')}
-            >
-              <LinearGradient
-                colors={['#5B7FDB', '#4A5FC1']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>📚</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Prompts</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('CoinShop')}
-            >
-              <LinearGradient
-                colors={['#FFA726', '#F57C00']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>💰</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Coin Shop</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('AvatarShop')}
-            >
-              <LinearGradient
-                colors={['#AB47BC', '#8E24AA']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>👤</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Shop</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('Challenges')}
-            >
-              <LinearGradient
-                colors={['#EC407A', '#D81B60']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>🎯</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Challenges</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryCard}
-              onPress={() => navigation.navigate('Events')}
-            >
-              <LinearGradient
-                colors={['#29B6F6', '#0288D1']}
-                style={styles.secondaryGradient}
-              >
-                <Text style={styles.secondaryIcon}>🏆</Text>
-                <Text style={styles.secondaryTitle} numberOfLines={0}>Events</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.secondaryCard}
               onPress={() => navigation.navigate('Friends')}
             >
@@ -765,9 +715,113 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('Groups')}
+            >
+              <LinearGradient
+                colors={['#5C6BC0', '#3949AB']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🏘️</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Groups</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('AvatarCreator')}
+            >
+              <LinearGradient
+                colors={['#E74C3C', '#C0392B']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🎨</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Creator</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('AvatarShop')}
+            >
+              <LinearGradient
+                colors={['#AB47BC', '#8E24AA']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>👤</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Avatar Shop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('CoinShop')}
+            >
+              <LinearGradient
+                colors={['#FFA726', '#F57C00']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>💰</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Coin Shop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('BattlePass')}
+            >
+              <LinearGradient
+                colors={['#9B59B6', '#8E44AD']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>⚔️</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Battle Pass</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('PromptLibrary')}
+            >
+              <LinearGradient
+                colors={['#5B7FDB', '#4A5FC1']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>📚</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Prompts</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('Challenges')}
+            >
+              <LinearGradient
+                colors={['#EC407A', '#D81B60']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🎯</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Challenges</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryCard}
+              onPress={() => navigation.navigate('Events')}
+            >
+              <LinearGradient
+                colors={['#29B6F6', '#0288D1']}
+                style={styles.secondaryGradient}
+              >
+                <Text style={styles.secondaryIcon}>🏆</Text>
+                <Text style={styles.secondaryTitle} numberOfLines={0}>Events</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
             {/* Admin Card - Only for admins */}
             {isUserAdmin(user) && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.secondaryCard}
                 onPress={() => navigation.navigate('AdminConsole')}
               >
@@ -844,6 +898,56 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             </View>
           </Animated.View>
         )}
+
+        {/* Group Games Sections — one per group the user belongs to */}
+        {userGroups.map((group) => {
+          const rooms = groupActiveRooms[group.id] || [];
+          if (rooms.length === 0) return null;
+          return (
+            <Animated.View key={group.id} style={[styles.activeGameSection, { opacity: fadeAnim }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
+                <Text style={styles.sectionTitle}>🏘️ {group.name} — Group Games</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('GroupDetail', { groupId: group.id })}>
+                  <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '600' }}>View Group</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.roomList}>
+                {rooms.map((room: any) => {
+                  const alreadyIn = room.players?.some((p: any) => p.userId === user?.uid);
+                  return (
+                    <TouchableOpacity
+                      key={room.roomId}
+                      style={styles.activeGameCard}
+                      onPress={() => {
+                        if (alreadyIn) {
+                          navigation.navigate('GameRoom', { roomId: room.roomId });
+                        } else {
+                          handleJoinRoom(room.roomId);
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.roomCardHeader}>
+                        <View style={styles.roomCardTitleRow}>
+                          <Text style={styles.roomCardName}>{room.name}</Text>
+                          {alreadyIn && <Badge text="YOU'RE IN" variant="success" size="sm" />}
+                        </View>
+                        <Text style={styles.roomCardPlayers}>
+                          👥 {room.players?.length || 0}/{room.settings?.maxPlayers || 12}
+                        </Text>
+                      </View>
+                      <View style={styles.roomCardFooter}>
+                        <Text style={styles.roomCardStatus}>
+                          {room.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </Animated.View>
+          );
+        })}
 
         {/* Current Room Games Section - appears below Explore when button clicked */}
         {selectedRoomType && (
