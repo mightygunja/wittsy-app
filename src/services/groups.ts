@@ -21,6 +21,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from 'firebase/firestore';
+import { Share, Alert } from 'react-native';
 import { firestore } from './firebase';
 import { Group, GroupMember, GroupMemberStats } from '../types/social';
 
@@ -373,11 +374,9 @@ export const shareGroupInviteLink = async (
   const url = buildGroupInviteLink(inviteCode);
   const message = `Join my Wittz group "${groupName}"! Use code ${inviteCode} in the app or tap: ${url}`;
   try {
-    const { Share } = await import('react-native');
     await Share.share({ message });
   } catch (error: any) {
     console.error('Failed to share group invite:', error);
-    const { Alert } = await import('react-native');
     Alert.alert(
       'Invite Code',
       `Share your group invite code:\n\n${inviteCode}\n\nOr share this link:\n${url}`,

@@ -304,16 +304,14 @@ class DeepLinkingService {
    * Share game room link
    */
   async shareGameRoom(roomId: string, roomName: string): Promise<void> {
-    const url = this.buildUniversalLink(`/game/${roomId}`);
-    const message = `Join me in ${roomName}! ${url}`;
+    // Use the custom scheme URL — guaranteed to open the app when installed.
+    // Passing a separate `url` field on iOS causes the OS to drop the message text,
+    // and universal links only work with a configured AASA file on the server.
+    const deepLink = this.buildGameRoomLink(roomId); // wittz://game/{roomId}
+    const message = `Join me in "${roomName}" on Wittz! Tap to join: ${deepLink}`;
 
     try {
-
-      await Share.share({
-        message,
-        url,
-        title: `Join ${roomName}`,
-      });
+      await Share.share({ message, title: `Join ${roomName}` });
     } catch (error) {
       console.error('Failed to share:', error);
     }
