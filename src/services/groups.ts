@@ -364,7 +364,9 @@ export const regenerateInviteCode = async (
 };
 
 export const buildGroupInviteLink = (inviteCode: string): string => {
-  return `https://wittz.app/group/${inviteCode}`;
+  // Use custom scheme — guaranteed to open the app when installed.
+  // Universal links (https://wittz.app/group/...) require an AASA file on the server.
+  return `wittsy://group/${inviteCode}`;
 };
 
 export const shareGroupInviteLink = async (

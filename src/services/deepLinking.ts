@@ -132,6 +132,16 @@ class DeepLinkingService {
       }
     }
 
+    // Handle custom scheme wittsy://group/{inviteCode}
+    // Expo Linking parses this as hostname='group', path='/{inviteCode}'
+    if (parsed.hostname === 'group' && path && path !== '/') {
+      const inviteCode = path.replace(/^\//, '').toUpperCase();
+      if (inviteCode) {
+        console.log('✅ Matched: Group invite via custom scheme, code:', inviteCode);
+        return { screen: 'Groups', params: { inviteCode } };
+      }
+    }
+
     // Match path to screen
     if (path === '/' || path === '/home') {
       console.log('✅ Matched: Home');
