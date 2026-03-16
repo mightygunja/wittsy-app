@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/game/:path*", "destination": "/redirect.html" },
+    { "source": "/group/:path*", "destination": "/redirect.html" },
+    { "source": "/:path*", "destination": "/index.html" }
+  ]
+}

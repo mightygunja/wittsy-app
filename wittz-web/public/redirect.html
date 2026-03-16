@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opening Wittz...</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #6C63FF; color: #fff;
+           display: flex; flex-direction: column; align-items: center; justify-content: center;
+           min-height: 100vh; margin: 0; text-align: center; padding: 24px; box-sizing: border-box; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    p  { font-size: 16px; opacity: 0.85; margin-bottom: 32px; }
+    a  { background: #fff; color: #6C63FF; font-weight: 700; font-size: 16px;
+         padding: 14px 32px; border-radius: 14px; text-decoration: none; }
+  </style>
+  <script>
+    (function () {
+      var parts = window.location.pathname.split('/').filter(Boolean);
+      var type  = parts[0]; // 'game' or 'group'
+      var id    = parts[1];
+      if (type && id) {
+        // Open the app via custom scheme
+        window.location.href = 'wittsy://' + type + '/' + id;
+      }
+    })();
+  </script>
+</head>
+<body>
+  <h1>⚡ Opening Wittz...</h1>
+  <p>If the app doesn't open, make sure Wittz is installed.</p>
+  <a href="https://apps.apple.com/app/id6744508464">Download on the App Store</a>
+</body>
+</html>
