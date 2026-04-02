@@ -40,6 +40,8 @@ import { useTheme } from '../hooks/useTheme';
 import { validatePhrase } from '../utils/validation';
 import { Button } from '../components/common/Button';
 import { LinearGradient } from 'expo-linear-gradient';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../services/firebase';
 import { rewards, REWARD_AMOUNTS } from '../services/rewardsService';
 import { incrementChallengeProgress } from '../services/challenges';
 import { battlePass } from '../services/battlePassService';
@@ -88,16 +90,8 @@ const saveMatchHistory = async (
 // Helper function to advance game phase
 const advancePhase = async (roomId: string) => {
   try {
-    const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'wittsy-51992';
-    const response = await fetch(
-      `https://us-central1-${projectId}.cloudfunctions.net/advanceGamePhase`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: { roomId } })
-      }
-    );
-    await response.json();
+    const advance = httpsCallable(functions, 'advanceGamePhase');
+    await advance({ roomId });
   } catch (error) {
     console.error('Error advancing phase:', error);
   }

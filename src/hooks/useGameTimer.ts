@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { httpsCallable } from 'firebase/functions';
-import { database, functions } from '../services/firebase';
+import { realtimeDb as database, functions } from '../services/firebase';
 
 const PHASE_DURATIONS = {
   prompt: 3,
