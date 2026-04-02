@@ -16,7 +16,7 @@ import { DailyRewardModal } from '../components/DailyRewardModal';
 import { dailyRewardsService } from '../services/dailyRewardsService';
 import { deepLinking } from '../services/deepLinking';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
-import { getActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom } from '../services/database';
+import { getActiveRooms, subscribeToActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom } from '../services/database';
 import { getUserGroups, subscribeToGroupActiveRooms, joinGroupViaInviteCode } from '../services/groups';
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
@@ -47,7 +47,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const dailyRewardCheckedRef = useRef(false);
   const [userGroups, setUserGroups] = useState<any[]>([]);
   const [groupActiveRooms, setGroupActiveRooms] = useState<{ [groupId: string]: any[] }>({});
+  const [groupGamesCollapsed, setGroupGamesCollapsed] = useState(false);
   const groupRoomUnsubscribers = useRef<(() => void)[]>([]);
+  const casualRoomsUnsubRef = useRef<(() => void) | null>(null);
   
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   
@@ -105,13 +107,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
     // Load active rooms on mount
     loadActiveRooms();
-    
+
     // Load user's active rooms
     loadUserActiveRoom();
     loadUserActiveCasualRoom();
-    
-    // Load casual rooms by default
-    loadCasualRooms();
+    // Casual rooms are loaded via the real-time subscription in useFocusEffect
     
     // Check daily login reward will be handled by useFocusEffect
     
@@ -181,27 +181,34 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     };
   }, [user, userProfile, navigation]);
 
-  // Reload rooms when screen comes into focus
+  // Reload rooms when screen comes into focus; subscribe to real-time updates
   useFocusEffect(
     useCallback(() => {
       loadActiveRooms();
       loadUserActiveRoom();
       loadUserActiveCasualRoom();
       checkDailyReward();
-      // Reload the selected room type if one is active
+
+      // Ranked rooms: one-time fetch (no real-time needed)
       if (selectedRoomType === 'ranked') {
         loadRankedRooms();
-      } else if (selectedRoomType === 'casual') {
-        loadCasualRooms();
       }
+
+      // Casual rooms: real-time subscription — fires immediately then on every change
+      if (casualRoomsUnsubRef.current) {
+        casualRoomsUnsubRef.current();
+      }
+      casualRoomsUnsubRef.current = subscribeToActiveRooms(
+        { isPrivate: false, maxResults: 50 },
+        (rooms) => setCasualRooms(rooms.filter((r: any) => !r.groupId))
+      );
+
       // Load groups and subscribe to their active rooms
       if (user) {
         getUserGroups(user.uid).then((groups) => {
           setUserGroups(groups);
-          // Tear down previous subscriptions
           groupRoomUnsubscribers.current.forEach((unsub) => unsub());
           groupRoomUnsubscribers.current = [];
-          // Subscribe to active rooms per group
           groups.forEach((group) => {
             const unsub = subscribeToGroupActiveRooms(group.id, (rooms) => {
               setGroupActiveRooms((prev) => ({ ...prev, [group.id]: rooms }));
@@ -210,7 +217,13 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           });
         });
       }
+
       return () => {
+        // Tear down all real-time subscriptions when screen loses focus
+        if (casualRoomsUnsubRef.current) {
+          casualRoomsUnsubRef.current();
+          casualRoomsUnsubRef.current = null;
+        }
         groupRoomUnsubscribers.current.forEach((unsub) => unsub());
         groupRoomUnsubscribers.current = [];
       };
@@ -542,7 +555,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               if (selectedRoomType === 'ranked') {
                 await loadRankedRooms();
               } else if (selectedRoomType === 'casual') {
-                await loadCasualRooms();
+                // Casual rooms update in real time — just show the spinner briefly
+                // to confirm to the user that a refresh happened
+                await new Promise(resolve => setTimeout(resolve, 500));
               }
               setRefreshing(false);
             }}
@@ -633,32 +648,32 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           >
             <View style={styles.actionCard}>
               <Text style={styles.actionIcon}>🎲</Text>
-              <Text style={styles.actionTitle} adjustsFontSizeToFit minimumFontScale={0.7}>CASUAL LOBBY</Text>
-              <Text style={styles.actionSubtitle} adjustsFontSizeToFit minimumFontScale={0.8}>Join Public Games</Text>
+              <Text style={styles.actionTitle} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5} allowFontScaling={false}>CASUAL LOBBY</Text>
+              <Text style={styles.actionSubtitle} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5} allowFontScaling={false}>Join Public Games</Text>
             </View>
           </Card>
 
-          <Card 
-            variant={selectedRoomType === 'ranked' ? 'glow' : 'elevated'} 
-            onPress={() => handleRoomTypeSelect('ranked')} 
+          <Card
+            variant={selectedRoomType === 'ranked' ? 'glow' : 'elevated'}
+            onPress={() => handleRoomTypeSelect('ranked')}
             style={styles.mainActionCard}
           >
             <View style={styles.actionCard}>
               <Text style={styles.actionIcon}>🏆</Text>
-              <Text style={styles.actionTitle} adjustsFontSizeToFit minimumFontScale={0.7}>RANKED LOBBY</Text>
-              <Text style={styles.actionSubtitle} adjustsFontSizeToFit minimumFontScale={0.8}>Competitive Play</Text>
+              <Text style={styles.actionTitle} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5} allowFontScaling={false}>RANKED LOBBY</Text>
+              <Text style={styles.actionSubtitle} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5} allowFontScaling={false}>Competitive Play</Text>
             </View>
           </Card>
 
-          <Card 
-            variant="elevated" 
-            onPress={() => navigation.navigate('QuickPlay')} 
+          <Card
+            variant="elevated"
+            onPress={() => navigation.navigate('QuickPlay')}
             style={styles.mainActionCard}
           >
             <View style={styles.actionCard}>
               <Text style={styles.actionIcon}>⚡</Text>
-              <Text style={styles.actionTitle} adjustsFontSizeToFit minimumFontScale={0.7}>QUICK MATCH</Text>
-              <Text style={styles.actionSubtitle} adjustsFontSizeToFit minimumFontScale={0.8}>Auto-Match Ranked</Text>
+              <Text style={styles.actionTitle} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5} allowFontScaling={false}>QUICK MATCH</Text>
+              <Text style={styles.actionSubtitle} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5} allowFontScaling={false}>Auto-Match Ranked</Text>
             </View>
           </Card>
         </Animated.View>
@@ -899,52 +914,78 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </Animated.View>
         )}
 
-        {/* Group Games Sections — one per group the user belongs to */}
-        {userGroups.map((group) => {
+        {/* Group Games Sections — one per group the user belongs to (casual only) */}
+        {selectedRoomType !== 'ranked' && userGroups.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setGroupGamesCollapsed(c => !c)}
+            activeOpacity={0.7}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}
+          >
+            <Text style={styles.sectionTitle}>Group Games</Text>
+            <Text style={{ fontSize: 18, color: COLORS.textSecondary, lineHeight: 22 }}>
+              {groupGamesCollapsed ? '›' : '⌄'}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {selectedRoomType !== 'ranked' && !groupGamesCollapsed && userGroups.map((group) => {
           const rooms = groupActiveRooms[group.id] || [];
-          if (rooms.length === 0) return null;
           return (
             <Animated.View key={group.id} style={[styles.activeGameSection, { opacity: fadeAnim }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
-                <Text style={styles.sectionTitle}>🏘️ {group.name} — Group Games</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('GroupDetail', { groupId: group.id })}>
-                  <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '600' }}>View Group</Text>
+                <Text style={styles.sectionTitle}>🏘️ {group.name}</Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => navigation.navigate('CreateRoom', { groupId: group.id, groupName: group.name })}>
+                    <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '700' }}>+ Create Game</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('GroupDetail', { groupId: group.id })}>
+                    <Text style={{ color: COLORS.textSecondary, fontSize: 13, fontWeight: '600' }}>View Group</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {rooms.length === 0 ? (
+                <TouchableOpacity
+                  style={styles.groupEmptyState}
+                  onPress={() => navigation.navigate('CreateRoom', { groupId: group.id, groupName: group.name })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.groupEmptyText}>No active games — tap to start one</Text>
                 </TouchableOpacity>
-              </View>
-              <View style={styles.roomList}>
-                {rooms.map((room: any) => {
-                  const alreadyIn = room.players?.some((p: any) => p.userId === user?.uid);
-                  return (
-                    <TouchableOpacity
-                      key={room.roomId}
-                      style={styles.activeGameCard}
-                      onPress={() => {
-                        if (alreadyIn) {
-                          navigation.navigate('GameRoom', { roomId: room.roomId });
-                        } else {
-                          handleJoinRoom(room.roomId);
-                        }
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.roomCardHeader}>
-                        <View style={styles.roomCardTitleRow}>
-                          <Text style={styles.roomCardName}>{room.name}</Text>
-                          {alreadyIn && <Badge text="YOU'RE IN" variant="success" size="sm" />}
+              ) : (
+                <View style={styles.roomList}>
+                  {rooms.map((room: any) => {
+                    const alreadyIn = room.players?.some((p: any) => p.userId === user?.uid);
+                    return (
+                      <TouchableOpacity
+                        key={room.roomId}
+                        style={styles.activeGameCard}
+                        onPress={() => {
+                          if (alreadyIn) {
+                            navigation.navigate('GameRoom', { roomId: room.roomId });
+                          } else {
+                            handleJoinRoom(room.roomId);
+                          }
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.roomCardHeader}>
+                          <View style={styles.roomCardTitleRow}>
+                            <Text style={styles.roomCardName}>{room.name}</Text>
+                            {alreadyIn && <Badge text="YOU'RE IN" variant="success" size="sm" />}
+                          </View>
+                          <Text style={styles.roomCardPlayers}>
+                            👥 {room.players?.length || 0}/{room.settings?.maxPlayers || 12}
+                          </Text>
                         </View>
-                        <Text style={styles.roomCardPlayers}>
-                          👥 {room.players?.length || 0}/{room.settings?.maxPlayers || 12}
-                        </Text>
-                      </View>
-                      <View style={styles.roomCardFooter}>
-                        <Text style={styles.roomCardStatus}>
-                          {room.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        <View style={styles.roomCardFooter}>
+                          <Text style={styles.roomCardStatus}>
+                            {room.status === 'waiting' ? '⏳ Waiting to start' : '🎯 Game in progress'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </Animated.View>
           );
         })}
@@ -1256,6 +1297,19 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   roomList: {
     gap: SPACING.sm,
+  },
+  groupEmptyState: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: 'dashed' as const,
+    borderColor: COLORS.primary + '50',
+    alignItems: 'center' as const,
+  },
+  groupEmptyText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
   },
   roomCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',

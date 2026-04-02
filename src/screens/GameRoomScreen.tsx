@@ -11,8 +11,6 @@ import {
   BackHandler,
   Platform,
   InputAccessoryView,
-  Keyboard,
-  KeyboardEvent,
   Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,10 +36,10 @@ import {
 import { ref, remove } from 'firebase/database';
 import { realtimeDb } from '../services/firebase';
 import { Room, GamePhase } from '../types';
-import { ChatBox } from '../components/social/ChatBox';
 import { useTheme } from '../hooks/useTheme';
 import { validatePhrase } from '../utils/validation';
 import { Button } from '../components/common/Button';
+import { LinearGradient } from 'expo-linear-gradient';
 import { rewards, REWARD_AMOUNTS } from '../services/rewardsService';
 import { incrementChallengeProgress } from '../services/challenges';
 import { battlePass } from '../services/battlePassService';
@@ -178,7 +176,6 @@ const GameRoomScreen: React.FC = () => {
   const [shuffledSubmissions, setShuffledSubmissions] = useState<[string, string][]>([]);
   const [multiplayerRatingChanges, setMultiplayerRatingChanges] = useState<Record<string, RatingUpdate> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [chatKeyboardHeight, setChatKeyboardHeight] = useState(0);
   const [showGameEndSummary, setShowGameEndSummary] = useState(false);
   const [gameEndRewards, setGameEndRewards] = useState<{
     coins: number;
@@ -1055,23 +1052,6 @@ const GameRoomScreen: React.FC = () => {
     }
   };
   
-  // Track keyboard height so the chat box floats above the keyboard when expanded
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, (e: KeyboardEvent) => {
-      setChatKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setChatKeyboardHeight(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   // Save current room on mount
   useEffect(() => {
@@ -1508,7 +1488,13 @@ const GameRoomScreen: React.FC = () => {
         );
 
       default:
-        return null;
+        return (
+          <View style={styles.loadingPhase}>
+            <Text style={styles.loadingEmoji}>⏳</Text>
+            <Text style={styles.loadingText}>Get Ready...</Text>
+            <Text style={styles.loadingSubtext}>Next round is starting</Text>
+          </View>
+        );
     }
   };
 
@@ -1687,14 +1673,21 @@ const GameRoomScreen: React.FC = () => {
               const needed = Math.max(0, minPlayers - room.players.length);
               return (
                 <View style={styles.lobbyActionSection}>
-                  <Button
-                    title="START GAME"
-                    onPress={handleStartGame}
+                  <TouchableOpacity
+                    onPress={needed > 0 ? undefined : handleStartGame}
+                    activeOpacity={needed > 0 ? 1 : 0.8}
+                    style={[styles.startButton, needed > 0 && styles.startButtonDisabled]}
                     disabled={needed > 0}
-                    size="lg"
-                    variant="primary"
-                    style={styles.startButton}
-                  />
+                  >
+                    <LinearGradient
+                      colors={needed > 0 ? [COLORS.textDisabled, COLORS.textMuted] : COLORS.gradientPrimary as any}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.startButtonGradient}
+                    >
+                      <Text style={styles.startButtonText}>START GAME</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
                   {needed > 0 && (
                     <Text style={styles.needMorePlayersText}>
                       {needed} more player{needed !== 1 ? 's' : ''} needed to start
@@ -1724,27 +1717,6 @@ const GameRoomScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        {/* COLLAPSIBLE CHAT - Only show in lobby (waiting status) */}
-        {/* bottom offset increases by keyboard height so chat rides above the keyboard */}
-        {user && room?.status === 'waiting' && (
-          <View style={{
-            position: 'absolute',
-            bottom: 20 + chatKeyboardHeight,
-            left: 20,
-            right: 20,
-            zIndex: 9999,
-            elevation: 9999,
-          }}>
-            <ChatBox
-              roomId={roomId}
-              userId={user.uid}
-              username={room.players.find(p => p.userId === user.uid)?.username || 'Player'}
-              compact={true}
-              maxHeight={300}
-              userJoinedAt={Date.now()}
-            />
-          </View>
-        )}
 
         {/* Starting game - room active but game state not yet loaded from RTDB */}
         {room.status === 'active' && !gameState && (
@@ -2772,10 +2744,6 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  chatContainer: {
-    padding: 12,
-    paddingBottom: 0,
-  },
   finishedContainer: {
     flex: 1,
     alignItems: 'center',
@@ -2790,10 +2758,28 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     textAlign: 'center',
   },
   startButton: {
-    height: 48,
     marginTop: 16,
     alignSelf: 'center',
     width: '80%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    height: 56,
+  },
+  startButtonDisabled: {
+    opacity: 0.5,
+  },
+  startButtonGradient: {
+    flex: 1,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButtonText: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   needMorePlayersText: {
     fontSize: 13,
