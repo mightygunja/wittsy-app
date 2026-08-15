@@ -13,12 +13,15 @@ const admin = require('firebase-admin');
 const db = admin.firestore();
 const rtdb = admin.database();
 
-// Default phase durations (in seconds) - used as fallback only
+// Minimum votes required for a phrase to earn a star
+const STAR_THRESHOLD = 4;
+
+// Default phase durations (in seconds) - must match client PHASE_DURATIONS in useGameTimer.ts
 const DEFAULT_DURATIONS = {
-  prompt: 5,
-  submission: 30,
-  voting: 20,
-  results: 10
+  prompt: 3,
+  submission: 25,
+  voting: 10,
+  results: 8
 };
 
 /**
@@ -87,186 +90,192 @@ async function startGame(roomId) {
 }
 
 /**
- * Advance to next phase
- * Called by client when timer expires OR by scheduled function as backup
+ * Advance to next phase.
+ * Called by client when timer expires.
+ *
+ * Race condition context: all clients fire advancePhase when their timer hits 0.
+ * With N players there are N concurrent Cloud Function calls. For most phases the
+ * double-check (fresh re-read before writing) is sufficient to drop duplicate calls.
+ *
+ * The submission phase needs a stronger guard: a delayed call that arrives 1-2 seconds
+ * after the submission phase starts will bypass the 1-second guard, read 0 submissions
+ * (nobody has had time to type yet), and incorrectly trigger insufficient → new round.
+ * Fix: reject submission-phase advances that arrive more than 3 seconds before the
+ * configured deadline, unless every player in the room has already submitted
+ * (the legitimate everyone-is-done early advance).
  */
 async function advancePhase(roomId) {
   const gameRef = rtdb.ref(`rooms/${roomId}/game`);
   const snapshot = await gameRef.once('value');
   const game = snapshot.val();
-  
+
   if (!game) {
     console.log(`⚠️ No game state for ${roomId}`);
     return;
   }
-  
-  // PRODUCTION FIX: Prevent race conditions - check if phase was already advanced
+
+  // Basic guard against back-to-back duplicate calls. Racing calls that land
+  // early in the submission phase (and would see 0 submissions) are rejected
+  // by the clock-skew guard inside the submission case, which allows an early
+  // advance only when every player has already submitted.
+  const minElapsed = 1;
   const elapsed = (Date.now() - game.phaseStart) / 1000;
-  if (elapsed < 1) {
-    console.log(`⏸️ Skipping advance - phase just started (${elapsed.toFixed(2)}s ago)`);
+  if (elapsed < minElapsed) {
+    console.log(`⏸️ Skipping advance - ${elapsed.toFixed(2)}s elapsed (min ${minElapsed}s for ${game.phase})`);
     return;
   }
-  
-  const now = Date.now();
-  let nextPhase = null;
-  let nextDuration = 0;
-  const updates = { phaseStart: now };
-  
+
   console.log(`⏭️ Advancing ${roomId} from ${game.phase}`);
-  
+
   switch (game.phase) {
-    case 'prompt':
-      nextPhase = 'submission';
-      nextDuration = await getPhaseDurationForRoom(roomId, 'submission');
-      // PRODUCTION FIX: Enforce minimum 10 seconds for submission
-      nextDuration = Math.max(10, nextDuration);
-      updates.phase = nextPhase;
-      updates.phaseDuration = nextDuration;
-      updates.prompt = game.prompt; // CRITICAL: Preserve prompt across phase transitions
-      updates.submissions = {}; // Clear submissions from previous round
-      updates.votes = {}; // Clear votes from previous round
-      break;
-      
+    case 'prompt': {
+      const nextDuration = Math.max(10, await getPhaseDurationForRoom(roomId, 'submission'));
+      await gameRef.update({
+        phase: 'submission',
+        phaseDuration: nextDuration,
+        phaseStart: Date.now(),
+        prompt: game.prompt,
+        submissions: {},
+        votes: {},
+      });
+      console.log(`✅ ${roomId}: prompt → submission (${nextDuration}s)`);
+      return;
+    }
+
     case 'submission': {
-      // SERVER-SIDE CLOCK GUARD: reject early advances from clock-skewed clients.
-      // Client clocks can run ahead of the server. A client whose clock is 10s fast
-      // will call advancePhase before the server-side deadline, triggering 'insufficient'
-      // while other players still see time on their countdown.
-      // Allow the advance only if the server clock shows <= 3s remaining.
-      const serverRemaining = game.phaseDuration - elapsed;
-      if (serverRemaining > 3) {
-        console.log(`⏸️ Submission phase: ${serverRemaining.toFixed(1)}s still remaining on server clock — ignoring early advance from client`);
+      // Fresh read — if another concurrent call already advanced, bail out.
+      const freshSubSnap = await gameRef.once('value');
+      const freshSubGame = freshSubSnap.val();
+      if (!freshSubGame || freshSubGame.phase !== 'submission') {
+        console.log(`⏸️ submission already moved to '${freshSubGame?.phase}' — skipping`);
         return;
       }
 
-      // Get player count from Firestore
       const roomDoc = await db.collection('rooms').doc(roomId).get();
       const playerCount = roomDoc.data()?.players?.length || 0;
-      const submissionCount = Object.keys(game.submissions || {}).length;
-      console.log(`📝 ${submissionCount} submissions received from ${playerCount} players`);
 
-      if (submissionCount === 0) {
-        console.log(`⚠️ No submissions - extending submission phase by 5s`);
-        updates.phaseStart = now;
-        updates.phaseDuration = 5;
-        await gameRef.update(updates);
+      // Clock-skew guard: a client with a fast clock (or a buggy timer) must not be
+      // able to end the submission phase early for the whole room. Only allow an
+      // early advance when every player in the room has already submitted.
+      const subElapsed = (Date.now() - freshSubGame.phaseStart) / 1000;
+      const configuredDuration = freshSubGame.phaseDuration || 0;
+      const submittedCount = Object.keys(freshSubGame.submissions || {}).length;
+      if (configuredDuration - subElapsed > 3 && submittedCount < playerCount) {
+        console.log(`⏸️ Early advance rejected - ${subElapsed.toFixed(1)}s/${configuredDuration}s elapsed, ${submittedCount}/${playerCount} submitted`);
         return;
       }
-      
-      // Filter late submissions — add 3s grace period for client/server clock drift and network latency.
-      // Submissions use client Date.now(); phaseStart uses server Date.now() — there can be drift.
-      const GRACE_MS = 3000;
-      const submissionPhaseEnd = game.phaseStart + (game.phaseDuration * 1000) + GRACE_MS;
-      const validSubmissions = {};
-      Object.entries(game.submissions || {}).forEach(([userId, submission]) => {
-        const submissionData = typeof submission === 'object' ? submission : { phrase: submission, timestamp: game.phaseStart };
-        const submissionTime = submissionData.timestamp || game.phaseStart;
 
-        if (submissionTime <= submissionPhaseEnd) {
-          validSubmissions[userId] = submissionData.phrase || submission;
-        } else {
-          console.log(`⏰ EXCLUDED submission from ${userId} (${Math.round((submissionTime - submissionPhaseEnd) / 1000)}s past grace period)`);
+      const votingDuration = Math.max(8, await getPhaseDurationForRoom(roomId, 'voting'));
+      const subNow = Date.now();
+
+      const submissions = freshSubGame.submissions || {};
+      const validSubmissions = {};
+      Object.entries(submissions).forEach(([userId, submission]) => {
+        const submissionData = typeof submission === 'object' ? submission : { phrase: submission };
+        const phrase = submissionData.phrase || submission;
+        if (phrase && String(phrase).trim()) {
+          validSubmissions[userId] = phrase;
         }
       });
-
       const validSubmissionCount = Object.keys(validSubmissions).length;
-      console.log(`✅ Valid submissions for voting: ${validSubmissionCount}/${submissionCount}`);
 
-      // If 3+ players and fewer than 3 valid submissions, show "not enough" for 5s then new round.
-      // IMPORTANT: Do NOT use setTimeout here — Cloud Function containers can be terminated before
-      // a deferred callback fires. Instead, set phaseDuration=5 and let the client timer call
-      // advancePhase when it hits 0, which then calls startNewRound via case 'insufficient'.
-      if (playerCount >= 3 && validSubmissionCount < 3) {
-        console.log(`⚠️ Not enough valid submissions (${validSubmissionCount}/3) - insufficient phase`);
-        updates.phase = 'insufficient';
-        updates.phaseDuration = 5;
-        updates.prompt = game.prompt;
-        updates.insufficientSubmissions = true;
-        await gameRef.update(updates);
-        return;
-      }
-      
-      nextPhase = 'voting';
-      nextDuration = await getPhaseDurationForRoom(roomId, 'voting');
-      // PRODUCTION FIX: Enforce minimum 8 seconds for voting to ensure it shows
-      nextDuration = Math.max(8, nextDuration);
-      updates.phase = nextPhase;
-      updates.phaseDuration = nextDuration;
-      updates.prompt = game.prompt; // CRITICAL: Preserve prompt across phase transitions
-      updates.validSubmissions = validSubmissions; // Store filtered submissions for voting
-      break;
-    } // end case 'submission'
-
-    case 'voting':
-      // PRODUCTION FIX: Ensure at least 1 vote before advancing
-      const voteCount = Object.keys(game.votes || {}).length;
-      console.log(`🗳️ ${voteCount} votes received`);
-
-      if (voteCount === 0) {
-        console.log(`⚠️ No votes - extending voting phase by 5s`);
-        updates.phaseStart = now;
-        updates.phaseDuration = 5;
-        await gameRef.update(updates);
+      // Require at least 3 valid submissions to proceed to voting.
+      if (validSubmissionCount < 3) {
+        console.log(`⚠️ ${roomId}: ${validSubmissionCount}/${playerCount} submissions — insufficient`);
+        await gameRef.update({
+          phase: 'insufficient',
+          phaseDuration: 5,
+          phaseStart: subNow,
+          prompt: freshSubGame.prompt,
+          insufficientSubmissions: true,
+        });
         return;
       }
 
-      // Re-read to catch concurrent advances (stale-read guard)
+      await gameRef.update({
+        phase: 'voting',
+        phaseDuration: votingDuration,
+        phaseStart: subNow,
+        prompt: freshSubGame.prompt,
+        validSubmissions,
+      });
+      console.log(`✅ ${roomId}: submission → voting (${votingDuration}s) | ${validSubmissionCount} valid submissions`);
+      return;
+    }
+
+    case 'voting': {
+      // Fresh read — if another concurrent call already advanced, bail out.
       const freshVotingSnap = await gameRef.once('value');
       const freshVotingGame = freshVotingSnap.val();
       if (!freshVotingGame || freshVotingGame.phase !== 'voting') {
-        console.log(`⏸️ Voting phase already advanced (${freshVotingGame?.phase}) — skipping`);
+        console.log(`⏸️ Voting already moved to '${freshVotingGame?.phase}' — skipping`);
         return;
       }
 
-      // Process votes — pass validSubmissions and round directly so processVotesSync
-      // does NOT re-read RTDB (avoids stale/concurrent data causing wrong vote counts)
-      await processVotesSync(
+      console.log(`🗳️ ${Object.keys(freshVotingGame.votes || {}).length} votes received`);
+
+      const winnerData = await processVotesSync(
         roomId,
         freshVotingGame.votes,
         freshVotingGame.validSubmissions || null,
-        freshVotingGame.round || 0
+        freshVotingGame.round || 0,
+        freshVotingGame.prompt || ''
       );
-      
-      nextPhase = 'results';
-      nextDuration = await getPhaseDurationForRoom(roomId, 'results');
-      // PRODUCTION FIX: Enforce minimum 5 seconds for results to show
-      nextDuration = Math.max(5, nextDuration);
-      updates.phase = nextPhase;
-      updates.phaseDuration = nextDuration;
-      updates.prompt = game.prompt; // CRITICAL: Preserve prompt across phase transitions
-      // lastWinner and lastWinningPhrase are set by processVotesSync
-      break;
-      
+
+      const resultsDuration = Math.max(5, await getPhaseDurationForRoom(roomId, 'results'));
+      const votingUpdates = {
+        phase: 'results',
+        phaseDuration: resultsDuration,
+        phaseStart: Date.now(),
+        prompt: freshVotingGame.prompt,
+      };
+      if (winnerData) {
+        Object.assign(votingUpdates, winnerData);
+      } else {
+        // Zero-vote round: explicitly clear winner fields so clients don't
+        // display the previous round's winner on the results screen.
+        Object.assign(votingUpdates, {
+          lastWinners: null,
+          lastWinner: null,
+          lastWinningPhrases: null,
+          lastWinningPhrase: null,
+          roundVoteCounts: null,
+        });
+      }
+
+      await gameRef.update(votingUpdates);
+      console.log(`✅ ${roomId}: voting → results (${resultsDuration}s)`);
+      return;
+    }
+
     case 'insufficient': {
-      // Re-read state to prevent concurrent advance from another client
       const insuffSnap = await gameRef.once('value');
       const insuffGame = insuffSnap.val();
       if (!insuffGame || insuffGame.phase !== 'insufficient') {
-        console.log(`⏸️ Insufficient phase already advanced (phase: ${insuffGame?.phase}) — skipping`);
+        console.log(`⏸️ Insufficient phase already advanced (${insuffGame?.phase}) — skipping`);
         return;
       }
       return startNewRound(roomId);
     }
 
-    case 'results':
-      // Re-read the CURRENT game state immediately before acting — the snapshot
-      // at the top of this function may be stale if another client already advanced.
+    case 'results': {
       const freshSnap = await gameRef.once('value');
       const freshGame = freshSnap.val();
       if (!freshGame || freshGame.phase !== 'results') {
-        console.log(`⏸️ Results already advanced by another client (phase: ${freshGame?.phase}) — skipping`);
+        console.log(`⏸️ Results already advanced (${freshGame?.phase}) — skipping`);
         return;
       }
-      // Check for winner or start new round
       const shouldContinue = await checkWinner(roomId);
       if (shouldContinue) {
         return startNewRound(roomId);
       }
       return;
+    }
+
+    default:
+      console.log(`⚠️ Unknown phase '${game.phase}' for ${roomId}`);
+      return;
   }
-  
-  await gameRef.update(updates);
-  console.log(`✅ ${roomId}: ${game.phase} → ${nextPhase} (${nextDuration}s)`);
 }
 
 /**
@@ -283,6 +292,11 @@ async function startNewRound(roomId) {
   const gameRef = rtdb.ref(`rooms/${roomId}/game`);
   const roomDoc = await db.collection('rooms').doc(roomId).get();
   const room = roomDoc.data();
+
+  if (!room) {
+    console.log(`⚠️ startNewRound: room ${roomId} not found in Firestore — skipping`);
+    return;
+  }
 
   // Read usedPromptIds from Firestore — shared across ALL Cloud Function instances.
   // This is the ONLY reliable way to prevent prompt repetition since in-memory state
@@ -306,7 +320,10 @@ async function startNewRound(roomId) {
     validSubmissions: null,
     insufficientSubmissions: null,
     lastWinner: null,
-    lastWinningPhrase: null
+    lastWinningPhrase: null,
+    lastWinners: null,
+    lastWinningPhrases: null,
+    roundVoteCounts: null
   };
 
   // RTDB transaction: only ONE concurrent call commits (prompt-flip prevention).
@@ -379,7 +396,7 @@ async function processSubmissions(roomId, submissions) {
  *                  passed directly from the caller — do NOT re-read RTDB to avoid stale data.
  * currentRound:    round number, also passed from caller for the same reason.
  */
-async function processVotesSync(roomId, votes, validSubmissions, currentRound) {
+async function processVotesSync(roomId, votes, validSubmissions, currentRound, prompt) {
   if (!votes || Object.keys(votes).length === 0) {
     console.log(`⚠️ No votes to process for ${roomId}`);
     return;
@@ -429,13 +446,17 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound) {
   // success with a flag that is reset at the START of each callback invocation
   // (not after) to avoid false-positive from a prior failed attempt.
   let transactionCommitted = false;
+  let capturedRoomData = null;
 
   await db.runTransaction(async (transaction) => {
-    // Reset flag at start of each invocation — Firestore may retry the callback
+    // Reset flags at start of each invocation — Firestore may retry the callback
     transactionCommitted = false;
 
     const roomDoc = await transaction.get(roomRef);
     const room = roomDoc.data();
+
+    // Capture room data for use after transaction (overwrites on each retry — final value is correct)
+    capturedRoomData = { name: room?.name, players: room?.players || [] };
 
     // IDEMPOTENCY: if another concurrent call already processed this round, abort
     if (room?.lastProcessedRound === currentRound) {
@@ -457,12 +478,15 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound) {
       scores[userId].totalVotes += count;
     });
 
-    // Add +2 bonus for round winner(s)
+    // Add +2 bonus for round winner(s) and increment stars if threshold met
     winners.forEach(winnerId => {
       if (scores[winnerId]) {
         scores[winnerId].roundWins += 1;
         scores[winnerId].totalVotes += 2;
-        console.log(`🏆 ${winnerId}: ${maxVotes} votes + 2 bonus = ${scores[winnerId].totalVotes} total`);
+        if (maxVotes >= STAR_THRESHOLD) {
+          scores[winnerId].stars = (scores[winnerId].stars || 0) + 1;
+        }
+        console.log(`🏆 ${winnerId}: ${maxVotes} votes + 2 bonus = ${scores[winnerId].totalVotes} total${maxVotes >= STAR_THRESHOLD ? ' ⭐' : ''}`);
       }
     });
 
@@ -473,23 +497,58 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound) {
 
   if (!transactionCommitted) {
     console.log(`⏸️ processVotesSync: transaction aborted for round ${currentRound} (already processed by concurrent call)`);
-    return;
+    return null;
   }
-  
-  // Update game state with winner info (support multiple winners)
-  await rtdb.ref(`rooms/${roomId}/game`).update({
-    lastWinners: winners, // Array of winner IDs
-    lastWinner: winners[0] || null, // Keep for backwards compatibility
-    lastWinningPhrases: winningPhrases, // Array of winning phrases
-    lastWinningPhrase: winningPhrases[0] || null, // Keep for backwards compatibility
-    roundVoteCounts: voteCounts // Store vote counts for this round
-  });
-  
+
+  // Write starred phrases to dedicated Firestore collection for any round winner
+  // who received STAR_THRESHOLD or more votes.
+  if (maxVotes >= STAR_THRESHOLD && winners.length > 0) {
+    try {
+      const usernameLookup = {};
+      (capturedRoomData?.players || []).forEach(p => {
+        if (p.userId) usernameLookup[p.userId] = p.username || '';
+      });
+
+      const starBatch = db.batch();
+      winners.forEach(winnerId => {
+        const phrase = validSubmissions?.[winnerId];
+        if (!phrase) return;
+        const starRef = db.collection('starredPhrases').doc();
+        starBatch.set(starRef, {
+          userId: winnerId,
+          username: usernameLookup[winnerId] || '',
+          phrase,
+          prompt: prompt || '',
+          roomId,
+          roomName: capturedRoomData?.name || '',
+          voteCount: maxVotes,
+          round: currentRound,
+          earnedAt: admin.firestore.Timestamp.now(),
+        });
+      });
+      await starBatch.commit();
+      console.log(`⭐ Saved ${winners.length} starred phrase(s) for round ${currentRound} (${maxVotes} votes each)`);
+    } catch (err) {
+      console.error(`⚠️ Failed to save starred phrases for round ${currentRound}:`, err);
+    }
+  }
+
   if (winners.length > 1) {
     console.log(`✅ TIE! ${winners.length} winners with ${maxVotes} votes each`);
   } else {
     console.log(`✅ Votes processed: ${winners[0]} won with ${maxVotes} votes - "${winningPhrases[0]?.substring(0, 40)}..."`);
   }
+
+  // Return winner data so the caller can combine it with the phase update in a
+  // single RTDB write — eliminating the two-event gap where clients saw winner
+  // data while still on the 'voting' phase.
+  return {
+    lastWinners: winners,
+    lastWinner: winners[0] || null,
+    lastWinningPhrases: winningPhrases,
+    lastWinningPhrase: winningPhrases[0] || null,
+    roundVoteCounts: voteCounts,
+  };
 }
 
 /**
@@ -552,10 +611,11 @@ async function endGame(roomId) {
       }
     });
     
-    // Save match history for each player
+    // Save match history for each player (ALWAYS — not just players with bestPhrase)
     const batch = db.batch();
     const players = room?.players || [];
-    
+    let matchesQueued = 0;
+
     for (const player of players) {
       const userId = player.userId;
       const userScore = scores[userId] || { totalVotes: 0, roundWins: 0, stars: 0 };
@@ -563,29 +623,34 @@ async function endGame(roomId) {
       const prompt = allPrompts[userId] || room?.currentPrompt || '';
       const stars = userScore.stars || 0;
       const won = userId === winnerId;
-      
-      // Only save if player submitted at least one phrase
-      if (bestPhrase) {
-        const matchRef = db.collection('matches').doc();
-        batch.set(matchRef, {
-          roomId: roomId,
-          roomName: room.name || 'Unknown Room',
-          userId: userId,
-          username: player.username || 'Unknown',
-          bestPhrase: bestPhrase,
-          prompt: prompt, // CRITICAL: Save prompt with phrase
-          stars: stars,
-          totalVotes: userScore.totalVotes || 0,
-          roundWins: userScore.roundWins || 0,
-          won: won,
-          rounds: room.currentRound || 1,
-          playedAt: admin.firestore.Timestamp.now(),
-          createdAt: admin.firestore.Timestamp.now(),
-        });
-      }
+
+      const matchRef = db.collection('matches').doc(`${userId}_${roomId}_${Date.now()}`);
+      batch.set(matchRef, {
+        roomId: roomId,
+        roomName: room.name || 'Unknown Room',
+        userId: userId,
+        username: player.username || 'Unknown',
+        bestPhrase: bestPhrase,
+        prompt: prompt,
+        stars: stars,
+        totalVotes: userScore.totalVotes || 0,
+        roundWins: userScore.roundWins || 0,
+        won: won,
+        playerCount: players.length,
+        isRanked: room.isRanked || false,
+        rounds: room.currentRound || 1,
+        playedAt: admin.firestore.Timestamp.now(),
+        createdAt: admin.firestore.Timestamp.now(),
+      });
+      matchesQueued++;
     }
-    
-    await batch.commit();
+
+    if (matchesQueued > 0) {
+      await batch.commit();
+      console.log(`💾 Saved ${matchesQueued} match history records for room ${roomId}`);
+    } else {
+      console.log(`⚠️ No match history records to save for room ${roomId}`);
+    }
     
     // Clear game state
     await rtdb.ref(`rooms/${roomId}/game`).remove();
@@ -620,7 +685,7 @@ async function getRandomPrompt(usedPromptIds = []) {
   if (promptsCache.length === 0 || (now - cacheTime) > 300000) {
     const snapshot = await db.collection('prompts')
       .where('status', '==', 'active')
-      .limit(500)
+      .limit(1000)
       .get();
     promptsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     cacheTime = now;

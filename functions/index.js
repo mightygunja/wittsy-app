@@ -15,8 +15,6 @@ const initCollections = require('./initCollections');
 
 exports.onGameStart = gameFunctions.onGameStart;
 exports.advanceGamePhase = gameFunctions.advanceGamePhase;
-// Scheduler function commented out due to deployment error - backup not critical
-// exports.checkGamePhases = gameFunctions.checkGamePhases;
 
 const simulate = require('./simulateGame');
 exports.simulateGame = simulate.simulateGame;

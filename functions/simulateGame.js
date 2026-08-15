@@ -129,12 +129,15 @@ exports.simulateGame = functions
 
     const gameRef = rtdb.ref(`rooms/${roomId}/game`);
 
-    // ── START GAME (triggers onGameStart Cloud Function) ───────────────────────
-    // We call gameEngine.startGame directly since we're inside the same process
-    await gameEngine.startGame(roomId);
-    ok('gameEngine.startGame() called');
+    // ── START GAME ─────────────────────────────────────────────────────────────
+    // Flip status waiting → active exactly like the client does. onGameStart
+    // fires and starts the engine. (Calling gameEngine.startGame directly here
+    // double-starts the game: startGame itself sets status 'active', which
+    // fires onGameStart, which calls startGame again and resets the phase.)
+    await roomRef.update({ status: 'active' });
+    ok('Room set active — waiting for onGameStart to start the engine');
 
-    await waitForPhase(gameRef, 'prompt', 10000);
+    await waitForPhase(gameRef, 'prompt', 30000);
     ok('Prompt phase confirmed in RTDB');
 
     // ── LOCAL SCORE TRACKER ────────────────────────────────────────────────────
@@ -162,8 +165,10 @@ exports.simulateGame = functions
       const phaseEnd = subGame.phaseStart + (subGame.phaseDuration * 1000);
 
       // ── SIMULATE SUBMISSIONS ─────────────────────────────────────────────────
-      // Randomly skip 0–1 players (~15% chance of 1 skip after round 2)
-      const skipCount = roundNum <= 2 ? 0 : (Math.random() < 0.15 ? 1 : 0);
+      // Randomly skip 0–1 players (~15% chance of 1 skip after round 2).
+      // Cap skips so at least 3 players always submit (matching server threshold).
+      const maxSkip = Math.max(0, PLAYERS.length - 3);
+      const skipCount = roundNum <= 2 ? 0 : (Math.random() < 0.15 ? Math.min(1, maxSkip) : 0);
       const shuffled  = [...PLAYERS].sort(() => Math.random() - 0.5);
       const submitters = shuffled.slice(0, PLAYERS.length - skipCount);
       const skipped    = PLAYERS.filter(p => !submitters.find(s => s.userId === p.userId));
@@ -202,10 +207,22 @@ exports.simulateGame = functions
         info(`  ${name} submission timestamp: ${ts}, isLate: ${ts > phaseEndMs} (phaseEnd=${phaseEndMs})`);
       });
 
-      // Advance submission → voting (or insufficient)
+      // Advance submission → voting (or insufficient).
+      // An early advance is only allowed when ALL players submitted; otherwise the
+      // clock-skew guard rejects it and we retry at the deadline — exactly like
+      // real clients whose timers fire at phase end.
       await sleep(1500);
       await gameEngine.advancePhase(roomId);
-      const afterSub = await waitForPhaseChange(gameRef, 'submission', 15000);
+      let afterSub;
+      try {
+        afterSub = await waitForPhaseChange(gameRef, 'submission', 3000);
+      } catch (e) {
+        const waitMs = Math.max(0, phaseEnd - Date.now()) + 500;
+        info(`Early advance rejected (players missing) — waiting ${(waitMs / 1000).toFixed(1)}s for deadline`);
+        await sleep(waitMs);
+        await gameEngine.advancePhase(roomId);
+        afterSub = await waitForPhaseChange(gameRef, 'submission', 15000);
+      }
 
       if (!afterSub) {
         warn('Game state null after submission — may have ended');
@@ -218,10 +235,10 @@ exports.simulateGame = functions
         const validCount = Object.keys(onTimeSubmissions).length;
         info(`Insufficient phase triggered — ${validCount} valid submissions`);
 
-        if (PLAYERS.length >= 3 && validCount < 3) {
+        if (validCount < 3) {
           ok(`RULE OK: insufficient correctly triggered (${validCount} valid < 3)`);
         } else {
-          error(`RULE FAIL: insufficient triggered with ${validCount} valid submissions for ${PLAYERS.length} players`);
+          error(`RULE FAIL: insufficient triggered with ${validCount} valid submissions`);
         }
 
         // Wait for next round
@@ -285,10 +302,11 @@ exports.simulateGame = functions
 
       info(`Winners: [${lastWinners.map(id => PLAYERS.find(p=>p.userId===id)?.username||id).join(', ')}]`);
 
-      // Build expected vote counts from what we cast
+      // Build expected vote counts — only count votes FROM valid submitters,
+      // since the server blocks votes from players who did not submit on time.
       const expectedCounts = {};
       for (const [voterId, targetId] of Object.entries(castVotes)) {
-        if (targetId !== voterId && validIds.includes(targetId)) {
+        if (targetId !== voterId && validIds.includes(targetId) && validIds.includes(voterId)) {
           expectedCounts[targetId] = (expectedCounts[targetId] || 0) + 1;
         }
       }

@@ -145,6 +145,31 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isRanked", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "starredPhrases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "earnedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "starredPhrases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "voteCount", "order": "DESCENDING" },
+        { "fieldPath": "earnedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
