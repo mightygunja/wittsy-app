@@ -94,6 +94,20 @@ export default {
         {
           microphonePermission: "Allow Wittz to access your microphone for voice chat."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          ios: {
+            // AppCheckCore (pulled in by GoogleSignIn) imports these pods from
+            // Swift, which requires them to generate module maps. Without this
+            // the EAS "Install pods" phase fails.
+            extraPods: [
+              { name: "GoogleUtilities", modular_headers: true },
+              { name: "RecaptchaInterop", modular_headers: true }
+            ]
+          }
+        }
       ]
     ],
     extra: {
