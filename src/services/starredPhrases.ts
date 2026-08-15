@@ -1,6 +1,7 @@
 /**
  * Starred Phrases Service
- * Fetches and manages starred phrases from match history
+ * Fetches and manages starred phrases from the dedicated starredPhrases collection.
+ * Phrases are written by Cloud Functions when a round winner receives 4+ votes.
  */
 
 import { firestore } from './firebase';
@@ -29,35 +30,31 @@ export const getUserStarredPhrases = async (
   maxResults: number = 50
 ): Promise<StarredPhrase[]> => {
   try {
-    // Query matches where user earned stars
     const q = query(
-      collection(firestore, 'matches'),
+      collection(firestore, 'starredPhrases'),
       where('userId', '==', userId),
-      where('stars', '>', 0),
-      orderBy('stars', 'desc'),
-      orderBy('createdAt', 'desc'),
+      orderBy('earnedAt', 'desc'),
       limit(maxResults)
     );
-    
+
     const snapshot = await getDocs(q);
-    
+
     return snapshot.docs
-      .map(doc => {
-        const data = doc.data();
+      .map(docSnap => {
+        const data = docSnap.data();
         return {
-          matchId: doc.id,
-          phrase: data.bestPhrase || '',
+          matchId: docSnap.id,
+          phrase: data.phrase || '',
           prompt: data.prompt || undefined,
-          stars: data.stars || 0,
-          totalVotes: data.totalVotes || 0,
-          playedAt: data.playedAt?.toDate?.() || new Date(data.createdAt),
+          stars: data.voteCount || 0,
+          totalVotes: data.voteCount || 0,
+          playedAt: data.earnedAt?.toDate?.() || new Date(),
           roomName: data.roomName || 'Unknown Room',
-          won: data.won || false,
+          won: false,
         };
       })
-      .filter(phrase => phrase.phrase); // Only include matches with phrases
+      .filter(phrase => phrase.phrase);
   } catch (error: any) {
-    // Handle permissions or index errors gracefully
     if (error?.code === 'permission-denied' || error?.code === 'failed-precondition') {
       console.warn('Starred phrases requires Firestore permissions or index. Returning empty list.');
       return [];
@@ -74,55 +71,47 @@ export const getCommunityStarredPhrases = async (
   maxResults: number = 50
 ): Promise<StarredPhrase[]> => {
   try {
-    // Query recent matches with high star counts
     const q = query(
-      collection(firestore, 'matches'),
-      where('stars', '>', 0), // At least 1 star
-      orderBy('stars', 'desc'),
-      orderBy('createdAt', 'desc'),
+      collection(firestore, 'starredPhrases'),
+      orderBy('voteCount', 'desc'),
+      orderBy('earnedAt', 'desc'),
       limit(maxResults)
     );
-    
+
     const snapshot = await getDocs(q);
-    
-    // Fetch user data for each phrase
+
     const phrasesWithUsers = await Promise.all(
-      snapshot.docs.map(async (matchDoc) => {
-        const data = matchDoc.data();
-        
-        // Fetch user profile
-        let username = 'Unknown User';
+      snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+
         let userAvatar = null;
-        
         if (data.userId) {
           try {
             const userDoc = await getDoc(doc(firestore, 'users', data.userId));
             if (userDoc.exists()) {
-              const userData = userDoc.data();
-              username = userData.username || 'Unknown User';
-              userAvatar = userData.avatar || null;
+              userAvatar = userDoc.data().avatar || null;
             }
-          } catch (error) {
-            console.warn('Could not fetch user data for phrase:', error);
+          } catch {
+            // Avatar fetch is best-effort
           }
         }
-        
+
         return {
-          matchId: matchDoc.id,
-          phrase: data.bestPhrase || '',
+          matchId: docSnap.id,
+          phrase: data.phrase || '',
           prompt: data.prompt || undefined,
-          stars: data.stars || 0,
-          totalVotes: data.totalVotes || 0,
-          playedAt: data.playedAt?.toDate?.() || new Date(data.createdAt),
+          stars: data.voteCount || 0,
+          totalVotes: data.voteCount || 0,
+          playedAt: data.earnedAt?.toDate?.() || new Date(),
           roomName: data.roomName || 'Unknown Room',
-          won: data.won || false,
+          won: false,
           userId: data.userId,
-          username,
+          username: data.username || 'Unknown User',
           userAvatar,
         };
       })
     );
-    
+
     return phrasesWithUsers.filter(phrase => phrase.phrase);
   } catch (error: any) {
     if (error?.code === 'permission-denied' || error?.code === 'failed-precondition') {
@@ -140,11 +129,10 @@ export const getCommunityStarredPhrases = async (
 export const getStarredPhrasesCount = async (userId: string): Promise<number> => {
   try {
     const q = query(
-      collection(firestore, 'matches'),
-      where('userId', '==', userId),
-      where('stars', '>', 0)
+      collection(firestore, 'starredPhrases'),
+      where('userId', '==', userId)
     );
-    
+
     const snapshot = await getDocs(q);
     return snapshot.size;
   } catch (error) {

@@ -1,7 +1,8 @@
 {
   "cli": {
     "version": ">= 13.2.0",
-    "appVersionSource": "local"
+    "appVersionSource": "local",
+    "promptToConfigurePushNotifications": false
   },
   "build": {
     "development": {
@@ -27,6 +28,9 @@
       "ios": {
         "simulator": false,
         "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     }
   },

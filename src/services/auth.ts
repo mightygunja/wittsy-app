@@ -28,6 +28,24 @@ try {
   console.log('⏭️ Skipping Apple Authentication import (Expo Go)');
 }
 
+// Generate a random fun username for new accounts that have no displayName
+const ADJECTIVES = [
+  'Witty', 'Clever', 'Sneaky', 'Zany', 'Sassy', 'Funky', 'Wacky', 'Spicy',
+  'Cheeky', 'Goofy', 'Peppy', 'Snappy', 'Jazzy', 'Nifty', 'Quirky', 'Snarky',
+  'Loopy', 'Zippy', 'Slick', 'Punchy', 'Jolly', 'Crafty', 'Feisty', 'Nerdy',
+];
+const NOUNS = [
+  'Wizard', 'Penguin', 'Llama', 'Pickle', 'Goblin', 'Noodle', 'Raccoon', 'Walrus',
+  'Platypus', 'Biscuit', 'Cactus', 'Muffin', 'Waffle', 'Burrito', 'Nugget', 'Taco',
+  'Pigeon', 'Hamster', 'Otter', 'Gremlin', 'Panda', 'Sloth', 'Wombat', 'Quokka',
+];
+const generateRandomUsername = (): string => {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const num = Math.floor(Math.random() * 900) + 100; // 100–999
+  return `${adj}${noun}${num}`;
+};
+
 // Helper to create default avatar
 const getDefaultAvatar = (): Avatar => ({
   faceShape: 'circle',
@@ -54,7 +72,7 @@ export const getOrCreateUserProfile = async (firebaseUser: FirebaseUser): Promis
       console.log('Creating new user document for:', firebaseUser.email);
       const newUser: User = {
         uid: firebaseUser.uid,
-        username: firebaseUser.displayName || 'Player',
+        username: firebaseUser.displayName || generateRandomUsername(),
         email: firebaseUser.email || '',
         avatar: getDefaultAvatar(),
         stats: {

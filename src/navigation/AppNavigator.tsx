@@ -16,12 +16,9 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ navigationRef }) => 
   const { user, loading } = useAuth();
   const { checking: checkingUpdate, updateRequired, minimumVersion, storeUrl } = useForceUpdate();
 
-  useEffect(() => {
-    // Initialize deep linking when navigation is ready
-    if (navigationRef?.current) {
-      deepLinking.initialize(navigationRef);
-    }
-  }, [navigationRef]);
+  const onNavigationReady = () => {
+    deepLinking.initialize(navigationRef);
+  };
 
   useEffect(() => {
     // Handle pending non-GameRoom deep links after user authentication.
@@ -45,7 +42,7 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ navigationRef }) => 
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
       {user ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );

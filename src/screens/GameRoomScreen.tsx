@@ -1180,59 +1180,62 @@ const GameRoomScreen: React.FC = () => {
                 )}
               </View>
 
-              {hasSubmitted ? (
+              {hasSubmitted && (
                 /* After submitting: show phrase read-only, waiting for others */
                 <View style={styles.submittedPhrasePreview}>
                   <Text style={styles.submittedBadgeText}>✓ Submitted — waiting for others</Text>
                   <Text style={styles.previewText}>"{phrase}"</Text>
                 </View>
-              ) : (
-                /* Input area — only shown before submitting */
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.phraseInput}
-                    placeholder="Type your witty response here..."
-                    placeholderTextColor={COLORS.textSecondary}
-                    value={phrase}
-                    onChangeText={handlePhraseChange}
-                    onSubmitEditing={() => {
-                      if (phrase.trim()) {
-                        handleSubmit();
-                      }
-                    }}
-                    multiline
-                    maxLength={200}
-                    autoFocus
-                    returnKeyType="done"
-                    blurOnSubmit={true}
-                    enablesReturnKeyAutomatically={true}
-                    inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
-                  />
-                  <View style={styles.charCountContainer}>
-                    <Text style={[
-                      styles.charCount,
-                      phrase.length > 180 && styles.charCountWarning,
-                      phrase.length === 200 && styles.charCountMax
-                    ]}>
-                      {phrase.length}/200
-                    </Text>
-                  </View>
-
-                  {/* Android button - shown in scroll view */}
-                  {Platform.OS === 'android' && (
-                    <View style={styles.androidButtonContainer}>
-                      <Button
-                        title="SUBMIT PHRASE"
-                        onPress={handleSubmit}
-                        disabled={!phrase.trim()}
-                        size="lg"
-                        style={styles.submitButton}
-                      />
-                    </View>
-                  )}
-                </View>
               )}
             </ScrollView>
+
+            {/* Input area — outside ScrollView so it stays fixed on screen
+                and is never pushed out of view when other players submit */}
+            {!hasSubmitted && (
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.phraseInput}
+                  placeholder="Type your witty response here..."
+                  placeholderTextColor={COLORS.textSecondary}
+                  value={phrase}
+                  onChangeText={handlePhraseChange}
+                  onSubmitEditing={() => {
+                    if (phrase.trim()) {
+                      handleSubmit();
+                    }
+                  }}
+                  multiline
+                  maxLength={200}
+                  autoFocus
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  enablesReturnKeyAutomatically={true}
+                  inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
+                />
+                <View style={styles.charCountContainer}>
+                  <Text style={[
+                    styles.charCount,
+                    phrase.length > 180 && styles.charCountWarning,
+                    phrase.length === 200 && styles.charCountMax
+                  ]}>
+                    {phrase.length}/200
+                  </Text>
+                </View>
+
+                {/* Android button */}
+                {Platform.OS === 'android' && (
+                  <View style={styles.androidButtonContainer}>
+                    <Button
+                      title="SUBMIT PHRASE"
+                      onPress={handleSubmit}
+                      disabled={!phrase.trim()}
+                      size="lg"
+                      style={styles.submitButton}
+                    />
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* iOS InputAccessoryView - only shown before submitting */}
             {Platform.OS === 'ios' && !hasSubmitted && (
@@ -1255,7 +1258,7 @@ const GameRoomScreen: React.FC = () => {
         return (
           <View style={styles.waitingPhase}>
             <Text style={styles.phaseTitle}>⚠️ NOT ENOUGH SUBMISSIONS</Text>
-            <Text style={styles.waitingText}>Need at least 3 submissions to vote</Text>
+            <Text style={styles.waitingText}>Need at least 3 submissions to play</Text>
             <Text style={styles.waitingSubtext}>Starting new round...</Text>
           </View>
         );
@@ -1270,6 +1273,7 @@ const GameRoomScreen: React.FC = () => {
 
       case 'voting':
         const votingSubmissions = (gameState as any)?.validSubmissions || gameState.submissions || {};
+        const validIds = Object.keys(votingSubmissions);
         // Check if current user submitted on time — non-submitters cannot vote
         const currentUserCanVote = user?.uid ? (user.uid in votingSubmissions) : false;
         console.log('🗳️ VOTING PHASE - validSubmissions:', Object.keys(votingSubmissions).length, 'canVote:', currentUserCanVote);
@@ -1280,11 +1284,12 @@ const GameRoomScreen: React.FC = () => {
               <Text style={styles.promptText}>{promptText}</Text>
             </View>
 
-            {/* Vote progress */}
+            {/* Vote progress — denominator is valid submitters, not total players,
+                since only submitters can vote */}
             <View style={styles.voteInfo}>
               <View style={styles.voteProgressHeader}>
                 <Text style={styles.infoText}>
-                  {voteCount}/{room?.players.length || 0} voted
+                  {voteCount}/{validIds.length || 0} voted
                 </Text>
                 {hasVoted && (
                   <Text style={styles.votedText}>✓ Vote cast!</Text>
@@ -1296,8 +1301,8 @@ const GameRoomScreen: React.FC = () => {
                   style={[
                     styles.progressBarFill,
                     {
-                      width: `${(voteCount / (room?.players.length || 1)) * 100}%`,
-                      backgroundColor: voteCount === room?.players.length ? '#4CAF50' : '#FF6B6B'
+                      width: `${(voteCount / (validIds.length || 1)) * 100}%`,
+                      backgroundColor: voteCount === validIds.length ? '#4CAF50' : '#FF6B6B'
                     }
                   ]}
                 />
@@ -1305,7 +1310,7 @@ const GameRoomScreen: React.FC = () => {
 
               {!hasVoted && currentUserCanVote && voteCount > 0 && (
                 <Text style={styles.pressureText}>
-                  ⏰ {room?.players.length! - voteCount} {room?.players.length! - voteCount === 1 ? 'player' : 'players'} waiting for you!
+                  ⏰ {validIds.length - voteCount} {validIds.length - voteCount === 1 ? 'player' : 'players'} waiting for you!
                 </Text>
               )}
             </View>
@@ -1313,6 +1318,9 @@ const GameRoomScreen: React.FC = () => {
             {currentUserCanVote ? (
               /* User submitted — show voting cards */
               <ScrollView style={styles.phrasesList} showsVerticalScrollIndicator={false}>
+                {shuffledSubmissions.length === 1 && (
+                  <Text style={styles.headToHeadNote}>Head to head! Pick the winner.</Text>
+                )}
                 {shuffledSubmissions.map(([userId, phraseText], index) => (
                   <PhraseCard
                     key={userId}
@@ -1336,12 +1344,32 @@ const GameRoomScreen: React.FC = () => {
           </View>
         );
 
-      case 'results':
+      case 'results': {
         console.log('🏆 RESULTS PHASE - Winners:', gameState.lastWinners || [gameState.lastWinner]);
         const winners = gameState.lastWinners || (gameState.lastWinner ? [gameState.lastWinner] : []);
         const winningPhrases = gameState.lastWinningPhrases || (gameState.lastWinningPhrase ? [gameState.lastWinningPhrase] : []);
         const isTie = winners.length > 1;
-        
+        const winnerSet = new Set(winners);
+
+        const winnerVotes = winners.length > 0
+          ? (gameState.roundVoteCounts?.[winners[0]] ??
+             Object.values(gameState.votes || {}).filter(v => v === winners[0]).length)
+          : 0;
+
+        // Build ranked non-winner list — winners excluded to avoid duplication
+        const nonWinners = Object.entries((gameState as any).validSubmissions || gameState.submissions || {})
+          .map(([userId, submission]) => {
+            const phraseText = typeof submission === 'object' && submission && 'phrase' in submission
+              ? (submission as any).phrase
+              : submission as string;
+            const votes = gameState.roundVoteCounts?.[userId] ??
+              Object.values(gameState.votes || {}).filter(v => v === userId).length;
+            const player = room?.players.find(p => p.userId === userId);
+            return { userId, phraseText, votes, username: player?.username || 'Unknown', avatarConfig: player?.avatarConfig };
+          })
+          .filter(s => !winnerSet.has(s.userId))
+          .sort((a, b) => b.votes - a.votes);
+
         return (
           <View style={styles.resultsPhase}>
             {/* Win streak badge */}
@@ -1352,134 +1380,107 @@ const GameRoomScreen: React.FC = () => {
               </View>
             )}
 
-            {isTie ? (
-              /* ── TIE layout ── */
-              <>
-                <View style={styles.tieTitleRow}>
-                  <Text style={styles.tieTitleEmoji}>🤝</Text>
-                  <Text style={styles.tieTitleText}>
-                    {winners.length === 2 ? "IT'S A TIE" : `${winners.length}-WAY TIE`}
-                  </Text>
-                </View>
+            {/* ── Winner hero card ── */}
+            <LinearGradient
+              colors={['#2a1f00', '#3d2d00', '#2a1f00']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.winnerHeroCard}
+            >
+              {/* Gold top border accent */}
+              <View style={styles.winnerHeroAccentBar} />
 
-                {/* Compact avatar row — scales down for many winners */}
-                <View style={styles.winnersAvatarRow}>
-                  {winners.map((winnerId) => {
-                    const winnerPlayer = room?.players.find(p => p.userId === winnerId);
-                    const avatarSize = winners.length <= 2 ? 80 : winners.length <= 4 ? 60 : 48;
-                    return (
-                      <View key={winnerId} style={styles.winnerAvatarContainer}>
-                        {winnerPlayer?.avatarConfig ? (
-                          <AvatarDisplay config={winnerPlayer.avatarConfig} size={avatarSize} />
-                        ) : (
-                          <View style={[styles.winnerAvatarFallback, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
-                            <Text style={styles.winnerAvatarFallbackText}>
-                              {(winnerPlayer?.username || '?').charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                        <Text style={styles.winnerNameBelowAvatar}>
-                          {winnerPlayer?.username || 'Unknown'}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
+              <Text style={styles.winnerHeroLabel}>
+                {isTie
+                  ? (winners.length === 2 ? "🤝 IT'S A TIE" : `🤝 ${winners.length}-WAY TIE`)
+                  : '🏆 ROUND WINNER'}
+              </Text>
 
-                {/* Single unified tie card */}
-                {(() => {
-                  const tieVotes = gameState.roundVoteCounts?.[winners[0]] ||
-                    Object.values(gameState.votes || {}).filter(v => v === winners[0]).length;
-                  return (
-                    <View style={styles.tieCard}>
-                      <Text style={styles.tieCardVotes}>
-                        {tieVotes} {tieVotes === 1 ? 'vote' : 'votes'} each
-                      </Text>
-                      {winningPhrases.map((phrase, index) => {
-                        const winnerId = winners[index];
-                        const winnerPlayer = room?.players.find(p => p.userId === winnerId);
-                        return (
-                          <View key={winnerId} style={[styles.tieCardRow, index > 0 && styles.tieCardRowBorder]}>
-                            <Text style={styles.tieCardAuthor}>{winnerPlayer?.username || 'Unknown'}</Text>
-                            <Text style={styles.tieCardPhrase}>"{phrase}"</Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  );
-                })()}
-              </>
-            ) : (
-              /* ── Single winner layout ── */
-              <>
-                <Text style={styles.winnerTitle}>🏆 ROUND WINNER</Text>
-                {(() => {
-                  const winnerId = winners[0];
+              {/* Avatar(s) */}
+              <View style={styles.winnerHeroAvatarRow}>
+                {winners.map((winnerId) => {
                   const winnerPlayer = room?.players.find(p => p.userId === winnerId);
-                  const voteCount = gameState.roundVoteCounts?.[winnerId] ||
-                    Object.values(gameState.votes || {}).filter(v => v === winnerId).length;
+                  const avatarSize = isTie
+                    ? (winners.length <= 2 ? 72 : winners.length <= 4 ? 56 : 44)
+                    : 96;
                   return (
-                    <>
-                      <View style={styles.winnerAvatarContainer}>
-                        {winnerPlayer?.avatarConfig ? (
-                          <AvatarDisplay config={winnerPlayer.avatarConfig} size={140} />
-                        ) : (
-                          <View style={[styles.winnerAvatarFallback, { width: 140, height: 140, borderRadius: 70 }]}>
-                            <Text style={[styles.winnerAvatarFallbackText, { fontSize: 56 }]}>
-                              {(winnerPlayer?.username || '?').charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                        <Text style={styles.winnerNameBelowAvatar}>{winnerPlayer?.username || 'Unknown'}</Text>
-                      </View>
-                      <View style={styles.winnerCard}>
-                        <Text style={styles.winningPhrase}>"{winningPhrases[0]}"</Text>
-                        <View style={styles.winnerCardFooter}>
-                          <Text style={styles.winnerCardVotes}>
-                            {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+                    <View key={winnerId} style={styles.winnerHeroAvatarItem}>
+                      {winnerPlayer?.avatarConfig ? (
+                        <AvatarDisplay config={winnerPlayer.avatarConfig} size={avatarSize} />
+                      ) : (
+                        <View style={[styles.winnerAvatarFallback, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
+                          <Text style={[styles.winnerAvatarFallbackText, { fontSize: avatarSize * 0.4 }]}>
+                            {(winnerPlayer?.username || '?').charAt(0).toUpperCase()}
                           </Text>
                         </View>
-                      </View>
-                    </>
-                  );
-                })()}
-              </>
-            )}
-
-            {/* All phrases ranked — use validSubmissions to exclude late entries */}
-            <ScrollView style={styles.allPhrasesList}>
-              {Object.entries((gameState as any).validSubmissions || gameState.submissions || {})
-                .map(([userId, submission]) => {
-                  const phraseText = typeof submission === 'object' && submission && 'phrase' in submission
-                    ? (submission as any).phrase
-                    : submission as string;
-                  const votes = Object.values(gameState.votes || {}).filter(v => v === userId).length;
-                  const player = room?.players.find(p => p.userId === userId);
-                  return { userId, phraseText, votes, username: player?.username || 'Unknown' };
-                })
-                .sort((a, b) => b.votes - a.votes)
-                .map(({ userId, phraseText, votes, username }) => (
-                  <View key={userId} style={[
-                    styles.resultCard,
-                    votes >= STAR_THRESHOLD && styles.starredResultCard
-                  ]}>
-                    <Text style={styles.resultPhrase}>"{phraseText}"</Text>
-                    <Text style={styles.resultAuthor}>by {username}</Text>
-                    <View style={styles.resultVotesContainer}>
-                      <Text style={styles.resultVotes}>
-                        {votes} {votes === 1 ? 'vote' : 'votes'}
-                      </Text>
-                      {votes >= STAR_THRESHOLD && (
-                        <View style={styles.starBadge}>
-                          <Text style={styles.starBadgeText}>STARRED</Text>
-                        </View>
+                      )}
+                      {isTie && (
+                        <Text style={styles.winnerHeroTieName}>{winnerPlayer?.username || 'Unknown'}</Text>
                       )}
                     </View>
-                  </View>
-                ))}
-            </ScrollView>
+                  );
+                })}
+              </View>
+
+              {/* Single winner name */}
+              {!isTie && winners.length > 0 && (
+                <Text style={styles.winnerHeroSingleName}>
+                  {room?.players.find(p => p.userId === winners[0])?.username || 'Unknown'}
+                </Text>
+              )}
+
+              {/* Winning phrase(s) */}
+              {isTie ? (
+                <View style={styles.winnerHeroPhraseBlock}>
+                  {winningPhrases.map((phrase, idx) => (
+                    <View key={idx} style={[styles.winnerHeroPhraseRow, idx > 0 && styles.winnerHeroPhraseRowBorder]}>
+                      <Text style={styles.winnerHeroPhraseAuthor}>
+                        {room?.players.find(p => p.userId === winners[idx])?.username || 'Unknown'}
+                      </Text>
+                      <Text style={styles.winnerHeroPhrase}>"{phrase}"</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.winnerHeroPhrase}>"{winningPhrases[0]}"</Text>
+              )}
+
+              {/* Vote count pill */}
+              <View style={styles.winnerHeroVoteChip}>
+                <Text style={styles.winnerHeroVoteText}>
+                  {winnerVotes} {winnerVotes === 1 ? 'vote' : 'votes'}{isTie ? ' each' : ''}
+                </Text>
+              </View>
+            </LinearGradient>
+
+            {/* ── Non-winner ranked list ── */}
+            {nonWinners.length > 0 && (
+              <>
+                <View style={styles.rankingDivider}>
+                  <View style={styles.rankingDividerLine} />
+                  <Text style={styles.rankingDividerLabel}>OTHER PLAYERS</Text>
+                  <View style={styles.rankingDividerLine} />
+                </View>
+
+                <ScrollView style={styles.rankingList} showsVerticalScrollIndicator={false}>
+                  {nonWinners.map(({ userId, phraseText, votes, username }, index) => (
+                    <View key={userId} style={styles.rankingRow}>
+                      <Text style={styles.rankingPos}>#{index + 2}</Text>
+                      <View style={styles.rankingContent}>
+                        <Text style={styles.rankingPhrase}>"{phraseText}"</Text>
+                        <Text style={styles.rankingAuthor}>by {username}</Text>
+                      </View>
+                      <View style={styles.rankingVotePill}>
+                        <Text style={styles.rankingVoteText}>{votes}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              </>
+            )}
           </View>
         );
+      }
 
       default:
         return (
@@ -2452,6 +2453,13 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
   },
+  headToHeadNote: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   promptReminderContainer: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
@@ -2544,7 +2552,193 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1,
   },
-  // Single winner
+  // ── Results phase: winner hero card ──────────────────────────────────────
+  winnerHeroCard: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#7a5c00',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  winnerHeroAccentBar: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#FFD700',
+    marginBottom: 14,
+  },
+  winnerHeroLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFD700',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 14,
+  },
+  winnerHeroAvatarRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginBottom: 12,
+  },
+  winnerHeroAvatarItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  winnerHeroTieName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFD700',
+    textAlign: 'center',
+    maxWidth: 80,
+  },
+  winnerHeroSingleName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFD700',
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  winnerHeroPhraseBlock: {
+    width: '100%',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#7a5c00',
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  winnerHeroPhraseRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  winnerHeroPhraseRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: '#7a5c00',
+  },
+  winnerHeroPhraseAuthor: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFD700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  winnerHeroPhrase: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff8e1',
+    textAlign: 'center',
+    lineHeight: 22,
+    fontStyle: 'italic',
+    marginBottom: 14,
+  },
+  winnerHeroVoteChip: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  winnerHeroVoteText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFD700',
+    letterSpacing: 0.3,
+  },
+  // ── Results phase: non-winner ranking list ────────────────────────────────
+  rankingDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 16,
+    gap: 10,
+  },
+  rankingDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  rankingDividerLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  rankingList: {
+    flex: 1,
+    width: '100%',
+  },
+  rankingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    gap: 10,
+  },
+  rankingPos: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    width: 28,
+    textAlign: 'center',
+  },
+  rankingContent: {
+    flex: 1,
+  },
+  rankingPhrase: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.text,
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+  rankingAuthor: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 3,
+  },
+  rankingVotePill: {
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary + '20',
+    borderWidth: 1,
+    borderColor: COLORS.primary + '50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  rankingVoteText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  // ── Kept for compatibility ────────────────────────────────────────────────
+  winnerAvatarFallback: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  winnerAvatarFallbackText: {
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  // Single winner (legacy — kept for compat)
   winnerTitle: {
     fontSize: 13,
     fontWeight: '800',
@@ -2643,46 +2837,6 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     lineHeight: 22,
   },
   // Shared avatar styles
-  winnersAvatarRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  winnerAvatarContainer: {
-    alignItems: 'center',
-    maxWidth: 80,
-  },
-  winnerAvatarFallback: {
-    backgroundColor: COLORS.primary + '30',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  winnerAvatarFallbackText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  winnerNameBelowAvatar: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  // kept for compatibility (voteCountText removed — replaced by winnerCardVotes/tieCardVotes)
-  winnerName: {
-    fontSize: 15,
-    color: COLORS.background,
-    fontWeight: '600',
-  },
-  voteCountText: {
-    fontSize: 14,
-    color: COLORS.background,
-    marginTop: 6,
-  },
   allPhrasesList: {
     flex: 1,
     marginTop: 16,

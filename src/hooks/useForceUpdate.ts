@@ -33,7 +33,7 @@ interface ForceUpdateState {
   storeUrl: string;
 }
 
-const IOS_STORE_URL = 'https://apps.apple.com/app/id6744508464';
+const IOS_STORE_URL = 'https://apps.apple.com/us/app/wittz-party-word-game/id6757277835';
 const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.wittsy.app';
 
 export const useForceUpdate = (): ForceUpdateState => {

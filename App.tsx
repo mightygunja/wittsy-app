@@ -15,11 +15,11 @@ import { configureGoogleSignIn } from './src/services/auth';
 import { isExpoGo } from './src/utils/platform';
 import './src/utils/adminHelpers'; // Load admin helpers
 
-// Cap OS font scaling at 15% growth across the entire app.
-// Allows accessibility font settings to have a visible effect without
-// exploding card layouts. Applies globally — no per-component changes needed.
-// (allowFontScaling={false} was rejected: ignores accessibility entirely)
-const MAX_FONT_SCALE = 1.15;
+// Cap OS font scaling at 30% growth.
+// iOS "Larger Text" has 7 steps — the top ~3 steps (used by ~10% of users)
+// cause layout overflow. Capping at 1.3 covers the 90% who use Large or below
+// while still honouring their accessibility preference.
+const MAX_FONT_SCALE = 1.3;
 (Text as any).defaultProps = { ...(Text as any).defaultProps, maxFontSizeMultiplier: MAX_FONT_SCALE };
 (TextInput as any).defaultProps = { ...(TextInput as any).defaultProps, maxFontSizeMultiplier: MAX_FONT_SCALE };
 

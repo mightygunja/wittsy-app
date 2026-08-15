@@ -123,7 +123,11 @@ export const Button: React.FC<ButtonProps> = ({
           color={variant === 'outline' || variant === 'ghost' ? COLORS.primary : COLORS.text} 
         />
       ) : (
-        <Text style={[styles.text, sizeStyles.text, styles[`${variant}Text`], textStyle]}>
+        <Text
+          style={[styles.text, sizeStyles.text, styles[`${variant}Text`], textStyle]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
           {title}
         </Text>
       )}
@@ -189,7 +193,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   pressable: {
     width: '100%',
-    height: '100%',
+    flex: 1,
   },
   gradient: {
     width: '100%',
@@ -223,16 +227,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     opacity: 0.5,
   },
   buttonSm: {
-    height: 36,
+    minHeight: 36,
+    paddingVertical: 6,
   },
   buttonMd: {
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 10,
   },
   buttonLg: {
-    height: 56,
+    minHeight: 56,
+    paddingVertical: 14,
   },
   buttonXl: {
-    height: 64,
+    minHeight: 64,
+    paddingVertical: 16,
   },
   text: {
     fontWeight: TYPOGRAPHY.fontWeight.bold,

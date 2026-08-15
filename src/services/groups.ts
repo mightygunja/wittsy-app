@@ -345,6 +345,9 @@ export const subscribeToGroupActiveRooms = (
   );
   return onSnapshot(q, (snap) => {
     onUpdate(snap.docs.map((d) => ({ roomId: d.id, ...d.data() })));
+  }, (error) => {
+    console.error('subscribeToGroupActiveRooms error:', error);
+    onUpdate([]);
   });
 };
 

@@ -35,7 +35,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
       ) : (
         <View style={styles.backButton} />
       )}
-      <Text style={styles.headerTitle}>{title}</Text>
+      <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>{title}</Text>
       <View style={styles.headerRight}>
         {rightComponent || <View style={styles.placeholder} />}
       </View>

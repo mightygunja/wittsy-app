@@ -227,11 +227,23 @@ class DeepLinkingService {
    * Handle pending deep link (call after authentication)
    */
   handlePendingDeepLink(navigationRef: any) {
-    if (this.pendingDeepLink && navigationRef?.current) {
-      console.log('✅ Handling pending deep link:', this.pendingDeepLink);
-      this.navigate(navigationRef, this.pendingDeepLink);
-      this.pendingDeepLink = null;
+    if (!this.pendingDeepLink || !navigationRef?.current) return;
+
+    // GameRoom and Group invite links MUST go through HomeScreen's addListener
+    // so joinRoom / joinGroupViaInviteCode is called before navigation.
+    // Leave pendingDeepLink intact so addListener fires it when HomeScreen registers.
+    const requiresListener =
+      this.pendingDeepLink.screen === 'GameRoom' ||
+      (this.pendingDeepLink.screen === 'Groups' && this.pendingDeepLink.params?.inviteCode);
+
+    if (requiresListener) {
+      console.log('⏳ Pending deep link requires HomeScreen listener, skipping direct navigate:', this.pendingDeepLink.screen);
+      return;
     }
+
+    console.log('✅ Handling pending deep link:', this.pendingDeepLink);
+    this.navigate(navigationRef, this.pendingDeepLink);
+    this.pendingDeepLink = null;
   }
 
   /**
@@ -314,10 +326,10 @@ class DeepLinkingService {
    * Share game room link
    */
   async shareGameRoom(roomId: string, roomName: string): Promise<void> {
-    // Use the custom scheme URL — guaranteed to open the app when installed.
-    // Passing a separate `url` field on iOS causes the OS to drop the message text,
-    // and universal links only work with a configured AASA file on the server.
-    const deepLink = this.buildGameRoomLink(roomId); // wittz://game/{roomId}
+    // Use universal link so iOS opens the app directly when installed (no Safari hop),
+    // and falls through to redirect.html with App Store fallback when not installed.
+    // Custom scheme wittsy:// shows an error dialog on iOS when the app is not installed.
+    const deepLink = `${DEEP_LINK_SCHEMES.universal}/game/${roomId}`; // https://wittz.app/game/{roomId}
     const message = `Join me in "${roomName}" on Wittz! Tap to join: ${deepLink}`;
 
     try {

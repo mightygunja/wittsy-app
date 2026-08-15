@@ -7,6 +7,7 @@ import { prompts4 } from './promptData/prompts4.js';
 import { prompts5 } from './promptData/prompts5.js';
 import { prompts6 } from './promptData/prompts6.js';
 import { prompts7 } from './promptData/prompts7.js';
+import { prompts8 } from './promptData/prompts8.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBJf4239QrQhCtd4ivB-fNPZ358dYIEG6M",
@@ -21,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 const firestore = getFirestore(app);
 
 async function uploadPrompts() {
-  const allPrompts = [...prompts1, ...prompts2, ...prompts3, ...prompts4, ...prompts5, ...prompts6, ...prompts7];
+  const allPrompts = [...prompts1, ...prompts2, ...prompts3, ...prompts4, ...prompts5, ...prompts6, ...prompts7, ...prompts8];
   
   console.log(`Starting upload of ${allPrompts.length} prompts...`);
   

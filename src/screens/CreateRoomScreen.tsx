@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Alert, Switch, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, Alert, Switch, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { createRoom } from '../services/database';
@@ -86,7 +86,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
     try {
       const settings: any = {
         maxPlayers: maxPlayersNum,
-        minPlayers: 2,
+        minPlayers: 3,
         submissionTime: submissionTimeNum,
         votingTime: votingTimeNum,
         winningVotes: WINNING_VOTES, // Fixed at 20
@@ -125,15 +125,12 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       >
-        <ScrollView 
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
         <Text style={styles.title}>Create Your Room</Text>
         {!!groupId && !!groupName && (
           <View style={styles.groupBanner}>
@@ -223,8 +220,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
         size="md"
         style={styles.cancelButton}
       />
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -237,7 +233,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   content: {
     padding: 16,
     paddingHorizontal: 16 + tabletHorizontalPadding,
-    paddingBottom: 24
+    paddingBottom: 60,
   },
   title: {
     fontSize: 24,

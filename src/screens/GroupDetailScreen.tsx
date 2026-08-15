@@ -95,9 +95,13 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
     setRefreshing(false);
   };
 
-  const handleShare = () => {
-    if (!group) return;
-    shareGroupInviteLink(group.name, group.inviteCode);
+  const handleShare = async () => {
+    if (!group || !group.inviteCode) return;
+    try {
+      await shareGroupInviteLink(group.name, group.inviteCode);
+    } catch (error) {
+      console.error('handleShare error:', error);
+    }
   };
 
   const handleRegenerateCode = () => {

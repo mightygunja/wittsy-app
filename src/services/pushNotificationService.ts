@@ -36,6 +36,7 @@ export type NotificationType =
   | 'battle_pass_reward'
   | 'leaderboard_rank_change'
   | 'room_ready'
+  | 'game_started'
   | 'message_received';
 
 export interface NotificationPayload {
@@ -181,6 +182,8 @@ const handleNotificationPress = (notification: Notifications.Notification): void
       navigationRef.current.navigate('Friends', { tab: 'requests' });
       break;
     case 'game_invite':
+    case 'room_ready':
+    case 'game_started':
       if (notifData.roomId) {
         navigationRef.current.navigate('GameRoom', { roomId: notifData.roomId });
       }

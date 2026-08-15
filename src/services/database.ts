@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   limit,
+  onSnapshot,
   QueryConstraint,
   DocumentData,
   Timestamp,
@@ -229,6 +230,40 @@ export const getActiveRooms = async (filters: {
     roomId: doc.id,
     ...doc.data()
   } as Room));
+};
+
+/**
+ * Real-time subscription to casual (non-ranked, non-private) active rooms.
+ * Fires immediately with current data, then again on any change.
+ * Returns an unsubscribe function — call it when the component unmounts or loses focus.
+ */
+export const subscribeToActiveRooms = (
+  filters: { isPrivate?: boolean; maxResults?: number } = {},
+  callback: (rooms: Room[]) => void
+): (() => void) => {
+  const constraints: QueryConstraint[] = [];
+
+  constraints.push(where('status', 'in', ['waiting', 'active']));
+
+  if (filters.isPrivate !== undefined) {
+    constraints.push(where('settings.isPrivate', '==', filters.isPrivate));
+  }
+
+  constraints.push(where('isRanked', '==', false));
+  constraints.push(orderBy('createdAt', 'desc'));
+
+  if (filters.maxResults) {
+    constraints.push(limit(filters.maxResults));
+  }
+
+  const q = query(collection(firestore, 'rooms'), ...constraints);
+  return onSnapshot(q, (snapshot) => {
+    const rooms = snapshot.docs.map(docSnap => ({
+      roomId: docSnap.id,
+      ...docSnap.data()
+    } as Room));
+    callback(rooms);
+  });
 };
 
 /**
