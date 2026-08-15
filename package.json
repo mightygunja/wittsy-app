@@ -1,6 +1,6 @@
 {
   "name": "wittz-app",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Wittz - Real-time witty phrase battle game",
   "main": "expo/AppEntry.js",
   "scripts": {
