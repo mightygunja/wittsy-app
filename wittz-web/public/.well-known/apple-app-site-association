@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "NWGXDCFAU7.com.wittsy.app",
+        "paths": [
+          "/game/*",
+          "/room/*",
+          "/group/*"
+        ]
+      }
+    ]
+  }
+}
