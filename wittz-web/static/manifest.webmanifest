@@ -1,0 +1,12 @@
+{
+  "name": "Wittz: Party Word Game",
+  "short_name": "Wittz",
+  "description": "The fast-paced party word game where your wit wins.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#13111C",
+  "theme_color": "#6C63FF",
+  "icons": [
+    { "src": "/icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ]
+}

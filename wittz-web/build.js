@@ -32,6 +32,11 @@ if (fs.existsSync(stash)) {
 
 fs.cpSync(DIST, PUBLIC, { recursive: true });
 
+// Static SEO/content pages (how-to-play, faq, legal, robots, sitemap, og image)
+// are copied AFTER dist so they always win over generated files.
+const STATIC = path.join(__dirname, 'static');
+if (fs.existsSync(STATIC)) fs.cpSync(STATIC, PUBLIC, { recursive: true });
+
 // Inject SEO / social metadata into the exported index.html.
 const indexPath = path.join(PUBLIC, 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
@@ -40,15 +45,51 @@ const DESCRIPTION =
 const META = `
   <meta name="description" content="${DESCRIPTION}">
   <meta name="theme-color" content="#6C63FF">
+  <link rel="canonical" href="https://wittz.app/">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://firestore.googleapis.com">
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+  <link rel="preconnect" href="https://wittsy-51992-default-rtdb.firebaseio.com">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Wittz">
   <meta property="og:title" content="Wittz: Party Word Game">
   <meta property="og:description" content="${DESCRIPTION}">
   <meta property="og:url" content="https://wittz.app">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://wittz.app/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Wittz: Party Word Game">
   <meta name="twitter:description" content="${DESCRIPTION}">
+  <meta name="twitter:image" content="https://wittz.app/og-image.jpg">
   <meta name="apple-itunes-app" content="app-id=6757277835">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "name": "Wittz: Party Word Game",
+    "url": "https://wittz.app",
+    "image": "https://wittz.app/og-image.jpg",
+    "description": "${DESCRIPTION}",
+    "genre": ["Party", "Word", "Trivia"],
+    "playMode": "MultiPlayer",
+    "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 3, "maxValue": 12 },
+    "applicationCategory": "Game",
+    "operatingSystem": "Web, iOS",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "sameAs": ["https://apps.apple.com/us/app/wittz-party-word-game/id6757277835"]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Wittz",
+    "url": "https://wittz.app",
+    "logo": "https://wittz.app/icon-1024.png"
+  }
+  </script>
 `;
 const GLOBAL_CSS = `
   <style>
@@ -73,14 +114,35 @@ const GLOBAL_CSS = `
   </style>
 `;
 const SPLASH = `
+  <!-- Crawlable content: matches what the app renders on its landing view.
+       Sits beneath the fixed splash overlay and is removed when React mounts,
+       so users never see it but non-JS crawlers index real content. -->
+  <div id="wittz-seo">
+    <h1>Wittz: Party Word Game</h1>
+    <p>${DESCRIPTION}</p>
+    <p>Wittz is a fast-paced party word game for 3–12 players. Each round you get
+    a prompt, write the funniest phrase in 25 seconds, and everyone votes
+    anonymously for the best answer. The round winner banks their votes plus a
+    bonus — first to 20 votes wins. Play ranked lobbies with an ELO rating and
+    seasonal leaderboards, or private rooms with friends via a 6-digit invite
+    code. Legendary answers earn stars and live forever in the community gallery.</p>
+    <ul>
+      <li><a href="/how-to-play">How to play Wittz — rules and tips</a></li>
+      <li><a href="/faq">Frequently asked questions</a></li>
+      <li><a href="https://apps.apple.com/us/app/wittz-party-word-game/id6757277835">Download Wittz on the App Store</a></li>
+      <li><a href="/support">Support</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></li>
+    </ul>
+  </div>
   <div id="wittz-splash"><div class="logo">⚡ Wit<span>tz</span></div><div class="spinner"></div></div>
   <script>
-    // Remove the splash once React mounts content into #root
+    // Remove the splash + SEO fallback once React mounts content into #root
     new MutationObserver(function (m, obs) {
       var root = document.getElementById('root');
       if (root && root.children.length > 0) {
         var s = document.getElementById('wittz-splash');
         if (s) { s.style.opacity = '0'; setTimeout(function () { s.remove(); }, 300); }
+        var seo = document.getElementById('wittz-seo');
+        if (seo) seo.remove();
         obs.disconnect();
       }
     }).observe(document.body, { childList: true, subtree: true });
