@@ -8,6 +8,7 @@ import { monetization } from '../services/monetization';
 import { battlePass } from '../services/battlePassService';
 import { seedChallenges } from '../utils/seedChallenges';
 import { seedPrompts } from '../utils/seedPrompts';
+import { analytics } from '../services/analytics';
 
 interface AuthContextType {
   user: User | null;
@@ -36,8 +37,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
       setUser(firebaseUser);
       setIsGuest(firebaseUser?.isAnonymous || false);
-      
+
       if (firebaseUser) {
+        // Attach analytics identity + device context to this user
+        analytics.setUser(firebaseUser.uid);
+        analytics.setUserProps({ is_guest: firebaseUser.isAnonymous === true });
+
         // Initialize RevenueCat with user ID
         await monetization.initialize(firebaseUser.uid);
         

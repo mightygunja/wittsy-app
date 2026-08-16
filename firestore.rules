@@ -419,6 +419,16 @@ service cloud.firestore {
       allow write: if false; // Only Cloud Functions write starred phrases
     }
 
+    // First-party analytics: clients append batched event docs; nobody reads
+    // them from the client. Aggregates live in analyticsDaily (console-only).
+    match /analyticsEvents/{batchId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if false;
+    }
+    match /analyticsDaily/{day} {
+      allow read, write: if false;
+    }
+
     // Content reports (Apple UGC requirement): users can flag public content.
     // Create-only for the reporter; reviewed via the Firebase console.
     match /reports/{reportId} {

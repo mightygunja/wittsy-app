@@ -53,8 +53,9 @@ export default function App() {
           await audioService.playBackgroundMusic();
         }
 
-        // Initialize analytics
+        // Initialize analytics + start the telemetry session
         analytics.setEnabled(true);
+        analytics.startSession();
 
         // Initialize monetization. Web has no IAP — purchases live in the
         // native apps, so skip the store connection entirely.

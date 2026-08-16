@@ -55,6 +55,7 @@ import { updateGroupStats } from '../services/groups';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
 import { updatePlayerRating, updateMultiplayerRatings, RatingUpdate } from '../services/eloRatingService';
 import { haptics } from '../services/haptics';
+import { analytics } from '../services/analytics';
 import { doc as firestoreDoc, setDoc } from 'firebase/firestore';
 
 // Helper function to save match history
@@ -627,6 +628,10 @@ const GameRoomScreen: React.FC = () => {
               state.lastWinningPhrase = state.submissions[winnerId];
               console.log('🏆 Winner:', winnerId, 'Phrase:', state.lastWinningPhrase, 'Votes:', maxVotes);
               
+              if (winnerId === user?.uid) {
+                analytics.winRound(roomId, state.round || 0, maxVotes);
+              }
+
               // Check if winner earned a star (4+ votes)
               if (maxVotes >= STAR_THRESHOLD) {
                 const winnerPlayer = room?.players.find(p => p.userId === winnerId);
@@ -813,6 +818,7 @@ const GameRoomScreen: React.FC = () => {
       await markSubmission(roomId, user.uid, phrase.trim());
       setHasSubmitted(true);
       setTyping(roomId, user.uid, false);
+      analytics.submitResponse(roomId, gameState?.currentRound || 0, phrase.trim().length);
       // Keep phrase visible so user can update before time's up
     } catch (error) {
       console.error('Error submitting phrase:', error);
@@ -862,7 +868,8 @@ const GameRoomScreen: React.FC = () => {
     try {
       await markVote(roomId, user.uid, phraseId);
       setHasVoted(true);
-      
+      analytics.castVote(roomId, gameState?.currentRound || 0);
+
       if (currentVote && currentVote !== phraseId) {
         console.log(`🔄 Changed vote from ${currentVote} to ${phraseId}`);
       }

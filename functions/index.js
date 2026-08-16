@@ -19,6 +19,9 @@ exports.advanceGamePhase = gameFunctions.advanceGamePhase;
 const simulate = require('./simulateGame');
 exports.simulateGame = simulate.simulateGame;
 
+const analyticsRollup = require('./analyticsRollup');
+exports.dailyAnalyticsRollup = analyticsRollup.dailyAnalyticsRollup;
+
 // One-time initialization
 exports.initializeCollections = initCollections.initializeCollections;
 

@@ -21,6 +21,7 @@ import { Room, RoomSettings, Player, Prompt } from '../types';
 import { generateRoomCode } from '../utils/helpers';
 import { WINNING_VOTES, JOIN_LOCK_THRESHOLD } from '../utils/constants';
 import { avatarService } from './avatarService';
+import { analytics } from './analytics';
 
 // ==================== ROOM OPERATIONS ====================
 
@@ -178,6 +179,12 @@ export const createRoom = async (
   console.log('✨ Room created with host avatar:', { roomName, hasHostAvatarConfig: !!roomData.players[0].avatarConfig });
 
   const docRef = await addDoc(collection(firestore, 'rooms'), roomData);
+  analytics.logEvent('create_room', {
+    is_ranked: isRanked,
+    is_private: defaultSettings.isPrivate,
+    max_players: defaultSettings.maxPlayers,
+    is_group_room: !!groupId,
+  });
   return docRef.id;
 };
 
@@ -400,7 +407,13 @@ export const joinRoom = async (
   }
   
   await updateDoc(roomRef, updateData);
-  
+
+  analytics.logEvent('join_room', {
+    player_count: updatedPlayers.length,
+    is_ranked: roomData.isRanked || false,
+    is_group_room: !!roomData.groupId,
+  });
+
   console.log('✅ Player joined successfully');
 };
 

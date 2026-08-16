@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import { app } from './firebase';
+import { telemetry } from './telemetry';
 
 class AnalyticsService {
   private analytics: any;
@@ -41,6 +42,7 @@ class AnalyticsService {
    */
   setUser(userId: string) {
     if (!this.enabled) return;
+    telemetry.setUser(userId);
     try {
       if (Platform.OS === 'web' && this.analytics) {
         const { setUserId } = require('firebase/analytics');
@@ -71,10 +73,13 @@ class AnalyticsService {
   }
 
   /**
-   * Log custom event
+   * Log custom event.
+   * Every event goes to the first-party telemetry pipeline (all platforms);
+   * on web it is additionally mirrored to Firebase Analytics (GA4).
    */
   logEvent(eventName: string, params?: { [key: string]: any }) {
     if (!this.enabled) return;
+    telemetry.track(eventName, params);
     try {
       if (Platform.OS === 'web' && this.analytics) {
         const { logEvent } = require('firebase/analytics');
@@ -85,6 +90,23 @@ class AnalyticsService {
     } catch (error) {
       console.error('Failed to log event:', error);
     }
+  }
+
+  /** Track a screen view with deduping (call from navigation state changes). */
+  trackScreen(screenName: string) {
+    if (!this.enabled) return;
+    telemetry.trackScreen(screenName);
+    try {
+      if (Platform.OS === 'web' && this.analytics) {
+        const { logEvent } = require('firebase/analytics');
+        logEvent(this.analytics, 'screen_view', { screen_name: screenName });
+      }
+    } catch {}
+  }
+
+  /** Start the telemetry session (call once at app startup). */
+  startSession() {
+    telemetry.start();
   }
 
   // ==================== AUTHENTICATION EVENTS ====================
@@ -366,6 +388,8 @@ export const analytics = {
   setUser: (userId: string) => analyticsService.setUser(userId),
   setUserProps: (props: any) => analyticsService.setUserProps(props),
   logEvent: (name: string, params?: any) => analyticsService.logEvent(name, params),
+  trackScreen: (screenName: string) => analyticsService.trackScreen(screenName),
+  startSession: () => analyticsService.startSession(),
   
   // Auth
   signUp: (method: string) => analyticsService.signUp(method),
