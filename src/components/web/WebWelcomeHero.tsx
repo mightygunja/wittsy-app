@@ -7,10 +7,11 @@
  * the phone layout.
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../hooks/useAuth';
 
 const APP_STORE_URL = 'https://apps.apple.com/us/app/wittz-party-word-game/id6757277835';
 
@@ -19,6 +20,22 @@ export const WebWelcomeHero: React.FC<{
   onGuestStart: () => void;
 }> = ({ navigation, onGuestStart }) => {
   const { colors: COLORS } = useTheme();
+  const { signInWithGoogle } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogle = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (error: any) {
+      if (error?.message !== 'Sign in was cancelled') {
+        Alert.alert('Sign In Failed', error?.message || 'An error occurred during sign-in');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -72,6 +89,16 @@ export const WebWelcomeHero: React.FC<{
               onPress={() => navigation.navigate('Register')}
             >
               <Text style={[styles.secondaryCtaText, { color: COLORS.text }]}>Create Account</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryCta, styles.googleCta]}
+              onPress={handleGoogle}
+              disabled={googleLoading}
+            >
+              <Text style={styles.googleG}>G</Text>
+              <Text style={[styles.secondaryCtaText, { color: '#1F1F1F' }]}>
+                {googleLoading ? 'Signing in…' : 'Continue with Google'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -218,6 +245,18 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   secondaryCtaText: { fontSize: 17, fontWeight: '700' },
+  googleCta: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  googleG: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#4285F4',
+  },
   trustLine: { fontSize: 14 },
 
   heroVisual: { flex: 0.9, alignItems: 'center' },

@@ -22,12 +22,13 @@ export const isStandaloneBuild = (): boolean => {
 };
 
 /**
- * Check if Google Sign-In is available
- * DISABLED: Google Sign-In removed from production due to native module issues.
- * Users can sign in via Apple, Email/Password, or Guest instead.
+ * Check if Google Sign-In is available.
+ * Native (iOS/Android): DISABLED — the native module caused build issues;
+ * users sign in via Apple, Email/Password, or Guest instead.
+ * Web: ENABLED — the Firebase JS SDK popup flow needs no native module.
  */
 export const isGoogleSignInAvailable = (): boolean => {
-  return false;
+  return Platform.OS === 'web';
 };
 
 /**

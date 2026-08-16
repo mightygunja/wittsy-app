@@ -12,7 +12,10 @@ import {
   signInWithCredential,
   fetchSignInMethodsForEmail,
   linkWithCredential,
+  signInWithPopup,
+  linkWithPopup,
 } from 'firebase/auth';
+import { Platform } from 'react-native';
 import { doc, setDoc, getDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
@@ -248,6 +251,54 @@ export const configureGoogleSignIn = () => {
 
 // Sign in with Google
 export const signInWithGoogle = async (): Promise<FirebaseUser> => {
+  // Web: the Firebase JS SDK handles Google natively via a popup — no native
+  // module required. Guests are upgraded in place (linkWithPopup keeps their
+  // uid, coins, stats, and starred phrases); if the Google account already
+  // belongs to another profile, we sign into that profile instead.
+  if (Platform.OS === 'web') {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    let firebaseUser: FirebaseUser;
+    try {
+      if (auth.currentUser?.isAnonymous) {
+        const cred = await linkWithPopup(auth.currentUser, provider);
+        firebaseUser = cred.user;
+      } else {
+        const cred = await signInWithPopup(auth, provider);
+        firebaseUser = cred.user;
+      }
+    } catch (error: any) {
+      if (
+        error?.code === 'auth/credential-already-in-use' ||
+        error?.code === 'auth/email-already-in-use'
+      ) {
+        // This Google account already owns a Wittz profile — sign into it.
+        const cred = await signInWithPopup(auth, provider);
+        firebaseUser = cred.user;
+      } else if (
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request'
+      ) {
+        throw new Error('Sign in was cancelled');
+      } else if (error?.code === 'auth/popup-blocked') {
+        throw new Error('Your browser blocked the sign-in popup. Please allow popups for wittz.app and try again.');
+      } else {
+        throw error;
+      }
+    }
+
+    await getOrCreateUserProfile(firebaseUser);
+    try {
+      await setDoc(
+        doc(firestore, 'users', firebaseUser.uid),
+        { lastActive: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch {}
+    return firebaseUser;
+  }
+
   if (!GoogleSignin) {
     throw new Error('Google Sign-In is not available in Expo Go. Use a development build.');
   }
