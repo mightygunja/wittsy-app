@@ -31,4 +31,26 @@ if (fs.existsSync(stash)) {
 }
 
 fs.cpSync(DIST, PUBLIC, { recursive: true });
-console.log('public/ rebuilt from', DIST);
+
+// Inject SEO / social metadata into the exported index.html.
+const indexPath = path.join(PUBLIC, 'index.html');
+let html = fs.readFileSync(indexPath, 'utf8');
+const DESCRIPTION =
+  'The fast-paced party word game where your wit wins. Get a prompt, write the funniest phrase, vote for the best — play free in your browser or on iPhone.';
+const META = `
+  <meta name="description" content="${DESCRIPTION}">
+  <meta name="theme-color" content="#6C63FF">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Wittz">
+  <meta property="og:title" content="Wittz: Party Word Game">
+  <meta property="og:description" content="${DESCRIPTION}">
+  <meta property="og:url" content="https://wittz.app">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Wittz: Party Word Game">
+  <meta name="twitter:description" content="${DESCRIPTION}">
+  <meta name="apple-itunes-app" content="app-id=6757277835">
+`;
+html = html.replace('</head>', `${META}</head>`);
+fs.writeFileSync(indexPath, html);
+
+console.log('public/ rebuilt from', DIST, '+ metadata injected');
