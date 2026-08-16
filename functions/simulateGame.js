@@ -105,6 +105,7 @@ exports.simulateGame = functions
       roomCode,
       status:    'waiting',
       isRanked:  false,
+      isSimulation: true, // engine skips starredPhrases/match-history writes
       hostId:    PLAYERS[0].userId,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       players:   PLAYERS.map(p => ({

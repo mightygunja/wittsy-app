@@ -456,7 +456,7 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound, p
     const room = roomDoc.data();
 
     // Capture room data for use after transaction (overwrites on each retry — final value is correct)
-    capturedRoomData = { name: room?.name, players: room?.players || [] };
+    capturedRoomData = { name: room?.name, players: room?.players || [], isSimulation: room?.isSimulation === true };
 
     // IDEMPOTENCY: if another concurrent call already processed this round, abort
     if (room?.lastProcessedRound === currentRound) {
@@ -502,7 +502,9 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound, p
 
   // Write starred phrases to dedicated Firestore collection for any round winner
   // who received STAR_THRESHOLD or more votes.
-  if (maxVotes >= STAR_THRESHOLD && winners.length > 0) {
+  // Simulation rooms are excluded — their phrases must not appear in the
+  // public community gallery.
+  if (maxVotes >= STAR_THRESHOLD && winners.length > 0 && !capturedRoomData?.isSimulation) {
     try {
       const usernameLookup = {};
       (capturedRoomData?.players || []).forEach(p => {
@@ -611,9 +613,10 @@ async function endGame(roomId) {
       }
     });
     
-    // Save match history for each player (ALWAYS — not just players with bestPhrase)
+    // Save match history for each player (ALWAYS — not just players with bestPhrase).
+    // Simulation rooms are excluded — bot matches must not pollute user history.
     const batch = db.batch();
-    const players = room?.players || [];
+    const players = room?.isSimulation === true ? [] : (room?.players || []);
     let matchesQueued = 0;
 
     for (const player of players) {

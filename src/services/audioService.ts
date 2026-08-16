@@ -160,8 +160,10 @@ class AudioService {
     if (sound) {
       try {
         await sound.replayAsync();
-      } catch (error) {
-        console.error(`Failed to play sound effect: ${effectName}`, error);
+      } catch {
+        // Several effect files are placeholder assets that fail to load;
+        // a missing click sound is not worth an error on every button press.
+        this.soundEffects.delete(effectName);
       }
     }
   }

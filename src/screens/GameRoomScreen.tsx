@@ -1217,8 +1217,10 @@ const GameRoomScreen: React.FC = () => {
                   </Text>
                 </View>
 
-                {/* Android button */}
-                {Platform.OS === 'android' && (
+                {/* Inline submit button — everywhere except iOS, which uses the
+                    keyboard InputAccessoryView below. Web MUST have this: Enter
+                    inserts a newline in a multiline input and never submits. */}
+                {Platform.OS !== 'ios' && (
                   <View style={styles.androidButtonContainer}>
                     <Button
                       title="SUBMIT PHRASE"

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, TextInput } from 'react-native';
+import { Text, TextInput, Platform } from 'react-native';
+import { installWebAlert } from './src/utils/webAlert';
 import { AuthProvider } from './src/context/AuthContext';
 import { SettingsProvider } from './src/contexts/SettingsContext';
 import { ThemeProvider } from './src/contexts/ThemeProvider';
@@ -23,6 +24,9 @@ const MAX_FONT_SCALE = 1.3;
 (Text as any).defaultProps = { ...(Text as any).defaultProps, maxFontSizeMultiplier: MAX_FONT_SCALE };
 (TextInput as any).defaultProps = { ...(TextInput as any).defaultProps, maxFontSizeMultiplier: MAX_FONT_SCALE };
 
+// react-native-web's Alert is a no-op — replace it so dialogs actually show.
+installWebAlert();
+
 export default function App() {
   const navigationRef = useRef(null);
 
@@ -41,15 +45,21 @@ export default function App() {
         
         // Initialize audio service
         await audioService.initialize();
-        
-        // Start background music
-        await audioService.playBackgroundMusic();
-        
+
+        // Start background music. Skipped on web: browsers block audio before
+        // the first user gesture, so autoplay here only produces console errors.
+        if (Platform.OS !== 'web') {
+          await audioService.playBackgroundMusic();
+        }
+
         // Initialize analytics
         analytics.setEnabled(true);
-        
-        // Initialize monetization
-        await monetization.initialize();
+
+        // Initialize monetization. Web has no IAP — purchases live in the
+        // native apps, so skip the store connection entirely.
+        if (Platform.OS !== 'web') {
+          await monetization.initialize();
+        }
         
         // Initialize A/B testing
         await abTesting.initialize();

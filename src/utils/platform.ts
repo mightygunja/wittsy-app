@@ -40,18 +40,18 @@ export const isAppleSignInAvailable = (): boolean => {
 
 /**
  * Check if In-App Purchases are available
- * Only available in standalone builds, not in Expo Go
+ * Only available in native standalone builds — not Expo Go, not web
  */
 export const isIAPAvailable = (): boolean => {
-  return !isExpoGo();
+  return !isExpoGo() && Platform.OS !== 'web';
 };
 
 /**
  * Check if Store Review is available
- * Only available in standalone builds, not in Expo Go
+ * Only available in native standalone builds — not Expo Go, not web
  */
 export const isStoreReviewAvailable = (): boolean => {
-  return !isExpoGo();
+  return !isExpoGo() && Platform.OS !== 'web';
 };
 
 /**
