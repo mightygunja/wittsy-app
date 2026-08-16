@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, TextInput, Platform } from 'react-native';
+import { Text, TextInput, Platform, View } from 'react-native';
 import { installWebAlert } from './src/utils/webAlert';
+import { WebNavBar } from './src/components/web/WebNavBar';
 import { AuthProvider } from './src/context/AuthContext';
 import { SettingsProvider } from './src/contexts/SettingsContext';
 import { ThemeProvider } from './src/contexts/ThemeProvider';
@@ -98,7 +99,13 @@ export default function App() {
     <SettingsProvider>
       <ThemeProvider>
         <AuthProvider>
-          <AppNavigator navigationRef={navigationRef} />
+          <View style={{ flex: 1 }}>
+            {/* Desktop-web top navigation; renders null on native/mobile web */}
+            <WebNavBar navigationRef={navigationRef} />
+            <View style={{ flex: 1 }}>
+              <AppNavigator navigationRef={navigationRef} />
+            </View>
+          </View>
           <StatusBar style="auto" />
         </AuthProvider>
       </ThemeProvider>

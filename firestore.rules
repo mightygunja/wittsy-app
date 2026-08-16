@@ -419,6 +419,15 @@ service cloud.firestore {
       allow write: if false; // Only Cloud Functions write starred phrases
     }
 
+    // Content reports (Apple UGC requirement): users can flag public content.
+    // Create-only for the reporter; reviewed via the Firebase console.
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.keys().hasAll(['contentType', 'contentId', 'reporterId', 'createdAt']);
+      allow read, update, delete: if false;
+    }
+
     // ==================== ADMIN ONLY ====================
     
     // System Configuration

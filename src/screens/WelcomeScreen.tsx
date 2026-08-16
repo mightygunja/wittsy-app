@@ -25,6 +25,8 @@ import { AppleSignInButton } from '../components/auth/AppleSignInButton';
 import { GoogleSignInButton } from '../components/auth/GoogleSignInButton';
 import { signInWithEmailAndPassword, linkWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import { isDesktopWeb } from '../utils/webLayout';
+import { WebWelcomeHero } from '../components/web/WebWelcomeHero';
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -79,6 +81,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
       ])
     ).start();
   }, []);
+
+  // Desktop web gets a real landing page instead of the phone layout.
+  if (isDesktopWeb) {
+    return <WebWelcomeHero navigation={navigation} onGuestStart={onGuestStart} />;
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>

@@ -25,6 +25,7 @@ import { getBrowsableRankedRooms } from '../services/matchmaking';
 import { DEFAULT_SUBMISSION_TIME, DEFAULT_VOTING_TIME, WINNING_VOTES, MAX_PLAYERS } from '../utils/constants';
 
 import { screenWidth, contentWidth, isTablet, isLargeTablet, tabletContentStyle, tabletHorizontalPadding, scaleFontSize, scaleIconSize, getLineHeight } from '../utils/responsive';
+import { isDesktopWeb } from '../utils/webLayout';
 const width = contentWidth;
 
 
@@ -1065,7 +1066,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
       </ScrollView>
 
-      {/* Fixed Bottom Navigation Bar */}
+      {/* Fixed Bottom Navigation Bar — phone pattern; desktop web uses the top WebNavBar */}
+      {!isDesktopWeb && (
       <View style={styles.bottomNav}>
         <TouchableOpacity 
           style={styles.navButton}
@@ -1099,6 +1101,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Text style={styles.navLabel}>Settings</Text>
         </TouchableOpacity>
       </View>
+      )}
     </SafeAreaView>
   );
 };

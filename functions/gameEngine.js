@@ -10,6 +10,7 @@
  */
 
 const admin = require('firebase-admin');
+const { isCleanForPublic } = require('./contentFilter');
 const db = admin.firestore();
 const rtdb = admin.database();
 
@@ -515,6 +516,11 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound, p
       winners.forEach(winnerId => {
         const phrase = validSubmissions?.[winnerId];
         if (!phrase) return;
+        // The gallery is public — filter explicit content before it lands there.
+        if (!isCleanForPublic(phrase)) {
+          console.log(`🚫 Starred phrase failed content filter — not saved to gallery`);
+          return;
+        }
         const starRef = db.collection('starredPhrases').doc();
         starBatch.set(starRef, {
           userId: winnerId,

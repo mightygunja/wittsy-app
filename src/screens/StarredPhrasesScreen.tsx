@@ -19,6 +19,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import { getUserStarredPhrases, getCommunityStarredPhrases, StarredPhrase } from '../services/starredPhrases';
+import { reportContent } from '../services/reports';
+import { Alert } from 'react-native';
 import { SPACING, RADIUS } from '../utils/constants';
 import { haptics } from '../services/haptics';
 import { tabletHorizontalPadding } from '../utils/responsive';
@@ -34,7 +36,8 @@ const PhraseCard: React.FC<{
   index: number;
   viewMode: ViewMode;
   currentUid?: string;
-}> = ({ phrase, index, viewMode, currentUid }) => {
+  onReport?: (phrase: StarredPhrase) => void;
+}> = ({ phrase, index, viewMode, currentUid, onReport }) => {
   const cardAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -120,14 +123,24 @@ const PhraseCard: React.FC<{
           )}
         </View>
 
-        {/* Date */}
-        <Text style={styles.dateText}>
-          {phrase.playedAt.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          })}
-        </Text>
+        {/* Date + report */}
+        <View style={styles.cardFooter}>
+          <Text style={styles.dateText}>
+            {phrase.playedAt.toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+          </Text>
+          {viewMode === 'community' && !isMyPhrase && onReport && (
+            <TouchableOpacity
+              onPress={() => onReport(phrase)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.reportLink}>⚑ Report</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </LinearGradient>
     </Animated.View>
   );
@@ -142,6 +155,35 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'top'>('all');
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
+
+  const handleReport = (phrase: StarredPhrase) => {
+    Alert.alert(
+      'Report this phrase?',
+      'It will be hidden for you and sent to the moderation team for review.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            setReportedIds(prev => new Set(prev).add(phrase.matchId));
+            try {
+              await reportContent({
+                contentType: 'starredPhrase',
+                contentId: phrase.matchId,
+                reporterId: userProfile?.uid || 'anonymous',
+                reportedUserId: phrase.userId,
+                contentText: phrase.phrase,
+              });
+            } catch (error) {
+              console.error('Failed to submit report:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -193,7 +235,7 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
   };
 
   const getFilteredPhrases = () => {
-    const phrases = getCurrentPhrases();
+    const phrases = getCurrentPhrases().filter(p => !reportedIds.has(p.matchId));
     switch (filter) {
       case 'top':
         return phrases.filter(p => p.stars >= 4);
@@ -302,6 +344,7 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
               index={index}
               viewMode={viewMode}
               currentUid={userProfile?.uid}
+              onReport={handleReport}
             />
           ))}
           
@@ -520,6 +563,15 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reportLink: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   loadingContainer: {
     flex: 1,

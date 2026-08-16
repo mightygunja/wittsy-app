@@ -49,6 +49,7 @@ export const MainNavigator: React.FC = () => {
           backgroundColor: '#6C63FF'
         },
         headerTintColor: '#FFFFFF',
+        headerTitleAlign: 'center',
         headerTitleStyle: {
           fontWeight: 'bold'
         },

@@ -8,6 +8,9 @@
  */
 import { Alert, AlertButton, Platform } from 'react-native';
 
+// tsconfig has no DOM lib (native project); window only exists at runtime on web.
+declare const window: any;
+
 export function installWebAlert(): void {
   if (Platform.OS !== 'web') return;
 
