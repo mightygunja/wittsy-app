@@ -12,6 +12,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking, Alert } 
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import { GoogleLogo } from '../auth/GoogleSignInButton';
 
 const APP_STORE_URL = 'https://apps.apple.com/us/app/wittz-party-word-game/id6757277835';
 
@@ -95,7 +96,7 @@ export const WebWelcomeHero: React.FC<{
               onPress={handleGoogle}
               disabled={googleLoading}
             >
-              <Text style={styles.googleG}>G</Text>
+              <GoogleLogo />
               <Text style={[styles.secondaryCtaText, { color: '#1F1F1F' }]}>
                 {googleLoading ? 'Signing in…' : 'Continue with Google'}
               </Text>
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
     gap: 64,
     paddingVertical: 56,
   },
-  heroCopy: { flex: 1.1 },
+  heroCopy: { flex: 1.1, minWidth: 0 },
   headline: {
     fontSize: 52,
     lineHeight: 62,
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     maxWidth: 520,
   },
-  ctaRow: { flexDirection: 'row', gap: 16, marginBottom: 20 },
+  ctaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 20, maxWidth: 560 },
   primaryCta: {
     paddingHorizontal: 32,
     paddingVertical: 16,
@@ -251,11 +252,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  googleG: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#4285F4',
   },
   trustLine: { fontSize: 14 },
 

@@ -9,7 +9,7 @@ interface GoogleSignInButtonProps {
   loading?: boolean;
 }
 
-const GoogleLogo = () => (
+export const GoogleLogo = () => (
   <Svg width="20" height="20" viewBox="0 0 20 20" fill="none">
     <G clipPath="url(#clip0)">
       <Path
