@@ -137,9 +137,22 @@ export const WebWelcomeHero: React.FC<{
             </View>
           </View>
         </TouchableOpacity>
-        <Text style={[styles.footerText, { color: COLORS.textSecondary }]}>
-          © {new Date().getFullYear()} Wittz
-        </Text>
+        <View style={styles.footerLinks}>
+          {[
+            ['How to Play', '/how-to-play'],
+            ['FAQ', '/faq'],
+            ['Support', '/support'],
+            ['Privacy', '/privacy'],
+            ['Terms', '/terms'],
+          ].map(([label, href]) => (
+            <TouchableOpacity key={href} onPress={() => { (globalThis as any).location.href = href; }}>
+              <Text style={[styles.footerText, { color: COLORS.textSecondary }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+          <Text style={[styles.footerText, { color: COLORS.textSecondary }]}>
+            © {new Date().getFullYear()} Wittz
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -263,6 +276,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 40,
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    flexWrap: 'wrap',
   },
   storeBadge: {
     flexDirection: 'row',
