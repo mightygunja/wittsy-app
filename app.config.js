@@ -7,6 +7,15 @@ export default {
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
     scheme: "wittsy",
+    // EAS Update: OTA delivery of JS-only changes to installed builds.
+    // runtimeVersion follows the store version, so an update published for
+    // runtime "1.0.9" reaches every build of 1.0.9 on the matching channel.
+    updates: {
+      url: "https://u.expo.dev/947483cc-b065-449a-b8fd-7e0da17d1ed2"
+    },
+    runtimeVersion: {
+      policy: "appVersion"
+    },
     splash: {
       image: "./assets/splash.png",
       resizeMode: "contain",
@@ -126,9 +135,6 @@ export default {
       revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
       revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
     },
-    owner: "adilgunja",
-    updates: {
-      enabled: false
-    }
+    owner: "adilgunja"
   }
 };
