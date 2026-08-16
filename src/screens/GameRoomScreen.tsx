@@ -136,11 +136,6 @@ const GameRoomScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(COLORS, SPACING), [COLORS]);
   
-  // Debug logging for roomId
-  console.log('🎮 GameRoomScreen loaded with roomId:', roomId);
-  console.log('🎮 RoomId type:', typeof roomId);
-  console.log('🎮 RoomId length:', roomId?.length);
-
   const [room, setRoom] = useState<Room | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1276,7 +1271,6 @@ const GameRoomScreen: React.FC = () => {
         const validIds = Object.keys(votingSubmissions);
         // Check if current user submitted on time — non-submitters cannot vote
         const currentUserCanVote = user?.uid ? (user.uid in votingSubmissions) : false;
-        console.log('🗳️ VOTING PHASE - validSubmissions:', Object.keys(votingSubmissions).length, 'canVote:', currentUserCanVote);
         return (
           <View style={styles.votingPhase}>
             <View style={styles.votingHeader}>
@@ -1345,7 +1339,6 @@ const GameRoomScreen: React.FC = () => {
         );
 
       case 'results': {
-        console.log('🏆 RESULTS PHASE - Winners:', gameState.lastWinners || [gameState.lastWinner]);
         const winners = gameState.lastWinners || (gameState.lastWinner ? [gameState.lastWinner] : []);
         const winningPhrases = gameState.lastWinningPhrases || (gameState.lastWinningPhrase ? [gameState.lastWinningPhrase] : []);
         const isTie = winners.length > 1;
@@ -1451,6 +1444,13 @@ const GameRoomScreen: React.FC = () => {
                   {winnerVotes} {winnerVotes === 1 ? 'vote' : 'votes'}{isTie ? ' each' : ''}
                 </Text>
               </View>
+
+              {/* Star earned badge — server awards a star at STAR_THRESHOLD+ votes */}
+              {winnerVotes >= STAR_THRESHOLD && (
+                <View style={styles.winnerHeroStarBadge}>
+                  <Text style={styles.winnerHeroStarText}>⭐ STARRED — saved to the gallery</Text>
+                </View>
+              )}
             </LinearGradient>
 
             {/* ── Non-winner ranked list ── */}
@@ -2656,6 +2656,19 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     color: '#FFD700',
     letterSpacing: 0.3,
   },
+  winnerHeroStarBadge: {
+    marginTop: 10,
+    backgroundColor: '#FFD700',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  winnerHeroStarText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: 0.3,
+  },
   // ── Results phase: non-winner ranking list ────────────────────────────────
   rankingDivider: {
     flexDirection: 'row',
@@ -3081,7 +3094,6 @@ const createStyles = (COLORS: any, SPACING: any) => StyleSheet.create({
     padding: 12,
     marginHorizontal: 20,
     marginTop: 12,
-    marginBottom: 8,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: COLORS.border,

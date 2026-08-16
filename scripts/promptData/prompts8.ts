@@ -16,7 +16,7 @@ export const prompts8 = [
   { text: "I became a completely different person the day I discovered ______", category: "Personal" },
   { text: "I spent way too long learning ______ and I use it exactly never", category: "Skills" },
   { text: "I would go to war for ______", category: "Humor" },
-  { text: "The audacity of ______ to think I would ever ______", category: "Humor" },
-  { text: "My love language is ______ but my actions say ______", category: "Dating" },
+  { text: "The audacity of ______ is truly unmatched", category: "Humor" },
+  { text: "My love language is ______", category: "Dating" },
   { text: "I don't have a type, I have a pattern, and that pattern is ______", category: "Dating" },
 ];

@@ -26,6 +26,113 @@ import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
 
 type ViewMode = 'mine' | 'community';
 
+// Must be a real component: it uses hooks (useRef/useEffect), which crash React
+// when called from a plain function invoked inside .map() — hook count changes
+// between renders as soon as the first phrase card appears.
+const PhraseCard: React.FC<{
+  phrase: StarredPhrase;
+  index: number;
+  viewMode: ViewMode;
+  currentUid?: string;
+}> = ({ phrase, index, viewMode, currentUid }) => {
+  const cardAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 400,
+      delay: index * 50,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const isMyPhrase = phrase.userId === currentUid;
+
+  return (
+    <Animated.View
+      style={[
+        styles.phraseCard,
+        {
+          opacity: cardAnim,
+          transform: [{
+            translateY: cardAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [20, 0],
+            }),
+          }],
+        },
+      ]}
+    >
+      <LinearGradient
+        colors={phrase.won ? ['#10B981', '#059669'] : ['#6366F1', '#4F46E5']}
+        style={styles.cardGradient}
+      >
+        {/* Star Count Badge */}
+        <View style={styles.starBadge}>
+          <Text style={styles.starEmoji}>⭐</Text>
+          <Text style={styles.starCount}>×{phrase.stars}</Text>
+        </View>
+
+        {/* User Attribution (for community view) */}
+        {viewMode === 'community' && phrase.username && (
+          <View style={styles.userSection}>
+            {phrase.userAvatar && (
+              <View style={styles.avatarContainer}>
+                <AvatarDisplay config={phrase.userAvatar} size={32} />
+              </View>
+            )}
+            <View style={styles.userInfo}>
+              <Text style={styles.username}>
+                {phrase.username}
+                {isMyPhrase && <Text style={styles.youBadge}> (You)</Text>}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Phrase Text */}
+        <View style={styles.phraseContent}>
+          <Text style={styles.phraseText}>"{phrase.phrase}"</Text>
+        </View>
+
+        {/* Prompt (if available) */}
+        {phrase.prompt && (
+          <View style={styles.promptSection}>
+            <Text style={styles.promptLabel}>Prompt:</Text>
+            <Text style={styles.promptText}>{phrase.prompt}</Text>
+          </View>
+        )}
+
+        {/* Metadata */}
+        <View style={styles.metadataRow}>
+          <View style={styles.metadataItem}>
+            <Text style={styles.metadataIcon}>👍</Text>
+            <Text style={styles.metadataText}>{phrase.totalVotes} votes</Text>
+          </View>
+          <View style={styles.metadataItem}>
+            <Text style={styles.metadataIcon}>🎮</Text>
+            <Text style={styles.metadataText}>{phrase.roomName}</Text>
+          </View>
+          {phrase.won && (
+            <View style={styles.winBadge}>
+              <Text style={styles.winText}>🏆 WIN</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Date */}
+        <Text style={styles.dateText}>
+          {phrase.playedAt.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+        </Text>
+      </LinearGradient>
+    </Animated.View>
+  );
+};
+
 export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { userProfile } = useAuth();
   const { colors: COLORS } = useTheme();
@@ -34,7 +141,7 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
   const [communityPhrases, setCommunityPhrases] = useState<StarredPhrase[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'wins' | 'top'>('all');
+  const [filter, setFilter] = useState<'all' | 'top'>('all');
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -88,8 +195,6 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
   const getFilteredPhrases = () => {
     const phrases = getCurrentPhrases();
     switch (filter) {
-      case 'wins':
-        return phrases.filter(p => p.won);
       case 'top':
         return phrases.filter(p => p.stars >= 4);
       default:
@@ -98,106 +203,6 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
   };
 
   const filteredPhrases = getFilteredPhrases();
-
-  const renderPhraseCard = (phrase: StarredPhrase, index: number) => {
-    const cardAnim = useRef(new Animated.Value(0)).current;
-    
-    useEffect(() => {
-      Animated.timing(cardAnim, {
-        toValue: 1,
-        duration: 400,
-        delay: index * 50,
-        useNativeDriver: true,
-      }).start();
-    }, []);
-
-    const isMyPhrase = phrase.userId === userProfile?.uid;
-
-    return (
-      <Animated.View
-        key={phrase.matchId}
-        style={[
-          styles.phraseCard,
-          {
-            opacity: cardAnim,
-            transform: [{
-              translateY: cardAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0],
-              }),
-            }],
-          },
-        ]}
-      >
-        <LinearGradient
-          colors={phrase.won ? ['#10B981', '#059669'] : ['#6366F1', '#4F46E5']}
-          style={styles.cardGradient}
-        >
-          {/* Star Count Badge */}
-          <View style={styles.starBadge}>
-            <Text style={styles.starEmoji}>⭐</Text>
-            <Text style={styles.starCount}>×{phrase.stars}</Text>
-          </View>
-
-          {/* User Attribution (for community view) */}
-          {viewMode === 'community' && phrase.username && (
-            <View style={styles.userSection}>
-              {phrase.userAvatar && (
-                <View style={styles.avatarContainer}>
-                  <AvatarDisplay config={phrase.userAvatar} size={32} />
-                </View>
-              )}
-              <View style={styles.userInfo}>
-                <Text style={styles.username}>
-                  {phrase.username}
-                  {isMyPhrase && <Text style={styles.youBadge}> (You)</Text>}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Phrase Text */}
-          <View style={styles.phraseContent}>
-            <Text style={styles.phraseText}>"{phrase.phrase}"</Text>
-          </View>
-
-          {/* Prompt (if available) */}
-          {phrase.prompt && (
-            <View style={styles.promptSection}>
-              <Text style={styles.promptLabel}>Prompt:</Text>
-              <Text style={styles.promptText}>{phrase.prompt}</Text>
-            </View>
-          )}
-
-          {/* Metadata */}
-          <View style={styles.metadataRow}>
-            <View style={styles.metadataItem}>
-              <Text style={styles.metadataIcon}>👍</Text>
-              <Text style={styles.metadataText}>{phrase.totalVotes} votes</Text>
-            </View>
-            <View style={styles.metadataItem}>
-              <Text style={styles.metadataIcon}>🎮</Text>
-              <Text style={styles.metadataText}>{phrase.roomName}</Text>
-            </View>
-            {phrase.won && (
-              <View style={styles.winBadge}>
-                <Text style={styles.winText}>🏆 WIN</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Date */}
-          <Text style={styles.dateText}>
-            {phrase.playedAt.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-          </Text>
-        </LinearGradient>
-      </Animated.View>
-    );
-  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
@@ -271,17 +276,6 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'wins' && styles.filterTabActive]}
-          onPress={() => {
-            haptics.light();
-            setFilter('wins');
-          }}
-        >
-          <Text style={[styles.filterText, filter === 'wins' && styles.filterTextActive]}>
-            Winning Phrases
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -301,7 +295,15 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
           }
           showsVerticalScrollIndicator={false}
         >
-          {filteredPhrases.map((phrase, index) => renderPhraseCard(phrase, index))}
+          {filteredPhrases.map((phrase, index) => (
+            <PhraseCard
+              key={phrase.matchId}
+              phrase={phrase}
+              index={index}
+              viewMode={viewMode}
+              currentUid={userProfile?.uid}
+            />
+          ))}
           
           {/* Bottom Padding */}
           <View style={styles.bottomPadding} />
