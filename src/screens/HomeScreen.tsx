@@ -51,6 +51,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [groupGamesCollapsed, setGroupGamesCollapsed] = useState(false);
   const groupRoomUnsubscribers = useRef<(() => void)[]>([]);
   const casualRoomsUnsubRef = useRef<(() => void) | null>(null);
+  const exploreScrollRef = useRef<ScrollView>(null);
+  const exploreScrollX = useRef(0);
   
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   
@@ -699,9 +701,37 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
         {/* Secondary Features - Horizontal Scroll */}
         <Animated.View style={[styles.secondarySection, { opacity: fadeAnim }]}>
-          <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>Explore</Text>
-          <ScrollView 
-            horizontal 
+          <View style={styles.exploreHeaderRow}>
+            <Text style={styles.sectionTitle}>Explore</Text>
+            {/* Desktop web: mouse wheels don't scroll horizontally — give arrows */}
+            {isDesktopWeb && (
+              <View style={styles.exploreArrows}>
+                <TouchableOpacity
+                  style={styles.exploreArrowButton}
+                  onPress={() => {
+                    exploreScrollX.current = Math.max(0, exploreScrollX.current - 360);
+                    exploreScrollRef.current?.scrollTo({ x: exploreScrollX.current, animated: true });
+                  }}
+                >
+                  <Text style={styles.exploreArrowText}>‹</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.exploreArrowButton}
+                  onPress={() => {
+                    exploreScrollX.current = exploreScrollX.current + 360;
+                    exploreScrollRef.current?.scrollTo({ x: exploreScrollX.current, animated: true });
+                  }}
+                >
+                  <Text style={styles.exploreArrowText}>›</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+          <ScrollView
+            horizontal
+            ref={exploreScrollRef}
+            onScroll={(e) => { exploreScrollX.current = e.nativeEvent.contentOffset.x; }}
+            scrollEventThrottle={64}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.secondaryScroll}
           >
@@ -1389,6 +1419,32 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   secondaryScroll: {
     paddingRight: SPACING.md,
     gap: SPACING.sm,
+  },
+  exploreHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  exploreArrows: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  exploreArrowButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exploreArrowText: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 22,
   },
   secondaryCard: {
     width: isLargeTablet ? 140 : isTablet ? 120 : 100,
