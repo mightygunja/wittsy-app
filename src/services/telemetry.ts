@@ -64,10 +64,17 @@ class Telemetry {
   private buffer: TelemetryEvent[] = [];
   private sessionId = randomId();
   private sessionStart = Date.now();
+  private sessionEnded = false;
   private screensViewed = 0;
   private lastScreen = '';
   private userId: string | null = null;
   private started = false;
+
+  // Local dev traffic must not pollute production analytics.
+  private readonly disabled =
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    /^(localhost|127\.0\.0\.1)$/.test(window.location?.hostname || '');
 
   private readonly context = {
     platform: Platform.OS,
@@ -94,6 +101,7 @@ class Telemetry {
         // Coming back after 30+ minutes counts as a new session
         this.sessionId = randomId();
         this.sessionStart = Date.now();
+        this.sessionEnded = false;
         this.screensViewed = 0;
         this.track('session_start');
       }
@@ -139,6 +147,9 @@ class Telemetry {
   }
 
   private endSession() {
+    // One end per session — tab switches on web would otherwise fire dozens.
+    if (this.sessionEnded) return;
+    this.sessionEnded = true;
     this.track('session_end', {
       durationSec: Math.round((Date.now() - this.sessionStart) / 1000),
       screensViewed: this.screensViewed,
@@ -147,7 +158,7 @@ class Telemetry {
   }
 
   async flush() {
-    if (this.buffer.length === 0) return;
+    if (this.disabled || this.buffer.length === 0) return;
     const events = this.buffer.splice(0, this.buffer.length);
     try {
       await addDoc(collection(firestore, 'analyticsEvents'), {
@@ -159,7 +170,10 @@ class Telemetry {
         flushedAt: Timestamp.now(),
       });
     } catch {
-      // Analytics must never break the app; drop the batch on failure.
+      // Most failures are pre-auth writes rejected by rules (visitor hasn't
+      // tapped Play yet). Re-queue so the batch lands after sign-in; cap the
+      // buffer so a persistent failure can't grow it unbounded.
+      this.buffer = [...events, ...this.buffer].slice(0, MAX_BUFFER * 3);
     }
   }
 }
