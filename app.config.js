@@ -1,8 +1,14 @@
+// Single source of truth for the release version. runtimeVersion mirrors it
+// (equivalent to the "appVersion" policy, written as a literal because the
+// committed android/ project makes the tooling treat this repo as bare
+// workflow, where policies are unsupported).
+const VERSION = "1.0.9";
+
 export default {
   expo: {
     name: "Wittz: Party Word Game",
     slug: "wittsy-app",
-    version: "1.0.9",
+    version: VERSION,
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -13,9 +19,7 @@ export default {
     updates: {
       url: "https://u.expo.dev/947483cc-b065-449a-b8fd-7e0da17d1ed2"
     },
-    runtimeVersion: {
-      policy: "appVersion"
-    },
+    runtimeVersion: VERSION,
     splash: {
       image: "./assets/splash.png",
       resizeMode: "contain",
