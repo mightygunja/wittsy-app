@@ -22,7 +22,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+
+      // IAP grant markers — one doc per store transaction, written in the
+      // same transaction as the coin balance update so grants are exactly-once.
+      // Immutable once written.
+      match /iapTransactions/{transactionId} {
+        allow read, create: if isOwner(userId);
+        allow update, delete: if false;
+      }
     }
 
     // Battle Pass collection
