@@ -220,7 +220,12 @@ export const WebWelcomeHero: React.FC<{
 };
 
 const styles = StyleSheet.create({
-  page: { flex: 1 },
+  // Explicit viewport height, and deliberately NO flex:1: the navigator
+  // parent sizes from content, and flex:1 (flex-basis 0%) would override
+  // height and grow this ScrollView to its content height — it then never
+  // scrolls, and body overflow:hidden clips the footer off-screen.
+  // Desktop-web-only component, so 100vh is safe.
+  page: { height: '100vh' as any },
   pageContent: {
     width: '100%',
     maxWidth: 1200,
