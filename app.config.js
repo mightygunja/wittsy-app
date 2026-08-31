@@ -31,7 +31,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wittsy.app",
-      buildNumber: "46",
+      buildNumber: "47",
       infoPlist: {
         NSCameraUsageDescription: "Wittz needs access to your camera to take profile photos.",
         NSPhotoLibraryUsageDescription: "Wittz needs access to your photo library to select profile photos.",
@@ -52,7 +52,7 @@ export default {
         backgroundColor: "#6C63FF"
       },
       package: "com.wittsy.app",
-      versionCode: 46,
+      versionCode: 47,
       permissions: [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -98,7 +98,7 @@ export default {
           icon: "./assets/notification-icon.png",
           color: "#6C63FF",
           sounds: [
-            "./assets/audio/notification.mp3"
+            "./assets/audio/notification.wav"
           ]
         }
       ],
