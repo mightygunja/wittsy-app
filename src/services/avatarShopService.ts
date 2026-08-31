@@ -49,7 +49,15 @@ function createShopItem(
 }
 
 /**
- * Get all available shop items
+ * Categories the Avatar Creator can actually equip today. Clothing, effects,
+ * facial hair, and face paint have catalog entries but no creator tab or
+ * renderer support — selling them would take real coins for items that can
+ * never be worn. Add a category back here once the creator supports it.
+ */
+export const EQUIPPABLE_SHOP_CATEGORIES = ['hair', 'accessories', 'background'] as const;
+
+/**
+ * Get all available shop items (equippable categories only)
  */
 export function getAllShopItems(): AvatarItem[] {
   const items: AvatarItem[] = [];
@@ -64,30 +72,13 @@ export function getAllShopItems(): AvatarItem[] {
     items.push(createShopItem(item, 'accessories'));
   });
 
-  // Clothing
-  EXPANDED_CLOTHING.forEach(item => {
-    items.push(createShopItem(item, 'clothing'));
-  });
-
   // Backgrounds
   EXPANDED_BACKGROUNDS.forEach(item => {
     items.push(createShopItem(item, 'background'));
   });
 
-  // Effects
-  EXPANDED_EFFECTS.forEach(item => {
-    items.push(createShopItem(item, 'effects'));
-  });
-
-  // Facial Hair
-  FACIAL_HAIR_STYLES.forEach(item => {
-    items.push(createShopItem(item, 'facial_hair'));
-  });
-
-  // Face Paint
-  FACE_PAINT_STYLES.forEach(item => {
-    items.push(createShopItem(item, 'face_paint'));
-  });
+  // NOT sold (yet): EXPANDED_CLOTHING, EXPANDED_EFFECTS, FACIAL_HAIR_STYLES,
+  // FACE_PAINT_STYLES — the Avatar Creator has no way to equip them.
 
   return items;
 }

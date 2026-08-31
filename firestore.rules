@@ -49,7 +49,15 @@ service cloud.firestore {
         (!('coins' in request.resource.data) || request.resource.data.coins >= 0) &&
         (!('xp' in request.resource.data) || request.resource.data.xp >= 0) &&
         hasValidTimestamp();
-      allow update: if isSignedIn() && isOwner(userId);
+      // Rating/record fields are settled exclusively by the server (endGame
+      // Cloud Function). Blocking client writes here also stops OLD app
+      // versions from double-counting their own ratings on top of the
+      // server's settlement.
+      allow update: if isSignedIn() && isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'rankedRating', 'casualRating', 'rankedGamesPlayed', 'casualGamesPlayed',
+          'gamesWon', 'gamesLost', 'peakRating', 'peakRankedRating', 'ratingDeviation'
+        ]);
       // Self-delete is required for in-app account deletion
       // (App Store Guideline 5.1.1(v) / GDPR).
       allow delete: if isSignedIn() && (isOwner(userId) || isAdmin());

@@ -42,6 +42,11 @@ import {
   AvatarRarity,
 } from '../types/avatar';
 import { SkinBase, Eyes, Mouths, Hair, Accessories, SKIN_COLORS, HAIR_COLORS } from '../components/avatar/AvatarFeatures';
+import {
+  EXPANDED_HAIR_STYLES,
+  EXPANDED_ACCESSORIES,
+  EXPANDED_BACKGROUNDS,
+} from '../types/avatar-items-expanded';
 import { contentWidth, avatarDisplaySize, avatarGridColumns, tabletHorizontalPadding } from '../utils/responsive';
 
 const width = contentWidth;
@@ -515,6 +520,14 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
     setDraggableFeatures(newFeatures);
   };
 
+  // Purchasable categories must show the FULL shop catalog (merged with the
+  // defaults, de-duped by id) — the shop sells the EXPANDED_* lists, and any
+  // purchased item missing from this grid would be paid for but unequippable.
+  const mergeCatalogs = (defaults: any[], expanded: any[]) => {
+    const seen = new Set(defaults.map((item) => item.id));
+    return [...defaults, ...expanded.filter((item) => !seen.has(item.id))];
+  };
+
   const getCategoryItems = (category: AvatarCategory) => {
     switch (category) {
       case 'skin':
@@ -524,11 +537,11 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
       case 'mouth':
         return DEFAULT_MOUTHS;
       case 'hair':
-        return DEFAULT_HAIR_STYLES;
+        return mergeCatalogs(DEFAULT_HAIR_STYLES, EXPANDED_HAIR_STYLES);
       case 'accessories':
-        return DEFAULT_ACCESSORIES;
+        return mergeCatalogs(DEFAULT_ACCESSORIES, EXPANDED_ACCESSORIES);
       case 'background':
-        return DEFAULT_BACKGROUNDS;
+        return mergeCatalogs(DEFAULT_BACKGROUNDS, EXPANDED_BACKGROUNDS);
       default:
         return [];
     }

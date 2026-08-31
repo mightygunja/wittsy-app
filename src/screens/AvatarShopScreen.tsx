@@ -368,7 +368,7 @@ export const AvatarShopScreen: React.FC<{
         contentContainerStyle={styles.categoryScrollContent}
         showsHorizontalScrollIndicator={false}
       >
-        {['all', 'hair', 'accessories', 'clothing', 'facial_hair', 'face_paint', 'background', 'effects'].map((cat) => (
+        {['all', 'hair', 'accessories', 'background'].map((cat) => (
           <TouchableOpacity
             key={cat}
             style={[styles.categoryButton, selectedCategory === cat && styles.categoryButtonActive]}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, Platform, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, Platform, TouchableOpacity, Alert, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +16,7 @@ import { DailyRewardModal } from '../components/DailyRewardModal';
 import { dailyRewardsService } from '../services/dailyRewardsService';
 import { deepLinking } from '../services/deepLinking';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
-import { getActiveRooms, subscribeToActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom } from '../services/database';
+import { getActiveRooms, subscribeToActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom, getRoomByCode } from '../services/database';
 import { getUserGroups, subscribeToGroupActiveRooms, joinGroupViaInviteCode } from '../services/groups';
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
@@ -34,6 +34,10 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { unreadCount } = useNotifications();
   const { colors: COLORS } = useTheme();
   const [quickMatchLoading, setQuickMatchLoading] = useState(false);
+  const [joinCodeOpen, setJoinCodeOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinCodeError, setJoinCodeError] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userActiveRoom, setUserActiveRoom] = useState<any | null>(null);
   const [userActiveCasualRoom, setUserActiveCasualRoom] = useState<any | null>(null);
@@ -408,47 +412,38 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
+  // Alert.prompt is iOS-only (a no-op on Android and a crash on web), so the
+  // card expands into an inline code input that works on every platform.
   const handleJoinByCode = () => {
-    Alert.prompt(
-      'Join Room',
-      'Enter the 6-digit room code:',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Join',
-          onPress: async (code?: string) => {
-            if (!code || code.trim().length === 0) {
-              Alert.alert('Invalid Code', 'Please enter a valid 6-digit room code');
-              return;
-            }
-            
-            const roomCode = code.trim().toUpperCase();
-            console.log('🔑 Attempting to join room with 6-digit code:', roomCode);
-            
-            try {
-              // Look up room by roomCode using dedicated function
-              const { getRoomByCode } = await import('../services/database');
-              const matchingRoom = await getRoomByCode(roomCode);
-              
-              if (matchingRoom) {
-                console.log('✅ Found room with code:', roomCode, 'Room ID:', matchingRoom.roomId);
-                await handleJoinRoom(matchingRoom.roomId);
-              } else {
-                console.error('❌ No room found with code:', roomCode);
-                Alert.alert('Room Not Found', `No active room found with code: ${roomCode}`);
-              }
-            } catch (error: any) {
-              console.error('❌ Error joining by code:', error);
-              Alert.alert('Error', 'Failed to join room. Please try again.');
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
+    setJoinCodeError('');
+    setJoinCodeOpen((open) => !open);
+  };
+
+  const submitJoinCode = async () => {
+    const roomCode = joinCode.trim().toUpperCase();
+    if (roomCode.length !== 6) {
+      setJoinCodeError('Enter the 6-character room code from your invite.');
+      return;
+    }
+
+    setJoinCodeError('');
+    setJoiningByCode(true);
+
+    try {
+      const matchingRoom = await getRoomByCode(roomCode);
+      if (matchingRoom) {
+        setJoinCodeOpen(false);
+        setJoinCode('');
+        await handleJoinRoom(matchingRoom.roomId);
+      } else {
+        setJoinCodeError(`No active room found with code ${roomCode}.`);
+      }
+    } catch (error: any) {
+      console.error('❌ Error joining by code:', error);
+      setJoinCodeError('Failed to join room. Please try again.');
+    } finally {
+      setJoiningByCode(false);
+    }
   };
 
   const handleQuickMatch = async () => {
@@ -684,7 +679,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         {/* Join by Code - Thin Full Width Card */}
         <Animated.View style={[{ opacity: fadeAnim, marginBottom: SPACING.lg }]}>
           <Card variant="elevated">
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleJoinByCode}
               style={styles.joinByCodeCard}
               activeOpacity={0.7}
@@ -694,8 +689,40 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 <Text style={styles.joinByCodeTitle}>Join by Room Code</Text>
                 <Text style={styles.joinByCodeSubtitle}>Enter 6-digit code from invite</Text>
               </View>
-              <Text style={styles.joinByCodeArrow}>›</Text>
+              <Text style={styles.joinByCodeArrow}>{joinCodeOpen ? '⌄' : '›'}</Text>
             </TouchableOpacity>
+
+            {joinCodeOpen && (
+              <View style={styles.joinCodeInputRow}>
+                <TextInput
+                  style={styles.joinCodeInput}
+                  value={joinCode}
+                  onChangeText={(text) => {
+                    setJoinCode(text.toUpperCase());
+                    if (joinCodeError) setJoinCodeError('');
+                  }}
+                  placeholder="ABC123"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={6}
+                  autoFocus
+                  editable={!joiningByCode}
+                  returnKeyType="go"
+                  onSubmitEditing={submitJoinCode}
+                />
+                <Button
+                  title="Join"
+                  onPress={submitJoinCode}
+                  loading={joiningByCode}
+                  size="md"
+                  style={styles.joinCodeButton}
+                />
+              </View>
+            )}
+            {joinCodeOpen && joinCodeError ? (
+              <Text style={styles.joinCodeError}>{joinCodeError}</Text>
+            ) : null}
           </Card>
         </Animated.View>
 
@@ -1582,5 +1609,33 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   joinByCodeArrow: {
     fontSize: scaleFontSize(20),
     color: COLORS.textTertiary,
+  },
+  joinCodeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  joinCodeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.md),
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    letterSpacing: 3,
+    backgroundColor: COLORS.surface,
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  joinCodeButton: {
+    minWidth: 90,
+  },
+  joinCodeError: {
+    color: COLORS.error,
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.sm),
+    marginTop: SPACING.sm,
   },
 });
