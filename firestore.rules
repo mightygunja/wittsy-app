@@ -2,171 +2,490 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
-    function isAuthenticated() {
+    // ==================== HELPER FUNCTIONS ====================
+    
+    function isSignedIn() {
       return request.auth != null;
     }
     
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
     
     function isAdmin() {
-      // Temporarily disabled - users collection was deleted
-      // TODO: Re-enable after users collection is restored
-      return false;
+      return isSignedIn() && 
+        (request.auth.token.email == 'mightygunja@gmail.com' || 
+         request.auth.token.email == 'noshir2@gmail.com');
     }
-
-    // Users collection
+    
+    function isValidString(text, minLen, maxLen) {
+      return text is string && 
+        text.size() >= minLen && 
+        text.size() <= maxLen;
+    }
+    
+    function isValidUsername(username) {
+      return isValidString(username, 3, 20) && 
+        username.matches('^[a-zA-Z0-9_]+$');
+    }
+    
+    function hasValidTimestamp() {
+      return request.resource.data.createdAt is timestamp || 
+        request.resource.data.createdAt is string;
+    }
+    
+    function isRecentTimestamp(ts) {
+      return ts > request.time - duration.value(1, 'h');
+    }
+    
+    
+    // ==================== USER DATA ====================
+    
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isOwner(userId) || isAdmin();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        isOwner(userId) &&
+        isValidUsername(request.resource.data.username) &&
+        (!('coins' in request.resource.data) || request.resource.data.coins >= 0) &&
+        (!('xp' in request.resource.data) || request.resource.data.xp >= 0) &&
+        hasValidTimestamp();
+      allow update: if isSignedIn() && isOwner(userId);
+      // Self-delete is required for in-app account deletion
+      // (App Store Guideline 5.1.1(v) / GDPR).
+      allow delete: if isSignedIn() && (isOwner(userId) || isAdmin());
 
       // IAP grant markers — one doc per store transaction, written in the
-      // same transaction as the coin balance update so grants are exactly-once.
-      // Immutable once written.
+      // same Firestore transaction as the coin balance update so purchases
+      // are granted exactly once. Immutable once written.
       match /iapTransactions/{transactionId} {
-        allow read, create: if isOwner(userId);
-        allow update, delete: if false;
+        allow read, create: if isSignedIn() && isOwner(userId);
+        allow update: if false;
+        allow delete: if isSignedIn() && isOwner(userId); // account deletion cascade
+      }
+
+      // Per-game personal settlement markers — guard the client's own
+      // end-of-game reward grants against remounts. Immutable once written.
+      match /settledGames/{gameId} {
+        allow read, create: if isSignedIn() && isOwner(userId);
+        allow update: if false;
+        allow delete: if isSignedIn() && isOwner(userId); // account deletion cascade
       }
     }
 
-    // Battle Pass collection
-    match /battlePasses/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isAdmin();
+    // Referrals — one doc per user (doc id == uid). Anyone signed in may read
+    // (needed to look up referral codes). The owner manages their own doc; a
+    // NEW user redeeming a code may update the REFERRER's doc, but only the
+    // referral-bookkeeping fields.
+    match /referrals/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (
+        isOwner(userId) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'referredUsers', 'totalReferrals', 'lastReferralAt',
+          'coinsEarned', 'milestonesReached', 'pendingCoins'
+        ])
+      );
+      allow delete: if isSignedIn() && isOwner(userId);
     }
-
-    // Battle Pass Seasons collection
-    match /battlePassSeasons/{seasonId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // Game rooms collection
+    
+    // ==================== GAME ROOMS ====================
+    
     match /rooms/{roomId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
     }
-
-    // Prompts collection
+    
     match /prompts/{promptId} {
-      allow read: if true; // Open for reading
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() || isAdmin();
-      allow delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
-
-    // Prompt Submissions collection (user-submitted prompts pending approval)
-    match /promptSubmissions/{submissionId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAdmin();
+    
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
-
-    // Prompt Packs collection
-    match /promptPacks/{packId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // Achievements collection
-    match /achievements/{achievementId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // User achievements
-    match /userAchievements/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isAdmin();
-    }
-
-    // Leaderboards
+    
     match /leaderboards/{leaderboardId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if true;
+      allow write: if false;
     }
-
-    // Friends
-    match /friends/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+    
+    match /achievements/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
     }
-
-    // Challenges - OPEN READ ACCESS
+    
+    match /friendRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+    }
+    
+    // ==================== CHAT MESSAGES ====================
+    
+    match /chatMessages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && 
+        request.auth.uid == request.resource.data.userId &&
+        isValidString(request.resource.data.content, 1, 500) &&
+        hasValidTimestamp() &&
+        isRecentTimestamp(request.resource.data.timestamp);
+      allow update: if isSignedIn() && 
+        resource.data.userId == request.auth.uid &&
+        // Only allow marking as edited
+        request.resource.data.content == resource.data.content;
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // Seasons - allow app to create default season
+    match /seasons/{seasonId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+    
+    // Season Stats - users can read their own and others
+    match /seasonStats/{statId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend updates stats
+    }
+    
+    // Rating History - users can read their own
+    match /ratingHistory/{historyId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend updates rating history
+    }
+    
+    // Prompts - allow app to seed prompts
+    match /prompts/{promptId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+    
+    // ==================== CONTENT MODERATION ====================
+    
+    // Prompt Submissions - users can submit, read their own
+    match /promptSubmissions/{submissionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && 
+        request.auth.uid == request.resource.data.submittedBy;
+      allow update: if isAdmin(); // Only admins can update (for moderation)
+      allow delete: if isAdmin();
+    }
+    
+    // Phrase Reports - users can report inappropriate content
+    match /phraseReports/{reportId} {
+      allow read: if isSignedIn() && (
+        resource.data.reportedBy == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && 
+        request.auth.uid == request.resource.data.reportedBy &&
+        isValidString(request.resource.data.reason, 1, 500) &&
+        hasValidTimestamp();
+      allow update: if isAdmin(); // Only admins can review and update status
+      allow delete: if isAdmin();
+    }
+    
+    // Content Moderation Queue
+    match /moderationQueue/{queueId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only backend can add to queue
+    }
+    
+    // User Prompt Preferences
+    match /userPromptPreferences/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Prompt Packs
+    match /promptPacks/{packId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only admins can create packs
+    }
+    
+    // ==================== SOCIAL FEATURES ====================
+    
+    // Friendships
+    match /friendships/{friendshipId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Friend Requests
+    match /friendRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromUserId;
+      allow update: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+      allow delete: if isSignedIn() && resource.data.fromUserId == request.auth.uid;
+    }
+    
+    // Game Invites
+    match /gameInvites/{inviteId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromUserId;
+      allow update: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+      allow delete: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+    }
+    
+    // Challenges - allow app to seed challenges
     match /challenges/{challengeId} {
-      allow read: if true; // Open for reading
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
-
-    // User challenges
-    match /userChallenges/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
-    }
-
+    
     // Challenge Progress
     match /challengeProgress/{progressId} {
-      allow read, write: if true; // Open for now
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && 
+        request.auth.uid == request.resource.data.userId &&
+        request.resource.data.progress >= 0;
+      allow update: if isSignedIn() && 
+        resource.data.userId == request.auth.uid &&
+        // Prevent progress from decreasing (anti-cheat)
+        request.resource.data.progress >= resource.data.progress;
+      allow delete: if false;
     }
-
-    // Battle Pass Seasons
-    match /battlePassSeasons/{seasonId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated(); // Allow for auto-creation
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // Seasons (for admin console)
-    match /seasons/{seasonId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated(); // Allow for auto-creation
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
+    
     // Events
     match /events/{eventId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if false; // Only admins can create events
+      
+      // Event Participants
+      match /participants/{participantId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+    }
+    
+    // Tournaments
+    match /tournaments/{tournamentId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend manages tournaments
+      
+      // Tournament Rounds
+      match /rounds/{roundId} {
+        allow read: if isSignedIn();
+        allow write: if false;
+        
+        // Tournament Matches
+        match /matches/{matchId} {
+          allow read: if isSignedIn();
+          allow write: if false; // Only backend updates matches
+        }
+      }
+      
+      // Tournament Leaderboard
+      match /leaderboard/{entryId} {
+        allow read: if isSignedIn();
+        allow write: if false;
+      }
+    }
+    
+    // Avatars - users can read/write their own avatar
+    match /avatars/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Battle Pass Seasons - allow app to create default season
+    match /battlePassSeasons/{seasonId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+    
+    // User Battle Pass Progress
+    match /userBattlePass/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Battle Passes (alternative collection name)
+    match /battlePasses/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Daily Rewards - users can read and write their own daily rewards
+    match /dailyRewards/{userId} {
+      allow read: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if false;
+    }
+    
+    // ==================== NOTIFICATIONS ====================
+    
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && (
+        // Users can create notifications for themselves
+        request.resource.data.userId == request.auth.uid ||
+        // Or system can create for any user
+        isAdmin()
+      );
+      allow update: if isSignedIn() && 
+        resource.data.userId == request.auth.uid &&
+        // Only allow marking as read
+        request.resource.data.read is bool;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // ==================== PURCHASES & TRANSACTIONS ====================
+    
+    // Purchase History
+    match /purchases/{purchaseId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if false; // Only backend can record purchases
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // Transaction Log (for coins/currency)
+    match /transactions/{transactionId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if false; // Only backend can create transactions
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // ==================== USER BLOCKING ====================
+    
+    // Blocked Users
+    match /blockedUsers/{userId} {
+      allow read: if isSignedIn() && isOwner(userId);
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // ==================== FEEDBACK ====================
+    
+    // User Feedback - users can submit, admins can read/update
+    match /feedback/{feedbackId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && 
+        request.auth.uid == request.resource.data.userId &&
+        isValidString(request.resource.data.title, 1, 100) &&
+        isValidString(request.resource.data.description, 1, 1000) &&
+        request.resource.data.type in ['bug', 'feature', 'improvement', 'other'] &&
+        hasValidTimestamp();
+      allow update: if isAdmin(); // Only admins can update status
       allow delete: if isAdmin();
     }
+    
+    // ==================== GROUPS ====================
 
-    // Notifications
-    match /notifications/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) || isAdmin();
+    match /groups/{groupId} {
+      // Any signed-in user can read a group (needed to look up invite codes)
+      allow read: if isSignedIn();
+      // Any signed-in user can create a group
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.createdBy &&
+        isValidString(request.resource.data.name, 1, 50) &&
+        request.resource.data.memberCount == 1 &&
+        request.resource.data.members.size() == 1 &&
+        request.resource.data.members.hasAll([request.auth.uid]);
+      // Members can update limited fields; only count/member array changes allowed for joins/leaves
+      allow update: if isSignedIn() && (
+        // Existing members can update the group
+        resource.data.members.hasAny([request.auth.uid]) ||
+        // A new user may add themselves via invite code: the only allowed change is
+        // appending their own uid to members and incrementing memberCount by 1.
+        (
+          !resource.data.members.hasAny([request.auth.uid]) &&
+          request.resource.data.members.hasAll(resource.data.members) &&
+          request.resource.data.members.hasAll([request.auth.uid]) &&
+          request.resource.data.memberCount == resource.data.memberCount + 1 &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberCount'])
+        )
+      );
+      allow delete: if isSignedIn() &&
+        resource.data.createdBy == request.auth.uid;
+
+      match /groupMembers/{memberId} {
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+        allow write: if isSignedIn();
+      }
+
+      match /groupStats/{memberId} {
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+        allow write: if isSignedIn();
+      }
     }
 
-    // Analytics (write-only for users, read for admins)
-    match /analytics/{document=**} {
-      allow read: if isAdmin();
-      allow write: if isAuthenticated();
+    // userGroups index: each user's list of groups they belong to
+    match /userGroups/{userId}/groups/{groupId} {
+      // The user themselves can always read/write their own index.
+      // A group member (e.g. admin adding a friend) can also write the target
+      // user's index entry for that specific group.
+      allow read: if isSignedIn() && isOwner(userId);
+      allow write: if isSignedIn() && (
+        isOwner(userId) ||
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid])
+      );
     }
 
-    // Default deny all other collections
-    match /{document=**} {
+    // Starred Phrases - written by Cloud Functions, readable by all signed-in users
+    match /starredPhrases/{phraseId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions write starred phrases
+    }
+
+    // First-party analytics: clients append batched event docs; nobody reads
+    // them from the client. Aggregates live in analyticsDaily (console-only).
+    match /analyticsEvents/{batchId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if false;
+    }
+    match /analyticsDaily/{day} {
       allow read, write: if false;
+    }
+
+    // Content reports (Apple UGC requirement): users can flag public content.
+    // Create-only for the reporter; reviewed via the Firebase console.
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.keys().hasAll(['contentType', 'contentId', 'reporterId', 'createdAt']);
+      allow read, update, delete: if false;
+    }
+
+    // ==================== ADMIN ONLY ====================
+    
+    // System Configuration
+    match /config/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    // Analytics Events
+    match /analyticsEvents/{eventId} {
+      allow read: if false;
+      allow write: if false; // Only backend can write analytics
     }
   }
 }
