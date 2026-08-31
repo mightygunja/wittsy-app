@@ -85,20 +85,29 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
       if (result.success) {
         haptics.success();
-        
+
         // Refresh user profile to update coin balance
         await refreshUserProfile();
-        
+
         // Reload purchase status if this was first-time offer
         if (product.firstTimeOnly) {
           await loadPurchaseStatus();
         }
-        
-        Alert.alert(
-          '🎉 Purchase Successful!',
-          `You received ${product.coins} coins!${product.firstTimeOnly ? '\n\nThank you for your first purchase!' : ''}`,
-          [{ text: 'Awesome!' }]
-        );
+
+        if (result.granted) {
+          Alert.alert(
+            '🎉 Purchase Successful!',
+            `You received ${product.coins} coins!${product.firstTimeOnly ? '\n\nThank you for your first purchase!' : ''}`,
+            [{ text: 'Awesome!' }]
+          );
+        } else {
+          // Charged, but the grant hasn't landed yet — never claim delivery.
+          Alert.alert(
+            'Purchase Processing',
+            'Your purchase went through and your coins are on the way. If they don\'t appear shortly, restart the app or use Restore Purchases.',
+            [{ text: 'OK' }]
+          );
+        }
       } else {
         haptics.error();
         Alert.alert('Purchase Failed', result.error || 'Please try again.');

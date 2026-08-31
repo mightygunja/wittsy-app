@@ -114,6 +114,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUserProfile(null);
+        // Clear the purchase-credit target so a later sign-in with a
+        // different account can never receive this user's purchases.
+        monetization.setUser(null);
       }
       
       setLoading(false);

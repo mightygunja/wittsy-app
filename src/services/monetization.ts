@@ -5,7 +5,7 @@
 
 import { Platform } from 'react-native';
 import { firestore } from './firebase';
-import { doc, updateDoc, increment, getDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, increment, getDoc, setDoc, runTransaction } from 'firebase/firestore';
 import { analytics } from './analytics';
 import { errorTracking } from './errorTracking';
 import { isIAPAvailable } from '../utils/platform';
@@ -173,6 +173,12 @@ export interface PurchaseResult {
   success: boolean;
   purchase?: Purchase;
   error?: string;
+  /**
+   * For coin purchases: true once the coins have actually landed in Firestore.
+   * success:true with granted:false means the store charge went through but the
+   * grant is still processing (it will be retried on next launch / restore).
+   */
+  granted?: boolean;
 }
 
 class MonetizationService {
@@ -182,11 +188,29 @@ class MonetizationService {
   private availableProducts: IAPProduct[] = [];
   private purchaseUpdateSubscription: any = null;
   private purchaseErrorSubscription: any = null;
+  // Purchases awaiting their grant, keyed by productId. Resolved by the
+  // purchase listeners so purchaseCoins can report the real outcome.
+  private pendingGrants = new Map<string, (result: { granted: boolean; error?: string }) => void>();
+
+  /**
+   * Set (or clear) the user purchases are credited to. Must track every auth
+   * change — the IAP connection outlives sign-out/sign-in, and a stale id
+   * here credits real-money purchases to the wrong account.
+   */
+  setUser(userId: string | null): void {
+    this.currentUserId = userId;
+  }
 
   /**
    * Initialize IAP connection
    */
   async initialize(userId?: string): Promise<void> {
+    // Always update the active user, even when the connection already exists
+    // (account switch after sign-out re-runs initialize with a new uid).
+    if (userId) {
+      this.currentUserId = userId;
+    }
+
     if (this.initialized) {
       console.log('💰 Monetization already initialized');
       return;
@@ -235,6 +259,18 @@ class MonetizationService {
         (error: PurchaseError) => {
           console.error('❌ Purchase error:', error);
           errorTracking.logError(new Error(error.message), { context: 'IAP purchase error' });
+          // Unblock any purchase waiting on its grant (cancel, card declined, ...)
+          const failedProductId = (error as any)?.productId;
+          const message = error?.code === 'E_USER_CANCELLED' ? 'Purchase cancelled' : (error?.message || 'Purchase failed');
+          if (failedProductId && this.pendingGrants.has(failedProductId)) {
+            this.pendingGrants.get(failedProductId)!({ granted: false, error: message });
+            this.pendingGrants.delete(failedProductId);
+          } else {
+            for (const [key, resolve] of this.pendingGrants) {
+              resolve({ granted: false, error: message });
+              this.pendingGrants.delete(key);
+            }
+          }
         }
       );
 
@@ -269,7 +305,9 @@ class MonetizationService {
       // Handle coin packages
       const coinProduct = COIN_PACKAGES.find(p => p.id === purchase.productId);
       if (coinProduct && coinProduct.coins) {
-        await this.grantCoinsToUser(this.currentUserId, coinProduct.coins);
+        // Idempotent by transactionId: safe against listener re-delivery,
+        // restore, and app-relaunch replays of unfinished transactions.
+        await this.grantCoinsIdempotent(this.currentUserId, coinProduct.coins, receipt, purchase.productId);
         console.log(`✅ Granted ${coinProduct.coins} coins to user ${this.currentUserId}`);
         
         // Mark first-time purchase if applicable and grant exclusive item
@@ -289,12 +327,15 @@ class MonetizationService {
         
         await RNIap.finishTransaction({ purchase });
         console.log('✅ Coin transaction finished');
-        
+
         analytics.logEvent('purchase_success', {
           product_id: purchase.productId,
           coins: coinProduct.coins,
           first_time: coinProduct.firstTimeOnly || false,
         });
+
+        this.pendingGrants.get(purchase.productId)?.({ granted: true });
+        this.pendingGrants.delete(purchase.productId);
         return;
       }
 
@@ -366,6 +407,14 @@ class MonetizationService {
     } catch (error: any) {
       console.error('❌ Failed to handle purchase update:', error);
       errorTracking.logError(error as Error, { context: 'Handle purchase update' });
+      // Deliberately NOT finishing the transaction here: the store will
+      // re-deliver it on next launch (or via Restore Purchases), so the
+      // grant gets retried instead of the money being silently lost.
+      this.pendingGrants.get(purchase.productId)?.({
+        granted: false,
+        error: 'Your payment went through, but delivering the coins hit a snag. They will be delivered automatically on your next launch, or use Restore Purchases.',
+      });
+      this.pendingGrants.delete(purchase.productId);
     }
   }
 
@@ -388,7 +437,13 @@ class MonetizationService {
       }
 
       console.log('🔵 Requesting purchase for:', productId);
-      
+
+      // Wire up the grant listener BEFORE requesting, so a fast store
+      // callback can't race past us.
+      const grantResult = new Promise<{ granted: boolean; error?: string }>((resolve) => {
+        this.pendingGrants.set(productId, resolve);
+      });
+
       // Request the purchase - using v14 API format
       await RNIap.requestPurchase({
         request: {
@@ -397,11 +452,24 @@ class MonetizationService {
         },
         type: 'in-app',
       });
-      
+
       console.log('✅ Purchase request sent');
 
-      // The actual purchase completion will be handled by purchaseUpdateListener
-      // Return success immediately
+      // Wait for the purchase listener to actually grant the coins (or fail).
+      // The timeout covers a store callback that never arrives — in that case
+      // the transaction stays unfinished and is re-delivered on next launch.
+      const outcome = await Promise.race([
+        grantResult,
+        new Promise<{ granted: boolean; error?: string }>((resolve) =>
+          setTimeout(() => resolve({ granted: false }), 60000)
+        ),
+      ]);
+      this.pendingGrants.delete(productId);
+
+      if (outcome.error) {
+        return { success: false, error: outcome.error };
+      }
+
       const purchase: Purchase = {
         id: `purchase_${Date.now()}`,
         productId,
@@ -410,16 +478,18 @@ class MonetizationService {
         price: product.priceValue,
         currency: product.currency,
         timestamp: new Date(),
-        status: 'pending',
+        status: outcome.granted ? 'completed' : 'pending',
       };
 
       this.purchaseHistory.push(purchase);
 
       return {
         success: true,
+        granted: outcome.granted,
         purchase,
       };
     } catch (error: any) {
+      this.pendingGrants.delete(productId);
       console.error('❌ Coin purchase failed:', error);
       console.error('❌ Error code:', error.code);
       console.error('❌ Error message:', error.message);
@@ -503,6 +573,45 @@ class MonetizationService {
         error: errorMessage,
       };
     }
+  }
+
+  /**
+   * Grant purchased coins exactly once per store transaction. A marker doc at
+   * users/{uid}/iapTransactions/{transactionId} is written in the same
+   * Firestore transaction as the balance update, so replays (listener
+   * re-delivery, restore, relaunch) become no-ops instead of double grants.
+   * Returns 'granted' on a fresh grant, 'already' when this transaction was
+   * granted before.
+   */
+  async grantCoinsIdempotent(
+    userId: string,
+    coins: number,
+    transactionId: string,
+    productId?: string
+  ): Promise<'granted' | 'already'> {
+    // Firestore doc ids cannot contain '/'
+    const markerId = String(transactionId).replace(/\//g, '_');
+    const markerRef = doc(firestore, 'users', userId, 'iapTransactions', markerId);
+    const userRef = doc(firestore, 'users', userId);
+
+    return runTransaction(firestore, async (tx) => {
+      const marker = await tx.get(markerRef);
+      if (marker.exists()) {
+        console.log(`💰 Transaction ${markerId} already granted — skipping`);
+        return 'already' as const;
+      }
+      const userDoc = await tx.get(userRef);
+      if (!userDoc.exists()) {
+        throw new Error('User document not found');
+      }
+      tx.set(markerRef, {
+        productId: productId || null,
+        coins,
+        grantedAt: new Date().toISOString(),
+      });
+      tx.update(userRef, { coins: (userDoc.data().coins || 0) + coins });
+      return 'granted' as const;
+    });
   }
 
   /**
@@ -608,6 +717,31 @@ class MonetizationService {
 
       if (purchases && purchases.length > 0) {
         for (const purchase of purchases) {
+          // Unfulfilled coin packs: a coin purchase still sitting in
+          // getAvailablePurchases was never finished — meaning its grant
+          // likely failed. Grant it now (idempotently) BEFORE finishing;
+          // finishing without granting would destroy the only record that
+          // lets the user ever get their coins.
+          const coinProduct = COIN_PACKAGES.find(p => p.id === purchase.productId);
+          if (coinProduct?.coins && this.currentUserId) {
+            try {
+              const txId = purchase.transactionId || `${purchase.productId}_${purchase.transactionDate || 'unknown'}`;
+              const result = await this.grantCoinsIdempotent(
+                this.currentUserId, coinProduct.coins, txId, purchase.productId
+              );
+              if (result === 'granted') {
+                restoredCount++;
+                console.log(`✅ Restored ${coinProduct.coins} coins from unfinished transaction`);
+              }
+              await RNIap.finishTransaction({ purchase });
+            } catch (e) {
+              // Grant failed — leave the transaction unfinished so it can be
+              // retried on the next launch or restore.
+              console.error('Failed to restore coin purchase (kept for retry):', e);
+            }
+            continue;
+          }
+
           // Handle battle pass premium restoration
           if (purchase.productId === 'com.wittz.battlepass.premium' && this.currentUserId) {
             try {
@@ -653,6 +787,8 @@ class MonetizationService {
       }
       await RNIap.endConnection();
       this.initialized = false;
+      this.currentUserId = null;
+      this.pendingGrants.clear();
       console.log('✅ IAP connection closed');
     } catch (error: any) {
       console.error('❌ Failed to cleanup IAP:', error);
