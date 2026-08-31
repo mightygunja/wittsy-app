@@ -49,7 +49,19 @@ service cloud.firestore {
         (!('coins' in request.resource.data) || request.resource.data.coins >= 0) &&
         (!('xp' in request.resource.data) || request.resource.data.xp >= 0) &&
         hasValidTimestamp();
-      allow update: if isSignedIn() && isOwner(userId);
+      // Rating/record fields are settled exclusively by the server (endGame
+      // Cloud Function). Blocking client writes here also stops OLD app
+      // versions from double-counting their own ratings on top of the
+      // server's settlement. Username changes must pass the same format rule
+      // as creation (renames previously bypassed it).
+      allow update: if isSignedIn() && isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'rankedRating', 'casualRating', 'rankedGamesPlayed', 'casualGamesPlayed',
+          'gamesWon', 'gamesLost', 'peakRating', 'peakRankedRating', 'ratingDeviation'
+        ]) &&
+        (!('username' in request.resource.data) ||
+          request.resource.data.username == resource.data.username ||
+          isValidUsername(request.resource.data.username));
       // Self-delete is required for in-app account deletion
       // (App Store Guideline 5.1.1(v) / GDPR).
       allow delete: if isSignedIn() && (isOwner(userId) || isAdmin());
@@ -100,10 +112,12 @@ service cloud.firestore {
     
     match /prompts/{promptId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      // Admin-only: open create let any user inject live prompts, bypassing
+      // the promptSubmissions approval pipeline entirely.
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
     }
-    
+
     match /matches/{matchId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
@@ -166,12 +180,8 @@ service cloud.firestore {
       allow write: if false; // Only backend updates rating history
     }
     
-    // Prompts - allow app to seed prompts
-    match /prompts/{promptId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
-    }
+    // (duplicate prompts match removed — overlapping matches grant if ANY
+    // rule allows, which silently re-opened prompt injection)
     
     // ==================== CONTENT MODERATION ====================
     
@@ -218,11 +228,16 @@ service cloud.firestore {
     
     // ==================== SOCIAL FEATURES ====================
     
-    // Friendships
+    // Friendships (one doc per direction). Either side may delete either doc
+    // so removing a friend cleans up BOTH directions — owner-only deletes left
+    // the removed friend with a stale one-sided friendship.
     match /friendships/{friendshipId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.friendId == request.auth.uid
+      );
     }
     
     // Friend Requests
@@ -270,8 +285,17 @@ service cloud.firestore {
     // Events
     match /events/{eventId} {
       allow read: if isSignedIn();
-      allow write: if false; // Only admins can create events
-      
+      allow create, delete: if isAdmin();
+      // Players joining/leaving may only step the participant counter by
+      // exactly ±1 (a key-only constraint would let any client write an
+      // arbitrary count and block registration by faking "full").
+      allow update: if isAdmin() || (isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentParticipants']) &&
+        request.resource.data.currentParticipants is int &&
+        request.resource.data.currentParticipants >= 0 &&
+        (request.resource.data.currentParticipants == resource.data.currentParticipants + 1 ||
+         request.resource.data.currentParticipants == resource.data.currentParticipants - 1));
+
       // Event Participants
       match /participants/{participantId} {
         allow read: if isSignedIn();
@@ -341,12 +365,15 @@ service cloud.firestore {
     
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && (
-        // Users can create notifications for themselves
-        request.resource.data.userId == request.auth.uid ||
-        // Or system can create for any user
-        isAdmin()
-      );
+      // Any signed-in user may create a notification for another user (friend
+      // requests, game invites, group invites are peer-to-peer in this app) —
+      // recipient-only creates silently killed every social notification.
+      // The shape is constrained; only the recipient can read/update/delete.
+      allow create: if isSignedIn() &&
+        request.resource.data.userId is string &&
+        request.resource.data.keys().hasAll(['userId', 'type']) &&
+        (!('title' in request.resource.data) || isValidString(request.resource.data.title, 1, 200)) &&
+        (!('body' in request.resource.data) || isValidString(request.resource.data.body, 1, 500));
       allow update: if isSignedIn() && 
         resource.data.userId == request.auth.uid &&
         // Only allow marking as read
@@ -421,19 +448,28 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberCount'])
         )
       );
-      allow delete: if isSignedIn() &&
-        resource.data.createdBy == request.auth.uid;
+      // Creator can always delete; a sole remaining member can also delete
+      // (the creator may have left under old code, orphaning the group with a
+      // live invite code).
+      allow delete: if isSignedIn() && (
+        resource.data.createdBy == request.auth.uid ||
+        (resource.data.members.size() == 1 && resource.data.members.hasAll([request.auth.uid]))
+      );
 
       match /groupMembers/{memberId} {
         allow read: if isSignedIn() &&
           get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
-        allow write: if isSignedIn();
+        // Only group members may write member docs — previously ANY signed-in
+        // user could tamper with any group's roster/roles.
+        allow write: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
       }
 
       match /groupStats/{memberId} {
         allow read: if isSignedIn() &&
           get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
-        allow write: if isSignedIn();
+        // Standings are settled exclusively by the endGame Cloud Function.
+        allow write: if false;
       }
     }
 
