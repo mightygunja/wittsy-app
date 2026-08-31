@@ -122,40 +122,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, []);
 
+  // Sign-in attempts must NOT toggle the global `loading` flag: AppNavigator
+  // swaps the whole NavigationContainer for a full-screen <Loading /> while it
+  // is true, which unmounts the auth screens and wipes their local state
+  // (typed email, inline error messages). The screens show their own button
+  // spinners, and the onAuthStateChange listener drives the success transition.
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      await authService.signIn(email, password);
-    } finally {
-      setLoading(false);
-    }
+    await authService.signIn(email, password);
   };
 
   const signUp = async (email: string, password: string, username: string, referralCode?: string) => {
-    setLoading(true);
-    try {
-      await authService.registerUser(email, password, username, referralCode);
-    } finally {
-      setLoading(false);
-    }
+    await authService.registerUser(email, password, username, referralCode);
   };
 
   const signInWithGoogle = async () => {
-    setLoading(true);
-    try {
-      await authService.signInWithGoogle();
-    } finally {
-      setLoading(false);
-    }
+    await authService.signInWithGoogle();
   };
 
   const signInWithApple = async () => {
-    setLoading(true);
-    try {
-      await authService.signInWithApple();
-    } finally {
-      setLoading(false);
-    }
+    await authService.signInWithApple();
   };
 
   const signInAsGuest = async () => {

@@ -34,6 +34,8 @@ if (isWeb) {
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
   Dimensions.addEventListener('change', ({ window: win }) => {
     if (settleTimer) clearTimeout(settleTimer);
+    // Hidden/backgrounded tabs can report a 0-width viewport — not a real tier change.
+    if (win.width <= 0) return;
     if (tierOf(win.width) !== initialTier) {
       settleTimer = setTimeout(() => {
         (globalThis as any).location?.reload?.();
