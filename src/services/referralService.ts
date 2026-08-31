@@ -4,17 +4,18 @@
  */
 
 import { firestore } from './firebase';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  increment, 
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  increment,
   collection,
   query,
   where,
   getDocs,
-  arrayUnion
+  arrayUnion,
+  runTransaction
 } from 'firebase/firestore';
 import { analytics } from './analytics';
 import { monetization } from './monetization';
@@ -195,13 +196,13 @@ class ReferralService {
         milestoneReached = 10;
       }
 
-      // Grant coins to referrer
-      await monetization.grantCoinsToUser(referrerId, coinsToGrant);
-
-      // Update referral stats
+      // The new user's client cannot write the REFERRER's users doc (owner-only
+      // rules), so the reward lands as pendingCoins on the referrer's referral
+      // doc — the referrer's own client claims it via claimPendingRewards().
       const referralRef = doc(firestore, 'referrals', referrerId);
       const updateData: any = {
         coinsEarned: increment(coinsToGrant),
+        pendingCoins: increment(coinsToGrant),
       };
 
       if (milestoneReached) {
@@ -239,6 +240,36 @@ class ReferralService {
       console.log(`✅ Granted ${REFERRAL_REWARDS.INVITEE_BONUS} welcome bonus to ${userId}`);
     } catch (error) {
       console.error('❌ Failed to grant welcome bonus:', error);
+    }
+  }
+
+  /**
+   * Claim referral coins earned while this user was away. Referral rewards
+   * are deposited as pendingCoins on the referrer's own referral doc (other
+   * users cannot write this user's coin balance directly); this moves them
+   * into the real balance atomically. Returns the number of coins claimed.
+   */
+  async claimPendingRewards(userId: string): Promise<number> {
+    try {
+      const referralRef = doc(firestore, 'referrals', userId);
+      const userRef = doc(firestore, 'users', userId);
+
+      return await runTransaction(firestore, async (tx) => {
+        const referralSnap = await tx.get(referralRef);
+        if (!referralSnap.exists()) return 0;
+        const pending = referralSnap.data().pendingCoins || 0;
+        if (pending <= 0) return 0;
+
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) return 0;
+
+        tx.update(referralRef, { pendingCoins: 0 });
+        tx.update(userRef, { coins: (userSnap.data().coins || 0) + pending });
+        return pending;
+      });
+    } catch (error) {
+      console.error('❌ Failed to claim pending referral rewards:', error);
+      return 0;
     }
   }
 

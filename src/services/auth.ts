@@ -504,15 +504,22 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
     console.error('❌ Apple Sign-In error:', error);
     console.error('❌ Error code:', error.code);
     console.error('❌ Error message:', error.message);
-    
+
+    // Re-throw the linking error UNCHANGED: it carries .email and
+    // .pendingCredential, which the linking UI needs. Wrapping it in a fresh
+    // Error strips those properties and breaks account linking entirely.
+    if (error.message === 'ACCOUNT_LINKING_REQUIRED') {
+      throw error;
+    }
+
     if (error.code === 'ERR_CANCELED') {
       throw new Error('Sign-in was cancelled');
     }
-    
+
     if (error.code === 'permission-denied') {
       throw new Error('Missing or insufficient permissions');
     }
-    
+
     throw new Error(error.message || 'Failed to sign in with Apple');
   }
 };
@@ -554,6 +561,15 @@ export const getCurrentUser = async (): Promise<User | null> => {
 };
 
 // Delete account permanently (required by Apple App Store guidelines)
+//
+// Ordering matters: Firebase rejects deleteUser with auth/requires-recent-login
+// for sessions older than ~5 minutes. The old flow deleted all Firestore data
+// FIRST, so that rejection left the account alive with every trace of progress
+// already destroyed. Now we (1) pre-check session recency before touching
+// anything, (2) require the core profile deletion to succeed before the auth
+// account is removed, and (3) never report success when data survived.
+const RECENT_LOGIN_WINDOW_MS = 4 * 60 * 1000;
+
 export const deleteAccount = async (): Promise<void> => {
   const currentUser = auth.currentUser;
   if (!currentUser) {
@@ -561,34 +577,43 @@ export const deleteAccount = async (): Promise<void> => {
   }
 
   const userId = currentUser.uid;
+
+  // 0. Recency pre-check BEFORE deleting anything: if the session is too old,
+  // deleteUser would fail after the data was already gone.
+  const lastSignIn = currentUser.metadata.lastSignInTime
+    ? new Date(currentUser.metadata.lastSignInTime).getTime()
+    : 0;
+  if (!currentUser.isAnonymous && Date.now() - lastSignIn > RECENT_LOGIN_WINDOW_MS) {
+    throw new Error(
+      'For security, please sign out, sign back in, and delete your account right away.'
+    );
+  }
+
   console.log('🗑️ Starting account deletion for user:', userId);
 
   try {
-    // 1. Delete user's Firestore document
-    try {
-      await deleteDoc(doc(firestore, 'users', userId));
-      console.log('✅ Deleted user document');
-    } catch (e) {
-      console.error('Failed to delete user document:', e);
+    // 1. Delete the user's core profile document. This one is NOT optional —
+    // if it fails we abort before removing the auth account, so nothing is
+    // orphaned and the user can retry.
+    await deleteDoc(doc(firestore, 'users', userId));
+    console.log('✅ Deleted user document');
+
+    // 2. Best-effort cleanup of secondary per-user documents.
+    const secondaryDocs = [
+      doc(firestore, 'battlePasses', userId),
+      doc(firestore, 'avatars', userId),
+      doc(firestore, 'referrals', userId),
+      doc(firestore, 'dailyRewards', userId),
+    ];
+    for (const ref of secondaryDocs) {
+      try {
+        await deleteDoc(ref);
+      } catch (e) {
+        console.error(`Failed to delete ${ref.path}:`, e);
+      }
     }
 
-    // 2. Delete user's battle pass data
-    try {
-      await deleteDoc(doc(firestore, 'battlePasses', userId));
-      console.log('✅ Deleted battle pass data');
-    } catch (e) {
-      console.error('Failed to delete battle pass data:', e);
-    }
-
-    // 3. Delete user's avatar data
-    try {
-      await deleteDoc(doc(firestore, 'avatars', userId));
-      console.log('✅ Deleted avatar data');
-    } catch (e) {
-      console.error('Failed to delete avatar data:', e);
-    }
-
-    // 4. Delete user's friend requests
+    // 3. Delete user's friend requests
     try {
       const sentRequests = await getDocs(
         query(collection(firestore, 'friendRequests'), where('fromUserId', '==', userId))
@@ -604,7 +629,8 @@ export const deleteAccount = async (): Promise<void> => {
       console.error('Failed to delete friend requests:', e);
     }
 
-    // 5. Delete the Firebase Auth account
+    // 4. Delete the Firebase Auth account last — the recency pre-check makes
+    // a requires-recent-login rejection here very unlikely.
     await deleteUser(currentUser);
     console.log('✅ Firebase Auth account deleted');
 
@@ -612,9 +638,13 @@ export const deleteAccount = async (): Promise<void> => {
   } catch (error: any) {
     console.error('❌ Account deletion failed:', error);
 
-    // If the error is auth/requires-recent-login, the user needs to re-authenticate
     if (error.code === 'auth/requires-recent-login') {
-      throw new Error('For security, please sign out and sign back in, then try deleting your account again.');
+      throw new Error(
+        'For security, please sign out, sign back in, and delete your account right away.'
+      );
+    }
+    if (error.code === 'permission-denied') {
+      throw new Error('Account deletion failed. Please try again or contact support.');
     }
 
     throw new Error(error.message || 'Failed to delete account');

@@ -30,12 +30,33 @@ export const getActiveChallenges = async (userId: string): Promise<Challenge[]> 
   );
 
   const snapshot = await getDocs(q);
-  const now = new Date().toISOString();
-  
-  // Filter active challenges client-side
+  const now = Date.now();
+
+  // Challenge dates arrive in two shapes: the cron Cloud Functions write
+  // Firestore Timestamps, while client-seeded challenges use ISO strings.
+  // Comparing a Timestamp to a string is always false, which permanently
+  // hid every server-generated challenge — normalize to epoch millis.
+  const toMillis = (value: any): number => {
+    if (!value) return NaN;
+    if (typeof value.toDate === 'function') return value.toDate().getTime();
+    if (typeof value.seconds === 'number') return value.seconds * 1000;
+    return new Date(value).getTime();
+  };
+
+  // Filter active challenges client-side, normalizing dates to ISO strings
+  // so downstream renderers (`new Date(challenge.endDate)`) work for both.
   const challenges = snapshot.docs
     .map(doc => ({ id: doc.id, ...doc.data() } as Challenge))
-    .filter(challenge => challenge.startDate <= now && challenge.endDate >= now);
+    .filter(challenge => {
+      const start = toMillis(challenge.startDate);
+      const end = toMillis(challenge.endDate);
+      return !isNaN(start) && !isNaN(end) && start <= now && end >= now;
+    })
+    .map(challenge => ({
+      ...challenge,
+      startDate: new Date(toMillis(challenge.startDate)).toISOString(),
+      endDate: new Date(toMillis(challenge.endDate)).toISOString(),
+    }));
 
   // Get user progress for each challenge
   const progressPromises = challenges.map(challenge => 

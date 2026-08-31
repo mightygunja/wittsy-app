@@ -25,7 +25,7 @@ import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const ReferralScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [referralCode, setReferralCode] = useState<string>('');
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +57,21 @@ export const ReferralScreen: React.FC = () => {
     if (!user) return;
 
     try {
-      const data = await referralService.getReferralData(user.uid);
+      // Deposit any referral coins earned while away into the real balance
+      const claimed = await referralService.claimPendingRewards(user.uid);
+      if (claimed > 0) {
+        console.log(`💰 Claimed ${claimed} pending referral coins`);
+      }
+
+      let data = await referralService.getReferralData(user.uid);
+
+      // Existing accounts predate the referral doc (or its creation previously
+      // failed against the old security rules) — create it on demand so the
+      // screen never shows an empty code with dead Copy/Share buttons.
+      if (!data && userProfile?.username) {
+        data = await referralService.initializeReferralData(user.uid, userProfile.username);
+      }
+
       const statsData = await referralService.getReferralStats(user.uid);
 
       if (data) {

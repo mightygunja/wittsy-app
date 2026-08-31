@@ -43,14 +43,50 @@ service cloud.firestore {
     
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && 
-        isOwner(userId) && 
+      allow create: if isSignedIn() &&
+        isOwner(userId) &&
         isValidUsername(request.resource.data.username) &&
         (!('coins' in request.resource.data) || request.resource.data.coins >= 0) &&
         (!('xp' in request.resource.data) || request.resource.data.xp >= 0) &&
         hasValidTimestamp();
       allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if false; // Users cannot delete their own accounts
+      // Self-delete is required for in-app account deletion
+      // (App Store Guideline 5.1.1(v) / GDPR).
+      allow delete: if isSignedIn() && (isOwner(userId) || isAdmin());
+
+      // IAP grant markers — one doc per store transaction, written in the
+      // same Firestore transaction as the coin balance update so purchases
+      // are granted exactly once. Immutable once written.
+      match /iapTransactions/{transactionId} {
+        allow read, create: if isSignedIn() && isOwner(userId);
+        allow update: if false;
+        allow delete: if isSignedIn() && isOwner(userId); // account deletion cascade
+      }
+
+      // Per-game personal settlement markers — guard the client's own
+      // end-of-game reward grants against remounts. Immutable once written.
+      match /settledGames/{gameId} {
+        allow read, create: if isSignedIn() && isOwner(userId);
+        allow update: if false;
+        allow delete: if isSignedIn() && isOwner(userId); // account deletion cascade
+      }
+    }
+
+    // Referrals — one doc per user (doc id == uid). Anyone signed in may read
+    // (needed to look up referral codes). The owner manages their own doc; a
+    // NEW user redeeming a code may update the REFERRER's doc, but only the
+    // referral-bookkeeping fields.
+    match /referrals/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (
+        isOwner(userId) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'referredUsers', 'totalReferrals', 'lastReferralAt',
+          'coinsEarned', 'milestonesReached', 'pendingCoins'
+        ])
+      );
+      allow delete: if isSignedIn() && isOwner(userId);
     }
     
     // ==================== GAME ROOMS ====================

@@ -11,6 +11,7 @@
 
 const admin = require('firebase-admin');
 const { isCleanForPublic } = require('./contentFilter');
+const { settleRatings } = require('./elo');
 const db = admin.firestore();
 const rtdb = admin.database();
 
@@ -112,6 +113,17 @@ async function advancePhase(roomId) {
 
   if (!game) {
     console.log(`⚠️ No game state for ${roomId}`);
+    return;
+  }
+
+  // Self-heal: if the Firestore room is already finished (e.g. ended via
+  // insufficient_players when someone left), the RTDB game node is stale.
+  // Remove it so clients see the end screen instead of looping rounds forever.
+  const statusDoc = await db.collection('rooms').doc(roomId).get();
+  if (!statusDoc.exists || statusDoc.data()?.status === 'finished') {
+    console.log(`🏁 Room ${roomId} is finished/gone — clearing stale game state`);
+    await rtdb.ref(`rooms/${roomId}/game`).remove();
+    await rtdb.ref(`rooms/${roomId}/submissions`).remove();
     return;
   }
 
@@ -222,6 +234,14 @@ async function advancePhase(roomId) {
         freshVotingGame.round || 0,
         freshVotingGame.prompt || ''
       );
+
+      // A concurrent call already processed this round AND is writing the
+      // results phase with the real winner data. Writing our (empty) update
+      // on top would clobber the winner for everyone — bail out entirely.
+      if (winnerData && winnerData.alreadyProcessed) {
+        console.log(`⏸️ Round already processed by concurrent call — skipping results write`);
+        return;
+      }
 
       const resultsDuration = Math.max(5, await getPhaseDurationForRoom(roomId, 'results'));
       const votingUpdates = {
@@ -498,7 +518,10 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound, p
 
   if (!transactionCommitted) {
     console.log(`⏸️ processVotesSync: transaction aborted for round ${currentRound} (already processed by concurrent call)`);
-    return null;
+    // Distinct from the zero-votes case (which returns undefined): the caller
+    // must NOT write a results update at all, or it would null out the winner
+    // fields the winning call just wrote.
+    return { alreadyProcessed: true };
   }
 
   // Write starred phrases to dedicated Firestore collection for any round winner
@@ -565,10 +588,36 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound, p
 async function endGame(roomId) {
   try {
     const roomRef = db.collection('rooms').doc(roomId);
-    const roomDoc = await roomRef.get();
-    const room = roomDoc.data();
+
+    // SETTLEMENT IDEMPOTENCY: concurrent results-phase advances can both reach
+    // endGame. Claim settlement in a transaction — only the first caller
+    // proceeds to write match history / ratings / group stats.
+    let claimed = false;
+    let room = null;
+    await db.runTransaction(async (tx) => {
+      claimed = false;
+      const snap = await tx.get(roomRef);
+      if (!snap.exists) return;
+      const data = snap.data();
+      room = data;
+      if (data.settled) return; // someone else already settled this game
+      tx.update(roomRef, {
+        settled: true,
+        status: 'finished',
+        endedAt: admin.firestore.Timestamp.now(),
+      });
+      claimed = true;
+    });
+
+    if (!claimed) {
+      console.log(`⏸️ endGame: ${roomId} already settled — cleaning up only`);
+      await rtdb.ref(`rooms/${roomId}/game`).remove();
+      await rtdb.ref(`rooms/${roomId}/submissions`).remove();
+      return;
+    }
+
     const scores = room?.scores || {};
-    
+
     // Find winner(s) - handle ties at game end too
     let maxVotes = 0;
     Object.entries(scores).forEach(([userId, data]) => {
@@ -577,21 +626,15 @@ async function endGame(roomId) {
         maxVotes = totalVotes;
       }
     });
-    
+
     // Get all winners with max votes (in case of tie)
     const winners = Object.entries(scores)
       .filter(([userId, data]) => (data?.totalVotes || 0) === maxVotes)
       .map(([userId]) => userId);
-    
+
     const winnerId = winners[0] || null;
-    
+
     console.log(`🏆 GAME END - Winner(s) with ${maxVotes} votes:`, winners);
-    
-    // Update room status
-    await roomRef.update({
-      status: 'finished',
-      endedAt: admin.firestore.Timestamp.now()
-    });
     
     // Save match history for each player with their best phrase and prompt
     const gameSnapshot = await rtdb.ref(`rooms/${roomId}/game`).once('value');
@@ -633,7 +676,9 @@ async function endGame(roomId) {
       const stars = userScore.stars || 0;
       const won = userId === winnerId;
 
-      const matchRef = db.collection('matches').doc(`${userId}_${roomId}_${Date.now()}`);
+      // Deterministic id — a second write for the same player+game overwrites
+      // instead of creating a duplicate history entry.
+      const matchRef = db.collection('matches').doc(`${userId}_${roomId}`);
       batch.set(matchRef, {
         roomId: roomId,
         roomName: room.name || 'Unknown Room',
@@ -660,7 +705,53 @@ async function endGame(roomId) {
     } else {
       console.log(`⚠️ No match history records to save for room ${roomId}`);
     }
-    
+
+    // Settle ELO ratings server-side (exactly once — we hold the settlement
+    // claim). Clients only read the result for display.
+    if (players.length >= 2) {
+      try {
+        const playerScores = players
+          .map(p => ({ userId: p.userId, score: scores[p.userId]?.totalVotes || 0 }))
+          .sort((a, b) => b.score - a.score);
+        const ratingUpdates = await settleRatings(db, playerScores, room?.isRanked === true);
+        if (Object.keys(ratingUpdates).length > 0) {
+          await roomRef.update({ ratingUpdates });
+          console.log(`📊 Ratings settled for ${Object.keys(ratingUpdates).length} players`);
+        }
+      } catch (err) {
+        console.error(`⚠️ Failed to settle ratings for ${roomId}:`, err);
+      }
+    }
+
+    // Update group standings server-side (exactly once) for group games.
+    if (room?.groupId && players.length > 0) {
+      try {
+        const sortedForGroup = players
+          .map(p => ({ userId: p.userId, username: p.username || '', score: scores[p.userId]?.totalVotes || 0 }))
+          .sort((a, b) => b.score - a.score);
+        const groupBatch = db.batch();
+        sortedForGroup.forEach((p, idx) => {
+          const place = idx + 1;
+          const statsRef = db.collection('groups').doc(room.groupId)
+            .collection('groupStats').doc(p.userId);
+          groupBatch.set(statsRef, {
+            userId: p.userId,
+            username: p.username,
+            gamesPlayed: admin.firestore.FieldValue.increment(1),
+            wins: admin.firestore.FieldValue.increment(place === 1 ? 1 : 0),
+            totalPoints: admin.firestore.FieldValue.increment(p.score),
+            // Nested object (not a dotted path): set+merge deep-merges maps,
+            // so only this placement bucket is incremented.
+            placements: { [String(place)]: admin.firestore.FieldValue.increment(1) },
+          }, { merge: true });
+        });
+        await groupBatch.commit();
+        console.log(`👥 Group standings updated for group ${room.groupId}`);
+      } catch (err) {
+        console.error(`⚠️ Failed to update group stats for ${roomId}:`, err);
+      }
+    }
+
     // Clear game state
     await rtdb.ref(`rooms/${roomId}/game`).remove();
     await rtdb.ref(`rooms/${roomId}/submissions`).remove();

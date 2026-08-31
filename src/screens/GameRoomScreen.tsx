@@ -51,41 +51,34 @@ import { StarCelebration } from '../components/game/StarCelebration';
 import { VictoryCelebration } from '../components/game/VictoryCelebration';
 import * as StoreReview from 'expo-store-review';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateGroupStats } from '../services/groups';
 import { SPACING, STAR_THRESHOLD } from '../utils/constants';
-import { updatePlayerRating, updateMultiplayerRatings, RatingUpdate } from '../services/eloRatingService';
+import { RatingUpdate } from '../services/eloRatingService';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
-import { doc as firestoreDoc, setDoc } from 'firebase/firestore';
+import { runTransaction } from 'firebase/firestore';
 
-// Helper function to save match history
-const saveMatchHistory = async (
-  userId: string,
-  matchData: {
-    roomId: string;
-    roomName: string;
-    won: boolean;
-    score: number;
-    stars: number;
-    totalVotes: number;
-    roundsWon: number;
-    playerCount: number;
-    isRanked: boolean;
-    bestPhrase?: string;
-    xpEarned: number;
-    leveledUp: boolean;
-    playedAt: Date;
-    prompt?: string;
+/**
+ * Claim this game's personal settlement exactly once. Creates
+ * users/{uid}/settledGames/{roomId} in a transaction; returns false when the
+ * marker already exists (rewards were already granted — e.g. the screen
+ * remounted on a finished room via a deep link).
+ * Match history, ELO, and group stats are settled SERVER-side in endGame —
+ * this marker only guards the client's own reward grants.
+ */
+const claimPersonalSettlement = async (userId: string, roomId: string): Promise<boolean> => {
+  const markerRef = doc(firestore, 'users', userId, 'settledGames', roomId);
+  try {
+    return await runTransaction(firestore, async (tx) => {
+      const snap = await tx.get(markerRef);
+      if (snap.exists()) return false;
+      tx.set(markerRef, { settledAt: new Date().toISOString() });
+      return true;
+    });
+  } catch (error) {
+    // If the claim itself fails (offline, rules), skip grants rather than risk doubling
+    console.error('Failed to claim game settlement:', error);
+    return false;
   }
-): Promise<void> => {
-  const matchId = `${userId}_${matchData.roomId}_${Date.now()}`;
-  const matchRef = firestoreDoc(firestore, 'matches', matchId);
-  
-  await setDoc(matchRef, {
-    userId,
-    ...matchData,
-    createdAt: matchData.playedAt.toISOString(),
-  });
 };
 
 // Helper function to advance game phase
@@ -199,21 +192,43 @@ const GameRoomScreen: React.FC = () => {
     }
   }, [room?.status, gameState, user]);
 
+  // Rating changes are settled server-side in endGame and stamped on the room
+  // doc as `ratingUpdates` — pick them up for the end-of-game display.
+  useEffect(() => {
+    const updates = (room as any)?.ratingUpdates as Record<string, any> | undefined;
+    if (!updates || room?.status !== 'finished') return;
+    const ids = Object.keys(updates);
+    if (ids.length === 2) {
+      const sorted = [...ids].sort((a, b) => (updates[a].placement || 9) - (updates[b].placement || 9));
+      setRatingChanges({ winner: updates[sorted[0]] as RatingUpdate, loser: updates[sorted[1]] as RatingUpdate });
+    } else if (ids.length > 2) {
+      setMultiplayerRatingChanges(updates as Record<string, RatingUpdate>);
+    }
+  }, [(room as any)?.ratingUpdates, room?.status]);
+
   const handleGameEnd = async () => {
     if (!room || !user) return;
 
     try {
       console.log('🎮 Game ended, processing rewards...');
 
-      // Grant participation rewards to current user
-      await rewards.grantParticipationRewards(user.uid);
+      // Exactly-once guard for THIS user's rewards: remounting a finished room
+      // (deep link, refresh) must not grant again. Shared settlement (match
+      // history, ELO, group stats) happens server-side in endGame.
+      const firstSettlement = await claimPersonalSettlement(user.uid, roomId);
 
-      // Get Battle Pass level up info
-      const battlePassResult = await battlePass.addXP(
-        user.uid,
-        REWARD_AMOUNTS.GAME_PARTICIPATION_XP,
-        'game_end'
-      );
+      let battlePassResult: { leveledUp: boolean; newLevel?: number } = { leveledUp: false };
+      if (firstSettlement) {
+        // Grant participation rewards to current user
+        await rewards.grantParticipationRewards(user.uid);
+
+        // Get Battle Pass level up info
+        battlePassResult = await battlePass.addXP(
+          user.uid,
+          REWARD_AMOUNTS.GAME_PARTICIPATION_XP,
+          'game_end'
+        );
+      }
 
       // Prepare final scores with phrase data
       const scores = room.players.map((player) => {
@@ -242,92 +257,17 @@ const GameRoomScreen: React.FC = () => {
 
       // Sort by score to determine winner and loser
       const sortedScores = [...scores].sort((a, b) => b.score - a.score);
-      
-      // Update ELO ratings for ALL players in ranked games
-      if (room.isRanked && sortedScores.length >= 2) {
-        try {
-          // Build vote data for margin of victory calculation
-          const voteData: Record<string, number> = {};
-          for (const s of sortedScores) {
-            voteData[s.userId] = s.score;
-          }
 
-          if (sortedScores.length === 2) {
-            // 1v1: use dedicated 1v1 function with full margin of victory
-            const winnerId = sortedScores[0].userId;
-            const loserId = sortedScores[1].userId;
-            const totalVotes = sortedScores[0].score + sortedScores[1].score;
-            
-            console.log('📊 Updating 1v1 ELO ratings:', { winnerId, loserId });
-            const ratingUpdate = await updatePlayerRating(winnerId, loserId, true, {
-              winnerVotes: sortedScores[0].score,
-              secondPlaceVotes: sortedScores[1].score,
-              totalVotes,
-            });
-            setRatingChanges(ratingUpdate);
-            
-            console.log('✅ 1v1 ELO ratings updated:', {
-              winner: `${ratingUpdate.winner.oldRating} → ${ratingUpdate.winner.newRating} (${ratingUpdate.winner.ratingChange > 0 ? '+' : ''}${ratingUpdate.winner.ratingChange})`,
-              loser: `${ratingUpdate.loser.oldRating} → ${ratingUpdate.loser.newRating} (${ratingUpdate.loser.ratingChange > 0 ? '+' : ''}${ratingUpdate.loser.ratingChange})`
-            });
-          } else {
-            // 3+ players: use multiplayer pairwise comparison system
-            const playerIds = sortedScores.map(s => s.userId);
-            const finalScoreMap: Record<string, number> = {};
-            for (const s of sortedScores) {
-              finalScoreMap[s.userId] = s.score;
-            }
-            
-            console.log('📊 Updating multiplayer ELO ratings for', playerIds.length, 'players');
-            const multiUpdates = await updateMultiplayerRatings(
-              playerIds,
-              finalScoreMap,
-              true,
-              voteData
-            );
-            setMultiplayerRatingChanges(multiUpdates);
-            
-            console.log('✅ Multiplayer ELO ratings updated for', Object.keys(multiUpdates).length, 'players');
-          }
-        } catch (error) {
-          console.error('Failed to update ELO ratings:', error);
-        }
-      }
+      // ELO ratings, match history, and group stats are all settled SERVER-side
+      // in the endGame Cloud Function (exactly once, for all players). The
+      // rating deltas arrive on the room doc as `ratingUpdates` and are picked
+      // up by the display effect below.
 
-      // Save match history for all players (for starred phrases)
       const winnerId = sortedScores[0]?.userId;
-      
-      // Grant game win XP to the winner
-      if (winnerId) {
-        await rewards.grantGameWinRewards(winnerId);
-      }
-      
-      for (const player of scores) {
-        try {
-          const playerScore = room.scores?.[player.userId];
-          const stars = typeof playerScore === 'object' ? (playerScore.stars || 0) : 0;
-          const roundWins = typeof playerScore === 'object' ? (playerScore.roundWins || 0) : 0;
-          
-          // Save to matches collection
-          await saveMatchHistory(player.userId, {
-            roomId: room.roomId,
-            roomName: room.name,
-            won: player.userId === winnerId,
-            score: player.score,
-            stars,
-            totalVotes: player.score,
-            roundsWon: roundWins,
-            playerCount: room.players.length,
-            isRanked: room.isRanked || false,
-            bestPhrase: player.bestPhrase,
-            xpEarned: 0,
-            leveledUp: false,
-            playedAt: new Date(),
-            prompt: typeof room.currentPrompt === 'string' ? room.currentPrompt : room.currentPrompt?.text,
-          });
-        } catch (error) {
-          console.error(`Failed to save match history for ${player.userId}:`, error);
-        }
+
+      // Grant game-win XP — each player grants only their OWN rewards
+      if (firstSettlement && winnerId === user.uid) {
+        await rewards.grantGameWinRewards(user.uid);
       }
 
       setFinalScores(scores);
@@ -351,20 +291,7 @@ const GameRoomScreen: React.FC = () => {
       setVictoryData(winners);
       setShowVictoryCelebration(true);
 
-      // Update group standings if this was a group game
-      if ((room as any).groupId) {
-        try {
-          const groupResults = sortedScores.map((s, idx) => ({
-            userId: s.userId,
-            username: s.username,
-            place: idx + 1,
-            points: s.score,
-          }));
-          await updateGroupStats((room as any).groupId, groupResults);
-        } catch (groupError) {
-          console.error('Failed to update group stats:', groupError);
-        }
-      }
+      // Group standings are updated server-side in endGame (exactly once).
 
       // Prompt for App Store review at peak excitement — after 2+ completed games.
       // Apple's API rate-limits this to 3 times per year per user regardless of
@@ -613,52 +540,41 @@ const GameRoomScreen: React.FC = () => {
             }
           }
           
-          if (!state.lastWinner && state.votes && state.submissions) {
-            const voteCounts: { [userId: string]: number } = {};
-            Object.values(state.votes).forEach((votedUserId: any) => {
-              if (votedUserId) voteCounts[votedUserId] = (voteCounts[votedUserId] || 0) + 1;
-            });
-            let maxVotes = 0;
-            let winnerId: string | null = null;
-            Object.entries(voteCounts).forEach(([userId, count]) => {
-              if (count > maxVotes) { maxVotes = count; winnerId = userId; }
-            });
-            if (winnerId && state.submissions[winnerId]) {
-              state.lastWinner = winnerId;
-              state.lastWinningPhrase = state.submissions[winnerId];
-              console.log('🏆 Winner:', winnerId, 'Phrase:', state.lastWinningPhrase, 'Votes:', maxVotes);
-              
-              if (winnerId === user?.uid) {
-                analytics.winRound(roomId, state.round || 0, maxVotes);
-              }
+          // Server-settled winner data (lastWinners/roundVoteCounts) drives
+          // celebrations. Each player grants only their OWN round rewards —
+          // cross-user grants from every client multiplied rewards by the
+          // number of connected players.
+          const roundWinners = state.lastWinners || (state.lastWinner ? [state.lastWinner] : []);
+          if (roundWinners.length > 0) {
+            const primaryWinner = roundWinners[0];
+            const winnerVotes = state.roundVoteCounts?.[primaryWinner] || 0;
 
-              // Check if winner earned a star (4+ votes)
-              if (maxVotes >= STAR_THRESHOLD) {
-                const winnerPlayer = room?.players.find(p => p.userId === winnerId);
-                if (winnerPlayer) {
-                  console.log('⭐ Star earned!', winnerPlayer.username, 'with', maxVotes, 'votes');
-                  setStarCelebrationData({
-                    username: winnerPlayer.username,
-                    phrase: state.submissions[winnerId],
-                    voteCount: maxVotes,
-                    isOwnStar: winnerId === user?.uid,
-                  });
-                  setShowStarCelebration(true);
-                }
+            // Star celebration at 4+ votes
+            if (winnerVotes >= STAR_THRESHOLD) {
+              const winnerPlayer = room?.players.find(p => p.userId === primaryWinner);
+              const winnerPhrase = state.lastWinningPhrases?.[0] || state.lastWinningPhrase;
+              if (winnerPlayer && winnerPhrase) {
+                setStarCelebrationData({
+                  username: winnerPlayer.username,
+                  phrase: winnerPhrase,
+                  voteCount: winnerVotes,
+                  isOwnStar: primaryWinner === user?.uid,
+                });
+                setShowStarCelebration(true);
               }
-              
-              // Grant rewards to winner
-              rewards.grantRoundWinRewards(winnerId, maxVotes).catch(err => 
+            }
+
+            if (user?.uid && roundWinners.includes(user.uid)) {
+              const myVotes = state.roundVoteCounts?.[user.uid] || 0;
+              analytics.winRound(roomId, state.currentRound || 0, myVotes);
+
+              rewards.grantRoundWinRewards(user.uid, myVotes).catch(err =>
                 console.error('Failed to grant rewards:', err)
               );
-              
-              // Update challenge progress for round win
-              incrementChallengeProgress(winnerId, 'round_won', 1).catch(err =>
+              incrementChallengeProgress(user.uid, 'round_won', 1).catch(err =>
                 console.error('Failed to update challenge progress:', err)
               );
-              
-              // Update challenge progress for votes received
-              incrementChallengeProgress(winnerId, 'votes_received', maxVotes).catch(err =>
+              incrementChallengeProgress(user.uid, 'votes_received', myVotes).catch(err =>
                 console.error('Failed to update vote challenge progress:', err)
               );
             }

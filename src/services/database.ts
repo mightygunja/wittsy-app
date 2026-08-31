@@ -16,7 +16,8 @@ import {
   Timestamp,
   increment
 } from 'firebase/firestore';
-import { firestore } from './firebase';
+import { firestore, realtimeDb } from './firebase';
+import { ref, remove } from 'firebase/database';
 import { Room, RoomSettings, Player, Prompt } from '../types';
 import { generateRoomCode } from '../utils/helpers';
 import { WINNING_VOTES, JOIN_LOCK_THRESHOLD } from '../utils/constants';
@@ -476,6 +477,18 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
     updateData.endedAt = new Date().toISOString();
     updateData.endReason = 'insufficient_players';
     await updateDoc(roomRef, updateData);
+
+    // Also clear the live RTDB game state. Without this the remaining players'
+    // clients never see gameState go null (the trigger for the end screen) and
+    // their timers keep cycling rounds in a game that is already over.
+    try {
+      await remove(ref(realtimeDb, `rooms/${roomId}/game`));
+      await remove(ref(realtimeDb, `rooms/${roomId}/submissions`));
+    } catch (rtdbError) {
+      // The server-side advancePhase self-heal will clean up on the next tick
+      console.error('Failed to clear RTDB game state (server will self-heal):', rtdbError);
+    }
+
     console.log(`🏁 Room ${roomId} ended - fewer than 3 players remaining (${updatedPlayers.length}). Game cannot continue.`);
     return;
   }

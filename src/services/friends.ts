@@ -51,8 +51,11 @@ export const sendFriendRequest = async (
   // Check for reverse request (they sent you a request)
   const reverseRequest = await getPendingRequest(toUserId, fromUserId);
   if (reverseRequest) {
-    // Auto-accept if they already sent you a request
-    await acceptFriendRequest(reverseRequest.id, toUserId);
+    // Auto-accept if they already sent you a request. The reverse request's
+    // recipient is the CURRENT user (fromUserId) — passing toUserId here made
+    // acceptFriendRequest's ownership check throw 'Unauthorized' every time
+    // two people added each other.
+    await acceptFriendRequest(reverseRequest.id, fromUserId);
     return reverseRequest.id;
   }
 
