@@ -503,14 +503,16 @@ const GameRoomScreen: React.FC = () => {
         if (state.phase === 'submission' && previousPhase !== 'submission') {
           // Only reset when entering submission phase from a different phase
           console.log('🔄 Entering submission phase');
-          // Check if user has already submitted in this round
-          const userAlreadySubmitted = state.submissions && user?.uid && state.submissions[user.uid];
-          setHasSubmitted(!!userAlreadySubmitted);
-          if (userAlreadySubmitted) {
-            setPhrase(state.submissions[user.uid]);
-          } else {
-            setPhrase('');
-          }
+          // Check if user has already submitted in this round. RTDB stores
+          // submissions either as a plain string or as an object with a
+          // .phrase field — normalize before putting it into the TextInput
+          // (rendering the raw object crashed the screen on re-entry).
+          const rawSubmission = state.submissions && user?.uid ? state.submissions[user.uid] : null;
+          const submittedPhrase = typeof rawSubmission === 'object' && rawSubmission !== null
+            ? ((rawSubmission as any).phrase || '')
+            : (rawSubmission || '');
+          setHasSubmitted(!!submittedPhrase);
+          setPhrase(submittedPhrase);
           setHasVoted(false);
         } else if (state.phase === 'voting' && previousPhase !== 'voting') {
           console.log('🔄 Entering voting phase');
@@ -601,27 +603,38 @@ const GameRoomScreen: React.FC = () => {
     };
   }, [roomId]);
   
+  // Live refs for values the timer callback needs: the interval closure is
+  // created at phase start, so reading `phrase`/`hasSubmitted` directly would
+  // see the values from that moment (the auto-submit bug: it always saw an
+  // empty phrase and never fired).
+  const phraseRef = useRef(phrase);
+  phraseRef.current = phrase;
+  const hasSubmittedRef = useRef(hasSubmitted);
+  hasSubmittedRef.current = hasSubmitted;
+
   // Client-side timer - calculate from phaseStartTime and phaseDuration
   useEffect(() => {
     if (!gameState?.phaseStartTime || !gameState?.phaseDuration) return;
-    
+
     let hasAdvanced = false;
-    
+
     const interval = setInterval(() => {
       setGameState(prev => {
         if (!prev?.phaseStartTime || !prev?.phaseDuration) return prev;
         const elapsed = (Date.now() - prev.phaseStartTime) / 1000;
         const remaining = Math.max(0, Math.floor(prev.phaseDuration - elapsed));
-        
-        // Auto-submit if enabled and time runs out
-        if (remaining === 0 && !hasAdvanced && gameState.phase === 'submission') {
-          if (settings.gameplay.autoSubmit && phrase.trim() && !hasSubmitted && user?.uid) {
+
+        // Auto-submit if enabled and time runs out (prev.phase and the refs
+        // are current — the outer gameState/phrase/hasSubmitted are stale here)
+        if (remaining === 0 && !hasAdvanced && prev.phase === 'submission') {
+          const currentPhrase = phraseRef.current;
+          if (settings.gameplay.autoSubmit && currentPhrase.trim() && !hasSubmittedRef.current && user?.uid) {
             console.log('⚡ Auto-submitting phrase due to timeout');
-            markSubmission(roomId, user.uid, phrase.trim());
+            markSubmission(roomId, user.uid, currentPhrase.trim());
             setHasSubmitted(true);
           }
         }
-        
+
         // Advance phase when timer hits 0 — including 'insufficient' phase.
         // Do NOT rely on server-side setTimeout (Cloud Function containers can be killed).
         // The 'insufficient' case in gameEngine calls startNewRound directly.
@@ -629,11 +642,11 @@ const GameRoomScreen: React.FC = () => {
           hasAdvanced = true;
           advancePhase(roomId);
         }
-        
+
         return { ...prev, timeRemaining: remaining };
       });
     }, 100); // Update every 100ms for smooth countdown
-    
+
     return () => clearInterval(interval);
   }, [gameState?.phaseStartTime, gameState?.phaseDuration, roomId]);
 

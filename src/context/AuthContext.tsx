@@ -6,8 +6,6 @@ import * as guestAuth from '../services/guestAuth';
 import { UserProfile } from '../types';
 import { monetization } from '../services/monetization';
 import { battlePass } from '../services/battlePassService';
-import { seedChallenges } from '../utils/seedChallenges';
-import { seedPrompts } from '../utils/seedPrompts';
 import { analytics } from '../services/analytics';
 
 interface AuthContextType {
@@ -48,11 +46,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Initialize Battle Pass (requires authentication)
         await battlePass.initialize();
-        
-        // Seed data after authentication
-        await seedChallenges();
-        await seedPrompts();
-        
+
+        // NOTE: client-side seeding removed. Prompts are admin-only under the
+        // rules (open create let anyone bypass the approval pipeline), and
+        // challenges come from the scheduled Cloud Functions. Seeding a fresh
+        // project is done from an admin account via the seed utils.
+
         // Create or fetch user profile from Firestore
         const userDoc = await authService.getOrCreateUserProfile(firebaseUser);
         

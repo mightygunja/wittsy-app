@@ -425,6 +425,17 @@ class MonetizationService {
     try {
       console.log('🔵 Starting coin purchase for product:', productId);
 
+      // No store available (web / Expo Go): fail with a human explanation
+      // instead of letting RNIap.requestPurchase throw a raw TypeError.
+      if (!RNIap || !isIAPAvailable()) {
+        return {
+          success: false,
+          error: Platform.OS === 'web'
+            ? 'Purchases aren’t available in the browser yet. Get the iOS app to buy coins — your account and coins sync everywhere.'
+            : 'Purchases aren’t available in this build.',
+        };
+      }
+
       if (!this.initialized) {
         console.error('❌ IAP not initialized');
         throw new Error('IAP not initialized');
@@ -517,6 +528,17 @@ class MonetizationService {
   async purchaseProduct(productId: string): Promise<PurchaseResult> {
     try {
       console.log('🔵 Starting product purchase for:', productId);
+
+      // No store available (web / Expo Go): fail with a human explanation
+      // instead of letting RNIap.requestPurchase throw a raw TypeError.
+      if (!RNIap || !isIAPAvailable()) {
+        return {
+          success: false,
+          error: Platform.OS === 'web'
+            ? 'Purchases aren’t available in the browser yet. Get the iOS app to purchase — your account syncs everywhere.'
+            : 'Purchases aren’t available in this build.',
+        };
+      }
 
       if (!this.initialized) {
         console.error('❌ Monetization not initialized');

@@ -4,7 +4,7 @@
  */
 
 import { firestore } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, runTransaction } from 'firebase/firestore';
 import { analytics } from './analytics';
 import { monetization } from './monetization';
 
@@ -189,33 +189,54 @@ class DailyRewardsService {
       const today = this.getTodayDateString();
       const reward = claimStatus.nextReward;
 
-      // Calculate new streak
-      let newStreak = 1;
-      if (data.lastClaimDate && this.isConsecutiveDay(data.lastClaimDate, today)) {
-        newStreak = data.currentStreak + 1;
+      // Atomic claim: the old flow granted coins FIRST and marked the claim
+      // afterwards with no re-check — two rapid taps (or a mid-flow failure)
+      // could double-grant or grant without recording. The transaction
+      // re-verifies today's claim and writes coins + claim mark together.
+      const rewardRef = doc(firestore, 'dailyRewards', userId);
+      const userRef = doc(firestore, 'users', userId);
+
+      const claimOutcome = await runTransaction(firestore, async (tx) => {
+        const rewardSnap = await tx.get(rewardRef);
+        if (!rewardSnap.exists()) {
+          throw new Error('Daily rewards not initialized');
+        }
+        const fresh = rewardSnap.data() as any;
+        if (fresh.lastClaimDate === today) {
+          return { alreadyClaimed: true as const, newStreak: fresh.currentStreak || 1 };
+        }
+
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error('User not found');
+        }
+
+        let freshStreak = 1;
+        if (fresh.lastClaimDate && this.isConsecutiveDay(fresh.lastClaimDate, today)) {
+          freshStreak = (fresh.currentStreak || 0) + 1;
+        }
+
+        tx.update(userRef, { coins: (userSnap.data().coins || 0) + reward.coins });
+        tx.update(rewardRef, {
+          currentStreak: freshStreak,
+          longestStreak: Math.max(freshStreak, fresh.longestStreak || 0),
+          lastClaimDate: today,
+          totalRewardsClaimed: increment(1),
+          totalCoinsEarned: increment(reward.coins),
+          claimHistory: [
+            ...(fresh.claimHistory || []).slice(-29), // Keep last 30 days
+            { date: today, day: reward.day, coins: reward.coins },
+          ],
+          updatedAt: new Date().toISOString(),
+        });
+        return { alreadyClaimed: false as const, newStreak: freshStreak };
+      });
+
+      if (claimOutcome.alreadyClaimed) {
+        return { success: false, error: 'You already claimed today\'s reward. Come back tomorrow!' };
       }
 
-      // Grant coins
-      await monetization.grantCoinsToUser(userId, reward.coins);
-
-      // Update daily rewards data
-      const rewardRef = doc(firestore, 'dailyRewards', userId);
-      await updateDoc(rewardRef, {
-        currentStreak: newStreak,
-        longestStreak: Math.max(newStreak, data.longestStreak),
-        lastClaimDate: today,
-        totalRewardsClaimed: increment(1),
-        totalCoinsEarned: increment(reward.coins),
-        claimHistory: [
-          ...data.claimHistory.slice(-29), // Keep last 30 days
-          {
-            date: today,
-            day: reward.day,
-            coins: reward.coins,
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      });
+      const newStreak = claimOutcome.newStreak;
 
       // Log analytics
       analytics.logEvent('daily_reward_claimed', {

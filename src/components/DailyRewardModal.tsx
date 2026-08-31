@@ -11,6 +11,7 @@ import {
   Modal,
   TouchableOpacity,
   Animated,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -127,11 +128,14 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({
       } else {
         console.log('❌ Claim FAILED:', result.error);
         haptics.error();
+        // Tell the user what happened instead of silently closing the modal
+        Alert.alert('Couldn\'t Claim Reward', result.error || 'Something went wrong. Please try again.');
         animateOut();
       }
     } catch (error) {
       console.error('❌ Claim ERROR:', error);
       haptics.error();
+      Alert.alert('Couldn\'t Claim Reward', 'Something went wrong. Please try again.');
       animateOut();
     } finally {
       setClaiming(false);

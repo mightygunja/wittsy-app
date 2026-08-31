@@ -108,10 +108,12 @@ service cloud.firestore {
     
     match /prompts/{promptId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      // Admin-only: open create let any user inject live prompts, bypassing
+      // the promptSubmissions approval pipeline entirely.
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
     }
-    
+
     match /matches/{matchId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
@@ -174,12 +176,8 @@ service cloud.firestore {
       allow write: if false; // Only backend updates rating history
     }
     
-    // Prompts - allow app to seed prompts
-    match /prompts/{promptId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
-    }
+    // (duplicate prompts match removed — overlapping matches grant if ANY
+    // rule allows, which silently re-opened prompt injection)
     
     // ==================== CONTENT MODERATION ====================
     
@@ -349,12 +347,15 @@ service cloud.firestore {
     
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && (
-        // Users can create notifications for themselves
-        request.resource.data.userId == request.auth.uid ||
-        // Or system can create for any user
-        isAdmin()
-      );
+      // Any signed-in user may create a notification for another user (friend
+      // requests, game invites, group invites are peer-to-peer in this app) —
+      // recipient-only creates silently killed every social notification.
+      // The shape is constrained; only the recipient can read/update/delete.
+      allow create: if isSignedIn() &&
+        request.resource.data.userId is string &&
+        request.resource.data.keys().hasAll(['userId', 'type']) &&
+        (!('title' in request.resource.data) || isValidString(request.resource.data.title, 1, 200)) &&
+        (!('body' in request.resource.data) || isValidString(request.resource.data.body, 1, 500));
       allow update: if isSignedIn() && 
         resource.data.userId == request.auth.uid &&
         // Only allow marking as read
@@ -435,13 +436,17 @@ service cloud.firestore {
       match /groupMembers/{memberId} {
         allow read: if isSignedIn() &&
           get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
-        allow write: if isSignedIn();
+        // Only group members may write member docs — previously ANY signed-in
+        // user could tamper with any group's roster/roles.
+        allow write: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
       }
 
       match /groupStats/{memberId} {
         allow read: if isSignedIn() &&
           get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
-        allow write: if isSignedIn();
+        // Standings are settled exclusively by the endGame Cloud Function.
+        allow write: if false;
       }
     }
 

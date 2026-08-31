@@ -5,6 +5,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  runTransaction,
   deleteDoc,
   query,
   where,
@@ -314,64 +315,61 @@ export const joinRoom = async (
   username: string
 ): Promise<void> => {
   console.log('🚪 Joining room:', { roomId, userId, username });
-  console.log('🔍 Looking up room in Firestore with ID:', roomId);
-  console.log('🔍 Room ID length:', roomId.length);
-  console.log('🔍 Room ID characters:', roomId.split('').map(c => c.charCodeAt(0)));
-  
+
   const roomRef = doc(firestore, 'rooms', roomId);
-  const roomDoc = await getDoc(roomRef);
-  
-  console.log('📊 Room exists in Firestore:', roomDoc.exists());
-  
-  if (!roomDoc.exists()) {
-    console.error('❌ Room not found in Firestore. Room ID:', roomId);
-    throw new Error(`Room not found. Please check the room code and try again. Code entered: ${roomId}`);
+
+  // Pre-reads that cannot run inside the transaction (query / other service).
+  const preDoc = await getDoc(roomRef);
+  if (!preDoc.exists()) {
+    throw new Error('Room not found. Please check the room code and try again.');
   }
-  
-  const roomData = roomDoc.data();
+
+  // Prevent joining multiple ranked games simultaneously
+  if (preDoc.data().isRanked) {
+    const alreadyInRankedGame = await isUserInActiveRankedGame(userId);
+    if (alreadyInRankedGame) {
+      throw new Error('You are already in an active ranked game. Please finish or leave that game before joining another ranked game.');
+    }
+  }
+
+  // Load user's avatar config before the transaction
+  const userAvatar = await avatarService.getUserAvatar(userId);
+
+  // Transactional join: the old read-modify-write of the players array meant
+  // two players joining at the same moment silently dropped one of them.
+  let joinedPlayerCount = 0;
+  let joinedRanked = false;
+  let joinedGroupRoom = false;
+
+  await runTransaction(firestore, async (tx) => {
+  const snap = await tx.get(roomRef);
+  if (!snap.exists()) {
+    throw new Error('Room not found. Please check the room code and try again.');
+  }
+
+  const roomData = snap.data();
   const players = roomData.players || [];
   const scores = roomData.scores || {};
-  
+
   // Check if user is already in the room
   if (players.find((p: Player) => p.userId === userId)) {
     console.warn('⚠️ User already in room, skipping join');
     throw new Error('Already in room');
   }
   
-  // Prevent joining multiple ranked games simultaneously
-  if (roomData.isRanked) {
-    const alreadyInRankedGame = await isUserInActiveRankedGame(userId);
-    if (alreadyInRankedGame) {
-      throw new Error('You are already in an active ranked game. Please finish or leave that game before joining another ranked game.');
-    }
-  }
-  
   // Check if any player has reached the join lock threshold
-  const maxVotes = Math.max(...Object.values(scores).map((s: any) => s.totalVotes || 0));
+  const maxVotes = Math.max(0, ...Object.values(scores).map((s: any) => s?.totalVotes || 0));
   const joinLockThreshold = roomData.settings.joinLockVoteThreshold || JOIN_LOCK_THRESHOLD;
-  
-  console.log('📊 Current room state:', {
-    currentPlayers: players.length,
-    maxPlayers: roomData.settings.maxPlayers,
-    maxVotes,
-    joinLockThreshold,
-    isJoinLocked: maxVotes >= joinLockThreshold,
-    playerUserIds: players.map((p: Player) => p.userId)
-  });
-  
+
   // Prevent joining if any player has reached vote threshold
   if (maxVotes >= joinLockThreshold) {
     throw new Error(`Game is locked - a player has reached ${joinLockThreshold} votes`);
   }
-  
+
   if (players.length >= roomData.settings.maxPlayers) {
     throw new Error('Room is full');
   }
-  
-  // Load user's avatar config
-  const userAvatar = await avatarService.getUserAvatar(userId);
-  console.log('👤 Loading avatar for user:', { userId, username, hasAvatar: !!userAvatar, config: userAvatar?.config });
-  
+
   const newPlayer = {
     userId,
     username,
@@ -379,23 +377,19 @@ export const joinRoom = async (
     isConnected: true,
     joinedAt: new Date().toISOString(),
     avatar: null,
-    avatarConfig: userAvatar?.config || undefined, // Include custom avatar configuration
+    avatarConfig: userAvatar?.config || null, // Include custom avatar configuration
   };
-  
-  console.log('✨ New player with avatar:', { username, hasAvatarConfig: !!newPlayer.avatarConfig });
-  
+
   const updatedPlayers = [...players, newPlayer];
-  
-  console.log('✅ Adding player to room:', {
-    newPlayerCount: updatedPlayers.length,
-    newPlayer: newPlayer.username
-  });
-  
-  const updateData: any = {
-    players: updatedPlayers,
-    [`scores.${userId}`]: { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] }
-  };
-  
+
+  const updateData: any = { players: updatedPlayers };
+
+  // Only initialize the score entry on FIRST join — a rejoining player keeps
+  // their accumulated votes, round wins, and stars (the old code zeroed them).
+  if (!scores[userId]) {
+    updateData[`scores.${userId}`] = { totalVotes: 0, roundWins: 0, stars: 0, phrases: [] };
+  }
+
   // Check if countdown should start (ranked rooms only)
   if (roomData.isRanked && roomData.settings.autoStart) {
     const countdownTrigger = roomData.settings.countdownTriggerPlayers || 6;
@@ -406,13 +400,18 @@ export const joinRoom = async (
       console.log('⏱️ Starting 30-second countdown - 6 players reached');
     }
   }
-  
-  await updateDoc(roomRef, updateData);
+
+  tx.update(roomRef, updateData);
+
+  joinedPlayerCount = updatedPlayers.length;
+  joinedRanked = roomData.isRanked || false;
+  joinedGroupRoom = !!roomData.groupId;
+  });
 
   analytics.logEvent('join_room', {
-    player_count: updatedPlayers.length,
-    is_ranked: roomData.isRanked || false,
-    is_group_room: !!roomData.groupId,
+    player_count: joinedPlayerCount,
+    is_ranked: joinedRanked,
+    is_group_room: joinedGroupRoom,
   });
 
   console.log('✅ Player joined successfully');
@@ -437,47 +436,53 @@ export const deleteRoom = async (roomId: string): Promise<void> => {
  */
 export const leaveRoom = async (roomId: string, userId: string): Promise<void> => {
   const roomRef = doc(firestore, 'rooms', roomId);
-  const roomDoc = await getDoc(roomRef);
-  
-  if (!roomDoc.exists()) return;
-  
-  const roomData = roomDoc.data();
-  const players = roomData.players || [];
-  const roomStatus = roomData.status; // 'waiting', 'active', or 'finished'
-  
-  console.log(`🚪 Player ${userId} leaving room ${roomId}. Status: ${roomStatus}. Players: ${players.length}`);
-  
-  // Remove the player from the room
-  const updatedPlayers = players.filter((p: Player) => p.userId !== userId);
-  
-  if (updatedPlayers.length === 0) {
-    await deleteDoc(roomRef);
-    console.log(`🗑️ Room ${roomId} deleted - all players left`);
-    return;
-  }
-  
-  const updateData: any = { players: updatedPlayers };
-  
-  // If host leaves, assign new host
-  if (roomData.hostId === userId) {
-    updateData.hostId = updatedPlayers[0].userId;
-    console.log(`👑 New host assigned: ${updatedPlayers[0].username}`);
-  }
-  
-  // For ranked games: if active and last player leaves, auto-delete the room
-  if (roomData.isRanked && roomStatus === 'active' && updatedPlayers.length === 0) {
-    await deleteDoc(roomRef);
-    console.log(`🗑️ Ranked room ${roomId} auto-deleted - last player left active game`);
-    return;
-  }
-  
-  // Active game with fewer than 3 players remaining - end the game
-  if (roomStatus === 'active' && updatedPlayers.length < 3) {
-    updateData.status = 'finished';
-    updateData.endedAt = new Date().toISOString();
-    updateData.endReason = 'insufficient_players';
-    await updateDoc(roomRef, updateData);
 
+  // Transactional leave: concurrent leaves (or a leave racing a join) on the
+  // old read-modify-write could resurrect a departed player or drop a joiner.
+  let endedForInsufficientPlayers = false;
+
+  await runTransaction(firestore, async (tx) => {
+    endedForInsufficientPlayers = false;
+
+    const snap = await tx.get(roomRef);
+    if (!snap.exists()) return;
+
+    const roomData = snap.data();
+    const players = roomData.players || [];
+    const roomStatus = roomData.status; // 'waiting', 'active', or 'finished'
+
+    console.log(`🚪 Player ${userId} leaving room ${roomId}. Status: ${roomStatus}. Players: ${players.length}`);
+
+    // Remove the player from the room
+    const updatedPlayers = players.filter((p: Player) => p.userId !== userId);
+    if (updatedPlayers.length === players.length) return; // wasn't in the room
+
+    if (updatedPlayers.length === 0) {
+      tx.delete(roomRef);
+      console.log(`🗑️ Room ${roomId} deleted - all players left`);
+      return;
+    }
+
+    const updateData: any = { players: updatedPlayers };
+
+    // If host leaves, assign new host
+    if (roomData.hostId === userId) {
+      updateData.hostId = updatedPlayers[0].userId;
+      console.log(`👑 New host assigned: ${updatedPlayers[0].username}`);
+    }
+
+    // Active game with fewer than 3 players remaining - end the game
+    if (roomStatus === 'active' && updatedPlayers.length < 3) {
+      updateData.status = 'finished';
+      updateData.endedAt = new Date().toISOString();
+      updateData.endReason = 'insufficient_players';
+      endedForInsufficientPlayers = true;
+    }
+
+    tx.update(roomRef, updateData);
+  });
+
+  if (endedForInsufficientPlayers) {
     // Also clear the live RTDB game state. Without this the remaining players'
     // clients never see gameState go null (the trigger for the end screen) and
     // their timers keep cycling rounds in a game that is already over.
@@ -488,13 +493,8 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
       // The server-side advancePhase self-heal will clean up on the next tick
       console.error('Failed to clear RTDB game state (server will self-heal):', rtdbError);
     }
-
-    console.log(`🏁 Room ${roomId} ended - fewer than 3 players remaining (${updatedPlayers.length}). Game cannot continue.`);
-    return;
+    console.log(`🏁 Room ${roomId} ended - fewer than 3 players remaining. Game cannot continue.`);
   }
-  
-  await updateDoc(roomRef, updateData);
-  console.log(`✅ Player left room ${roomId}. ${updatedPlayers.length} players remaining - room continues`);
 };
 
 /**
