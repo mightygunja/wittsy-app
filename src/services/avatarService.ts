@@ -193,9 +193,10 @@ class AvatarService {
   }
 
   /**
-   * Get default unlocked items
+   * Get default unlocked items. Public: the Avatar Creator uses this same
+   * list for its no-doc fallback so the two defaults can never drift.
    */
-  private getDefaultUnlockedItems(): string[] {
+  getDefaultUnlockedItems(): string[] {
     return [
       // Default skin tones
       'skin_light',

@@ -37,6 +37,8 @@ export interface NotificationPayload {
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
@@ -240,7 +242,10 @@ export const scheduleLocalNotification = async (
         body,
         data: data || {},
       },
-      trigger: triggerTime,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerTime,
+      },
     });
     console.log('Local notification scheduled:', { title, body, triggerTime });
   } catch (error) {

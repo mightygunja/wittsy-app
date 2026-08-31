@@ -24,6 +24,7 @@ import { Share, Alert } from 'react-native';
 import { firestore } from './firebase';
 import { Group, GroupMember, GroupMemberStats } from '../types/social';
 import { DEEP_LINK_SCHEMES } from '../types/platform';
+import { friendlyServiceError } from '../utils/friendlyError';
 
 // ==================== HELPERS ====================
 
@@ -40,25 +41,9 @@ const generateInviteCode = (): string => {
  * Map raw Firebase errors to copy a user can act on.
  * Our own thrown errors (e.g. "Only admins can remove members") pass through.
  */
-export const getGroupErrorMessage = (error: any, fallback: string): string => {
-  const code: string = error?.code || '';
-  const message: string = String(error?.message || '');
-  if (code === 'permission-denied' || message.includes('insufficient permissions')) {
-    return "You don't have permission to do that. Pull to refresh the group and try again.";
-  }
-  if (
-    code === 'unavailable' ||
-    code === 'deadline-exceeded' ||
-    message.toLowerCase().includes('network')
-  ) {
-    return 'Network problem — check your connection and try again.';
-  }
-  // Errors we threw ourselves are already user-friendly
-  if (!code && message && !message.includes('Firebase') && !message.includes('firestore')) {
-    return message;
-  }
-  return fallback;
-};
+// Shared implementation lives in utils/friendlyError — kept as a re-export
+// so the three group screens don't need touching.
+export const getGroupErrorMessage = friendlyServiceError;
 
 // ==================== GROUP CRUD ====================
 

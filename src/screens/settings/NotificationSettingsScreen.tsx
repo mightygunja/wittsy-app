@@ -10,6 +10,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../hooks/useAuth';
+import { doc, setDoc } from 'firebase/firestore';
+import { firestore } from '../../services/firebase';
 import { BackButton } from '../../components/common/BackButton';
 import { SPACING } from '../../utils/constants';
 import { createSettingsStyles } from '../../styles/settingsStyles';
@@ -18,9 +21,25 @@ export const NotificationSettingsScreen: React.FC = () => {
   const { colors: COLORS } = useTheme();
   const navigation = useNavigation();
   const { settings, updateNotifications } = useSettings();
+  const { user } = useAuth();
 
   const handleToggle = async (key: keyof typeof settings.notifications, value: boolean) => {
     await updateNotifications({ [key]: value });
+
+    // Mirror preferences to the user doc: local settings live in
+    // AsyncStorage, but the push-sending Cloud Function can only gate on
+    // what's in Firestore (users/{uid}.notificationPrefs).
+    if (user?.uid) {
+      try {
+        await setDoc(
+          doc(firestore, 'users', user.uid),
+          { notificationPrefs: { ...settings.notifications, [key]: value } },
+          { merge: true }
+        );
+      } catch (mirrorError) {
+        console.error('Failed to sync notification prefs:', mirrorError);
+      }
+    }
   };
   
   const styles = useMemo(() => createSettingsStyles(COLORS, SPACING), [COLORS]);

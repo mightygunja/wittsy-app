@@ -36,8 +36,9 @@ import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { SPACING } from '../utils/constants'
-import { useTheme } from '../hooks/useTheme';;
+import { useTheme } from '../hooks/useTheme';
 import { tabletHorizontalPadding } from '../utils/responsive';
+import { friendlyServiceError } from '../utils/friendlyError';
 
 type TabType = 'friends' | 'requests' | 'search';
 
@@ -48,21 +49,9 @@ const isTabType = (value: any): value is TabType =>
  * Map internal/service errors to copy a user can act on. Known service
  * messages are already human-readable; raw Firebase errors are not.
  */
-const friendlyError = (error: any, fallback: string): string => {
-  const message = typeof error?.message === 'string' ? error.message : '';
-  const knownMessages = [
-    'Already friends',
-    'Friend request already sent',
-    'Friend request not found',
-    'Request already processed',
-    'Friendship not found',
-  ];
-  if (knownMessages.includes(message)) {
-    return message;
-  }
-  console.warn('Friends action failed:', error);
-  return fallback;
-};
+// Shared mapper: our own thrown messages pass through, Firebase noise gets
+// actionable copy — no screen-local whitelist to keep in sync with friends.ts.
+const friendlyError = friendlyServiceError;
 
 export const FriendsScreen: React.FC<{ navigation: any; route?: any }> = ({ navigation, route }) => {
   const { colors: COLORS } = useTheme();

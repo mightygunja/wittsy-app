@@ -22,6 +22,12 @@ exports.simulateGame = simulate.simulateGame;
 const analyticsRollup = require('./analyticsRollup');
 exports.dailyAnalyticsRollup = analyticsRollup.dailyAnalyticsRollup;
 
+const pushSender = require('./pushSender');
+exports.sendPushOnNotification = pushSender.sendPushOnNotification;
+
+const moderateSubmissions = require('./moderateSubmissions');
+exports.moderatePromptSubmission = moderateSubmissions.moderatePromptSubmission;
+
 // One-time initialization
 exports.initializeCollections = initCollections.initializeCollections;
 

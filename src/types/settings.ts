@@ -74,6 +74,14 @@ export interface NotificationSettings {
   dailyReminders: boolean;
   pushEnabled: boolean;
   emailEnabled: boolean;
+  // Keys the settings screen exposes that were missing from this type
+  gameStart: boolean;
+  turnReminders: boolean;
+  messages: boolean;
+  achievements: boolean;
+  leaderboard: boolean;
+  promotions: boolean;
+  updates: boolean;
   inAppEnabled: boolean;
   sound: boolean;
   vibration: boolean;
@@ -177,6 +185,13 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   dailyReminders: false,
   pushEnabled: true,
   emailEnabled: false,
+  gameStart: true,
+  turnReminders: true,
+  messages: true,
+  achievements: true,
+  leaderboard: true,
+  promotions: false,
+  updates: true,
   inAppEnabled: true,
   sound: true,
   vibration: true,

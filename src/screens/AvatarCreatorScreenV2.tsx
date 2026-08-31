@@ -32,6 +32,7 @@ import { useTheme } from '../hooks/useTheme';
 import {
   AvatarConfig,
   AvatarCategory,
+  DEFAULT_AVATAR_CONFIG,
   DEFAULT_SKIN_TONES,
   DEFAULT_EYES,
   DEFAULT_MOUTHS,
@@ -194,28 +195,11 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
 
   // Default avatar + unlocks, matching avatarService.getDefaultUnlockedItems
   const applyDefaultAvatar = () => {
-    const defaultConfig: AvatarConfig = {
-      skin: 'skin_light',
-      eyes: 'eyes_normal',
-      mouth: 'mouth_smile',
-      hair: 'hair_short',
-      accessories: [],
-      clothing: 'clothing_casual',
-      background: 'bg_white',
-      effects: [],
-    };
-    const defaultUnlocked = [
-      'skin_light', 'skin_medium_light', 'skin_medium', 'skin_medium_dark', 'skin_dark',
-      'eyes_normal', 'eyes_happy',
-      'mouth_smile', 'mouth_grin',
-      'hair_short', 'hair_long', 'hair_bald',
-      'acc_none', 'acc_glasses',
-      'bg_white', 'bg_purple', 'bg_blue',
-      'fx_none',
-      'clothing_casual',
-    ];
+    // Single source of truth for defaults — the screen-local copies had
+    // already drifted from what avatarService creates (bg_white vs bg_purple).
+    const defaultConfig: AvatarConfig = { ...DEFAULT_AVATAR_CONFIG, accessories: [], effects: [] };
     setConfig(defaultConfig);
-    setUnlockedItems(defaultUnlocked);
+    setUnlockedItems(avatarService.getDefaultUnlockedItems());
     initializeDraggableFeatures(defaultConfig);
   };
 

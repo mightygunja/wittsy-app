@@ -27,7 +27,7 @@ import {
   registerForEvent,
   unregisterFromEvent,
   checkEventRequirements,
-  isUserRegistered,
+  getRegisteredEventIds,
 } from '../services/events';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -69,17 +69,11 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setAllEvents(active);
 
       // Load the user's registration state so cards can offer Unregister
-      // instead of a Register button that errors with "Already registered"
+      // instead of a Register button that errors with "Already registered".
+      // One user-doc read via the denormalized index — not one query per event.
       if (user?.uid) {
         const uniqueIds = Array.from(new Set([...featured, ...active].map(e => e.id)));
-        const flags = await Promise.all(
-          uniqueIds.map(id => isUserRegistered(id, user.uid).catch(() => false))
-        );
-        const registered = new Set<string>();
-        uniqueIds.forEach((id, i) => {
-          if (flags[i]) registered.add(id);
-        });
-        setRegisteredEventIds(registered);
+        setRegisteredEventIds(await getRegisteredEventIds(user.uid, uniqueIds));
       } else {
         setRegisteredEventIds(new Set());
       }

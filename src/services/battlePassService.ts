@@ -364,33 +364,35 @@ class BattlePassService {
   /**
    * Get battle pass stats
    */
+  /**
+   * Pure stats computation from a battle pass doc — the single source of
+   * truth used by both the fetch-based path and live snapshot listeners
+   * (previously duplicated in BattlePassScreen and prone to drift).
+   */
+  computeStats(bp: UserBattlePassDoc): BattlePassStats {
+    const nextLevelXP = this.currentSeason.xpPerLevel;
+    const claimedLevels = new Set([
+      ...(bp.claimedRewards || []),
+      ...(bp.claimedPremiumRewards || []),
+    ]);
+
+    return {
+      totalXP: bp.currentLevel * nextLevelXP + bp.currentXP,
+      currentLevel: bp.currentLevel,
+      nextLevelXP,
+      progressPercent: (bp.currentXP / nextLevelXP) * 100,
+      claimedRewards: claimedLevels.size,
+      totalRewards: this.currentSeason.rewards.length,
+      daysRemaining: this.getDaysRemaining(),
+      isPremium: bp.isPremium,
+    };
+  }
+
   async getBattlePassStats(userId: string): Promise<BattlePassStats | null> {
     try {
       const battlePass = await this.getUserBattlePass(userId);
       if (!battlePass) return null;
-
-      const nextLevelXP = this.currentSeason.xpPerLevel;
-      const progressPercent = (battlePass.currentXP / nextLevelXP) * 100;
-      const totalRewards = this.currentSeason.rewards.length;
-      const daysRemaining = Math.ceil(
-        (this.currentSeason.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-      );
-
-      const claimedLevels = new Set([
-        ...(battlePass.claimedRewards || []),
-        ...((battlePass as UserBattlePassDoc).claimedPremiumRewards || []),
-      ]);
-
-      return {
-        totalXP: battlePass.currentLevel * nextLevelXP + battlePass.currentXP,
-        currentLevel: battlePass.currentLevel,
-        nextLevelXP,
-        progressPercent,
-        claimedRewards: claimedLevels.size,
-        totalRewards,
-        daysRemaining,
-        isPremium: battlePass.isPremium,
-      };
+      return this.computeStats(battlePass as UserBattlePassDoc);
     } catch (error) {
       console.error('Failed to get stats:', error);
       return null;
@@ -476,6 +478,7 @@ export const battlePass = {
   purchaseLevelSkip: (userId: string, levels: 1 | 5 | 10 | 25) =>
     battlePassService.purchaseLevelSkip(userId, levels),
   getBattlePassStats: (userId: string) => battlePassService.getBattlePassStats(userId),
+  computeStats: (bp: UserBattlePassDoc) => battlePassService.computeStats(bp),
   isSeasonActive: () => battlePassService.isSeasonActive(),
   getDaysRemaining: () => battlePassService.getDaysRemaining(),
   claimAllRewards: (userId: string) => battlePassService.claimAllRewards(userId),

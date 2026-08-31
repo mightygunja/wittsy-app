@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { User } from 'firebase/auth';
 import * as authService from '../services/auth';
 import * as guestAuth from '../services/guestAuth';
@@ -8,6 +8,8 @@ import { monetization } from '../services/monetization';
 import { battlePass } from '../services/battlePassService';
 import { analytics } from '../services/analytics';
 import { friendlyAuthError } from '../utils/authErrors';
+import { initializePushNotifications } from '../services/pushNotificationService.expo';
+import { isExpoGo } from '../utils/platform';
 
 interface AuthContextType {
   user: User | null;
@@ -47,6 +49,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Initialize Battle Pass (requires authentication)
         await battlePass.initialize();
+
+        // Register this device for push notifications (native builds only —
+        // web has no push channel and Expo Go lacks the module). Deliberately
+        // not awaited: the OS permission prompt must not block sign-in.
+        if (Platform.OS !== 'web' && !isExpoGo()) {
+          initializePushNotifications(firebaseUser.uid).catch((pushError) =>
+            console.error('Push notification init failed:', pushError)
+          );
+        }
 
         // NOTE: client-side seeding removed. Prompts are admin-only under the
         // rules (open create let anyone bypass the approval pipeline), and

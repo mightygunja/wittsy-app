@@ -18,6 +18,8 @@ import {
   Timestamp,
   increment,
   runTransaction,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { firestore } from './firebase';
 import {
@@ -172,6 +174,10 @@ export const registerForEvent = async (
 
     tx.set(participantRef, participantData);
     tx.update(eventRef, { currentParticipants: increment(1) });
+    // Denormalized registration index: lets the events screen resolve all
+    // registration states with a single user-doc read instead of one
+    // participant query per event.
+    tx.update(userRef, { registeredEventIds: arrayUnion(eventId) });
   });
 
   // Create notification
@@ -228,9 +234,42 @@ export const unregisterFromEvent = async (
     // docs (pre-fee flow) have no paidEntryFee and get no refund.
     const paid = participantSnap.data()?.paidEntryFee || 0;
     if (paid > 0 && event.status === 'registration') {
-      tx.update(userRef, { coins: increment(paid) });
+      tx.update(userRef, { coins: increment(paid), registeredEventIds: arrayRemove(eventId) });
+    } else {
+      tx.update(userRef, { registeredEventIds: arrayRemove(eventId) });
     }
   });
+};
+
+/**
+ * Get all event ids the user is registered for, in one read.
+ * Uses the denormalized users/{uid}.registeredEventIds index; accounts that
+ * predate the index self-heal once by falling back to per-event checks and
+ * writing the result back.
+ */
+export const getRegisteredEventIds = async (
+  userId: string,
+  candidateEventIds: string[]
+): Promise<Set<string>> => {
+  const userRef = doc(firestore, 'users', userId);
+  const userSnap = await getDoc(userRef);
+  const indexed = userSnap.exists() ? userSnap.data()?.registeredEventIds : undefined;
+
+  if (Array.isArray(indexed)) {
+    return new Set(indexed);
+  }
+
+  // Legacy account: one-time N-per-event fallback, then persist the index.
+  const flags = await Promise.all(
+    candidateEventIds.map(id => isUserRegistered(id, userId).catch(() => false))
+  );
+  const registered = candidateEventIds.filter((_, i) => flags[i]);
+  try {
+    await updateDoc(userRef, { registeredEventIds: registered });
+  } catch (error) {
+    console.warn('Failed to persist registeredEventIds index:', error);
+  }
+  return new Set(registered);
 };
 
 /**

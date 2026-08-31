@@ -158,25 +158,9 @@ const scrollViewRef = useRef<ScrollView>(null);
   };
 
   // Mirrors battlePassService.getBattlePassStats math, computed from a live doc
-  const computeStats = (bp: UserBattlePassDoc): BattlePassStats => {
-    const currentSeason = battlePass.getCurrentSeason();
-    const nextLevelXP = currentSeason.xpPerLevel;
-    const claimedLevels = new Set([
-      ...(bp.claimedRewards || []),
-      ...(bp.claimedPremiumRewards || []),
-    ]);
-
-    return {
-      totalXP: bp.currentLevel * nextLevelXP + bp.currentXP,
-      currentLevel: bp.currentLevel,
-      nextLevelXP,
-      progressPercent: (bp.currentXP / nextLevelXP) * 100,
-      claimedRewards: claimedLevels.size,
-      totalRewards: currentSeason.rewards.length,
-      daysRemaining: battlePass.getDaysRemaining(),
-      isPremium: bp.isPremium,
-    };
-  };
+  // Stats math lives in battlePassService.computeStats — one source of truth
+  // for both this live-listener path and the fetch path.
+  const computeStats = (bp: UserBattlePassDoc): BattlePassStats => battlePass.computeStats(bp);
 
   const loadBattlePass = async () => {
     if (!user) return;
