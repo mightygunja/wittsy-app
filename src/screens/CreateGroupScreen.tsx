@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
-import { createGroup } from '../services/groups';
+import { createGroup, getGroupErrorMessage } from '../services/groups';
 
 export const CreateGroupScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -49,7 +49,7 @@ export const CreateGroupScreen: React.FC<{ navigation: any }> = ({ navigation })
       );
       navigation.replace('GroupDetail', { groupId });
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create group. Please try again.');
+      Alert.alert('Error', getGroupErrorMessage(error, 'Failed to create group. Please try again.'));
       setLoading(false);
     }
   };

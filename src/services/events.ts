@@ -17,6 +17,7 @@ import {
   limit,
   Timestamp,
   increment,
+  runTransaction,
 } from 'firebase/firestore';
 import { firestore } from './firebase';
 import {
@@ -31,6 +32,7 @@ import {
 import { rewards } from './rewardsService';
 import { avatarService } from './avatarService';
 import { analytics } from './analytics';
+import { awardXP } from './progression';
 
 // ==================== EVENT MANAGEMENT ====================
 
@@ -116,26 +118,60 @@ export const registerForEvent = async (
     throw new Error('Already registered');
   }
 
-  // Check requirements
-  if (event.requirements) {
-    // Add requirement checks here
-  }
-
-  // Create participant entry
-  const participantData: EventParticipant = {
+  // Create participant entry. paidEntryFee records what THIS registration
+  // actually paid — the refund on unregister is capped to it, so legacy
+  // registrants (who never paid under the old flow) can't mint coins.
+  const participantData: EventParticipant & { paidEntryFee: number } = {
     userId,
     username,
     avatar,
     rating,
     registeredAt: new Date().toISOString(),
     checkedIn: false,
+    paidEntryFee: event.entryFee || 0,
   };
 
-  await addDoc(collection(firestore, `events/${eventId}/participants`), participantData);
+  // Register transactionally: the entry fee (if any) is checked and deducted
+  // in the same transaction that creates the participant, so users can't join
+  // a paid event for free or be charged without being registered. The
+  // participant doc id is the userId, so the transaction can re-check for an
+  // existing registration — the query-based pre-check above races under
+  // double-taps and would charge the fee twice.
+  const eventRef = doc(firestore, 'events', eventId);
+  const userRef = doc(firestore, 'users', userId);
+  const participantRef = doc(firestore, `events/${eventId}/participants/${userId}`);
 
-  // Update event participant count
-  await updateDoc(doc(firestore, 'events', eventId), {
-    currentParticipants: event.currentParticipants + 1,
+  await runTransaction(firestore, async (tx) => {
+    const eventSnap = await tx.get(eventRef);
+    if (!eventSnap.exists()) {
+      throw new Error('Event not found');
+    }
+    const eventData = eventSnap.data() as Event;
+
+    if (eventData.status !== 'registration') {
+      throw new Error('Registration is not open');
+    }
+    if (eventData.maxParticipants && eventData.currentParticipants >= eventData.maxParticipants) {
+      throw new Error('Event is full');
+    }
+
+    const existingSnap = await tx.get(participantRef);
+    if (existingSnap.exists()) {
+      throw new Error('Already registered');
+    }
+
+    const entryFee = eventData.entryFee || 0;
+    if (entryFee > 0) {
+      const userSnap = await tx.get(userRef);
+      const coins = userSnap.exists() ? userSnap.data()?.coins || 0 : 0;
+      if (coins < entryFee) {
+        throw new Error(`Not enough coins — entry costs ${entryFee} coins and you have ${coins}.`);
+      }
+      tx.update(userRef, { coins: increment(-entryFee) });
+    }
+
+    tx.set(participantRef, participantData);
+    tx.update(eventRef, { currentParticipants: increment(1) });
   });
 
   // Create notification
@@ -153,27 +189,48 @@ export const unregisterFromEvent = async (
   eventId: string,
   userId: string
 ): Promise<void> => {
+  // Locate the participant doc outside the transaction (legacy registrations
+  // used random ids; new ones use the userId as the doc id).
   const q = query(
     collection(firestore, `events/${eventId}/participants`),
     where('userId', '==', userId)
   );
-
   const snapshot = await getDocs(q);
   if (snapshot.empty) {
     throw new Error('Not registered for this event');
   }
+  const participantRef = snapshot.docs[0].ref;
+  const eventRef = doc(firestore, 'events', eventId);
+  const userRef = doc(firestore, 'users', userId);
 
-  const participantDoc = snapshot.docs[0];
-  await deleteDoc(participantDoc.ref);
+  // Delete + decrement + refund atomically. The old flow deleted first and
+  // refunded last with independent writes — a mid-flow failure unregistered
+  // the user and silently kept their entry fee with no way to retry.
+  await runTransaction(firestore, async (tx) => {
+    const participantSnap = await tx.get(participantRef);
+    if (!participantSnap.exists()) {
+      throw new Error('Not registered for this event');
+    }
 
-  // Update event participant count
-  const eventDoc = await getDoc(doc(firestore, 'events', eventId));
-  if (eventDoc.exists()) {
-    const event = eventDoc.data() as Event;
-    await updateDoc(doc(firestore, 'events', eventId), {
-      currentParticipants: Math.max(0, event.currentParticipants - 1),
+    const eventSnap = await tx.get(eventRef);
+    if (!eventSnap.exists()) {
+      tx.delete(participantRef);
+      return;
+    }
+    const event = eventSnap.data() as Event;
+
+    tx.delete(participantRef);
+    tx.update(eventRef, {
+      currentParticipants: Math.max(0, (event.currentParticipants || 1) - 1),
     });
-  }
+
+    // Refund only what this registration actually paid. Legacy participant
+    // docs (pre-fee flow) have no paidEntryFee and get no refund.
+    const paid = participantSnap.data()?.paidEntryFee || 0;
+    if (paid > 0 && event.status === 'registration') {
+      tx.update(userRef, { coins: increment(paid) });
+    }
+  });
 };
 
 /**
@@ -486,15 +543,20 @@ export const checkEventRequirements = async (
   const userData = userDoc.data();
   const requirements = event.requirements;
 
-  if (requirements.minLevel && userData.level < requirements.minLevel) {
+  // Guard every field — user docs can be missing level/rating/stats entirely
+  const userLevel = userData.level ?? 1;
+  const userRating = userData.rankedRating ?? userData.rating ?? 0;
+  const gamesPlayed = userData.stats?.gamesPlayed ?? 0;
+
+  if (requirements.minLevel && userLevel < requirements.minLevel) {
     reasons.push(`Minimum level ${requirements.minLevel} required`);
   }
 
-  if (requirements.minRating && userData.rating < requirements.minRating) {
+  if (requirements.minRating && userRating < requirements.minRating) {
     reasons.push(`Minimum rating ${requirements.minRating} required`);
   }
 
-  if (requirements.minGamesPlayed && userData.stats.gamesPlayed < requirements.minGamesPlayed) {
+  if (requirements.minGamesPlayed && gamesPlayed < requirements.minGamesPlayed) {
     reasons.push(`Minimum ${requirements.minGamesPlayed} games played required`);
   }
 
@@ -554,13 +616,9 @@ export const grantEventRewards = async (
       console.log(`✅ Granted ${prize.coins} coins for event completion`);
     }
 
-    // Grant XP (to Battle Pass)
+    // Grant XP through awardXP so the account level is recomputed with the grant
     if (prize.xp) {
-      const userRef = doc(firestore, 'users', userId);
-      await updateDoc(userRef, {
-        xp: increment(prize.xp),
-      });
-      console.log(`✅ Granted ${prize.xp} XP for event completion`);
+      await awardXP(userId, prize.xp, `event_${eventId}_placement_${placement}`);
     }
 
     // Grant title

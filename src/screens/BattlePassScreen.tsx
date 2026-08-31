@@ -12,11 +12,15 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { firestore } from '../services/firebase';
 import { useAuth } from '../hooks/useAuth';
-import { battlePass } from '../services/battlePassService';
+import { battlePass, UserBattlePassDoc } from '../services/battlePassService';
 import { getCurrentSeason } from '../services/seasons';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
@@ -70,6 +74,29 @@ const scrollViewRef = useRef<ScrollView>(null);
 
     return () => clearInterval(interval);
   }, []);
+
+  // Live-subscribe to the battle pass doc so entitlements granted after the
+  // store confirms a purchase (premium, level skips) appear without a manual
+  // refresh — the purchase flow itself only *starts* the store transaction.
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const bpRef = doc(firestore, 'battlePasses', user.uid);
+    const unsubscribe = onSnapshot(
+      bpRef,
+      (snap) => {
+        if (!snap.exists()) return;
+        const bp = snap.data() as UserBattlePassDoc;
+        setUserBP(bp);
+        setStats(computeStats(bp));
+      },
+      (error) => {
+        console.error('Battle pass listener error:', error);
+      }
+    );
+
+    return unsubscribe;
+  }, [user?.uid]);
 
   useEffect(() => {
     if (stats) {
@@ -130,6 +157,27 @@ const scrollViewRef = useRef<ScrollView>(null);
     }
   };
 
+  // Mirrors battlePassService.getBattlePassStats math, computed from a live doc
+  const computeStats = (bp: UserBattlePassDoc): BattlePassStats => {
+    const currentSeason = battlePass.getCurrentSeason();
+    const nextLevelXP = currentSeason.xpPerLevel;
+    const claimedLevels = new Set([
+      ...(bp.claimedRewards || []),
+      ...(bp.claimedPremiumRewards || []),
+    ]);
+
+    return {
+      totalXP: bp.currentLevel * nextLevelXP + bp.currentXP,
+      currentLevel: bp.currentLevel,
+      nextLevelXP,
+      progressPercent: (bp.currentXP / nextLevelXP) * 100,
+      claimedRewards: claimedLevels.size,
+      totalRewards: currentSeason.rewards.length,
+      daysRemaining: battlePass.getDaysRemaining(),
+      isPremium: bp.isPremium,
+    };
+  };
+
   const loadBattlePass = async () => {
     if (!user) return;
 
@@ -159,6 +207,19 @@ const scrollViewRef = useRef<ScrollView>(null);
   const handlePurchasePremium = async () => {
     if (!user) return;
 
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Not Available on Web',
+        'Purchases aren’t available in the browser yet. Get the iOS app to upgrade — your account syncs everywhere.'
+      );
+      return;
+    }
+
+    if (!battlePass.isSeasonActive()) {
+      Alert.alert('Season Ended', 'This season has ended. A new season is coming soon!');
+      return;
+    }
+
     Alert.alert(
       '🎉 Upgrade to Premium',
       `Unlock all premium rewards for $${battlePass.getCurrentSeason().price}!`,
@@ -168,21 +229,18 @@ const scrollViewRef = useRef<ScrollView>(null);
           text: 'Purchase',
           onPress: async () => {
             haptics.medium();
-            const success = await battlePass.purchasePremium(user.uid);
-            
-            if (success) {
-              haptics.success();
-              Alert.alert('Success!', 'You now have premium access!');
-              
-              // Refresh battle pass data immediately
-              await loadBattlePass();
-              await refreshUserProfile();
-              
-              // Force a re-render by updating state
-              setLoading(false);
+            const initiated = await battlePass.purchasePremium(user.uid);
+
+            if (initiated) {
+              // The store hasn't confirmed anything yet — premium is granted by
+              // the purchase listener and will appear via the Firestore listener.
+              Alert.alert(
+                'Purchase Started',
+                'Finish the payment in the store dialog. Premium unlocks here automatically once your purchase is confirmed.'
+              );
             } else {
               haptics.error();
-              Alert.alert('Failed', 'Purchase failed. Please try again.');
+              Alert.alert('Purchase Failed', 'The purchase could not be started. Please try again.');
             }
           },
         },
@@ -260,6 +318,11 @@ const scrollViewRef = useRef<ScrollView>(null);
   };
 
   const handleBuyLevels = () => {
+    if (!battlePass.isSeasonActive()) {
+      Alert.alert('Season Ended', 'This season has ended. A new season is coming soon!');
+      return;
+    }
+
     Alert.alert(
       '⚡ Skip Levels',
       'Purchase level skips to unlock rewards faster!',
@@ -277,21 +340,18 @@ const scrollViewRef = useRef<ScrollView>(null);
     if (!user) return;
 
     haptics.medium();
-    const success = await battlePass.purchaseLevelSkip(user.uid, levels);
-    
-    if (success) {
-      haptics.success();
-      Alert.alert('Success!', `Skipped ${levels} levels!`);
-      
-      // Refresh battle pass data immediately
-      await loadBattlePass();
-      await refreshUserProfile();
-      
-      // Force a re-render by updating state
-      setLoading(false);
+    const initiated = await battlePass.purchaseLevelSkip(user.uid, levels);
+
+    if (initiated) {
+      // Levels are granted by the purchase listener once the store confirms;
+      // the Firestore listener will update the track when that happens.
+      Alert.alert(
+        'Purchase Started',
+        `Finish the payment in the store dialog. Your ${levels} level${levels > 1 ? 's' : ''} will be added once the purchase is confirmed.`
+      );
     } else {
       haptics.error();
-      Alert.alert('Failed', 'Purchase failed. Please try again.');
+      Alert.alert('Purchase Failed', 'The purchase could not be started. Please try again.');
     }
   };
 
@@ -299,7 +359,14 @@ const scrollViewRef = useRef<ScrollView>(null);
     if (!userBP || !reward) return null;
 
     const isLevelReached = userBP.currentLevel >= reward.level;
-    const isClaimed = userBP.claimedRewards?.includes(reward.level) || false;
+    const claimedFree = userBP.claimedRewards || [];
+    const claimedPremium = (userBP as UserBattlePassDoc).claimedPremiumRewards || [];
+    // The card shows the premium reward for premium users, so "claimed" must
+    // track the premium claim list for them — not the shared free list.
+    const isClaimed =
+      userBP.isPremium && reward.premium
+        ? claimedPremium.includes(reward.level)
+        : claimedFree.includes(reward.level);
     const isCurrent = userBP.currentLevel === reward.level;
 
     // Determine which reward to show (premium if user has it, otherwise free)
@@ -349,7 +416,7 @@ const scrollViewRef = useRef<ScrollView>(null);
               handleClaimReward(reward.level, !!isPremiumReward);
             }
           }}
-          disabled={isClaimed || isLocked}
+          disabled={isClaimed || isLocked || claiming !== null}
           activeOpacity={0.7}
         >
           <LinearGradient
@@ -401,11 +468,34 @@ const scrollViewRef = useRef<ScrollView>(null);
 
   const season = battlePass.getCurrentSeason();
   const daysRemaining = battlePass.getDaysRemaining();
+  const seasonActive = battlePass.isSeasonActive();
+  const purchasesAvailable = Platform.OS !== 'web' && seasonActive;
 
-  if (loading || !userBP || !stats) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading Battle Pass...</Text>
+      </View>
+    );
+  }
+
+  if (!userBP || !stats) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorTitle}>Couldn't load the Battle Pass</Text>
+        <Text style={styles.errorText}>Check your connection and try again.</Text>
+        <View style={styles.retryButtonWrapper}>
+          <Button
+            title="Retry"
+            onPress={() => {
+              setLoading(true);
+              loadBattlePass();
+            }}
+            variant="primary"
+            size="md"
+          />
+        </View>
       </View>
     );
   }
@@ -446,7 +536,11 @@ const scrollViewRef = useRef<ScrollView>(null);
           {/* Days Remaining Banner */}
           <View style={[styles.daysRemainingBanner, { backgroundColor: COLORS.warning + '30' }]}>
           <Text style={[styles.daysRemainingText, { color: COLORS.text }]}>
-            ⏰ <Text style={{ fontWeight: 'bold' }}>{daysRemaining} days remaining</Text> in this season!
+            {seasonActive ? (
+              <>⏰ <Text style={{ fontWeight: 'bold' }}>{daysRemaining} days remaining</Text> in this season!</>
+            ) : (
+              <>🏁 <Text style={{ fontWeight: 'bold' }}>Season ended</Text> — a new season is coming soon! You can still claim rewards you've earned.</>
+            )}
           </Text>
         </View>
 
@@ -545,7 +639,7 @@ const scrollViewRef = useRef<ScrollView>(null);
 
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
-          {!userBP.isPremium && (
+          {!userBP.isPremium && purchasesAvailable && (
             <View style={styles.buttonWrapper}>
               <Button
                 title={`Upgrade - $${season.price}`}
@@ -567,17 +661,24 @@ const scrollViewRef = useRef<ScrollView>(null);
               fullWidth
             />
           </View>
-          <View style={styles.buttonWrapper}>
-            <Button
-              title="Buy Levels"
-              onPress={handleBuyLevels}
-              variant="success"
-              size="md"
-              icon={<Text style={styles.buttonIcon}>⚡</Text>}
-              fullWidth
-            />
+          {purchasesAvailable && (
+            <View style={styles.buttonWrapper}>
+              <Button
+                title="Buy Levels"
+                onPress={handleBuyLevels}
+                variant="success"
+                size="md"
+                icon={<Text style={styles.buttonIcon}>⚡</Text>}
+                fullWidth
+              />
+            </View>
+          )}
           </View>
-          </View>
+          {Platform.OS === 'web' && seasonActive && (
+            <Text style={styles.purchaseNote}>
+              Purchases are available in the iOS app — your account syncs everywhere.
+            </Text>
+          )}
 
           {/* Rewards Track */}
           <View style={styles.trackContainer}>
@@ -618,6 +719,32 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 16,
     color: COLORS.text,
     fontWeight: '600',
+    marginTop: SPACING.md,
+  },
+  errorTitle: {
+    fontSize: 18,
+    color: COLORS.text,
+    fontWeight: 'bold',
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+    paddingHorizontal: SPACING.xl,
+  },
+  retryButtonWrapper: {
+    minWidth: 160,
+  },
+  purchaseNote: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.lg,
   },
   seasonHeader: {
     flexDirection: 'row',

@@ -8,7 +8,12 @@ import { useAuth } from './useAuth';
 import { getGuestProgress, shouldShowUpgradePrompt } from '../services/guestAuth';
 
 export const useGuestUpgrade = () => {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest: contextIsGuest, refreshUserProfile } = useAuth();
+  // Firebase's onAuthStateChanged does not re-fire when an anonymous account is
+  // linked to a permanent credential, so the context flag goes stale after a
+  // successful upgrade. Track the upgrade locally so guest UI hides right away.
+  const [upgradedThisSession, setUpgradedThisSession] = useState(false);
+  const isGuest = contextIsGuest && !upgradedThisSession;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState('');
   const [guestProgress, setGuestProgress] = useState({
@@ -46,9 +51,15 @@ export const useGuestUpgrade = () => {
     setShowUpgradeModal(false);
   };
 
-  const handleUpgradeSuccess = () => {
+  const handleUpgradeSuccess = async () => {
     setShowUpgradeModal(false);
-    // User will be automatically refreshed by AuthContext
+    setUpgradedThisSession(true);
+    // Pull the updated username/email into the in-memory profile
+    try {
+      await refreshUserProfile();
+    } catch {
+      // Non-fatal: the profile will refresh on the next auth state change
+    }
   };
 
   return {

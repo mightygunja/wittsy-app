@@ -18,23 +18,27 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [roomType, setRoomType] = useState<'ranked' | 'casual'>('ranked');
 
   const loadRooms = async () => {
     try {
       let activeRooms: Room[];
       if (roomType === 'ranked') {
-        // Get user's ELO from profile, default to 1000 for new players
-        const userElo = userProfile?.rating || 1000;
+        // Get user's ELO from profile, default to the new-profile rating
+        const userElo = (userProfile as any)?.rankedRating || userProfile?.rating || 1200;
         activeRooms = await getBrowsableRankedRooms(userElo);
       } else {
         const all = await getActiveRooms({ isPrivate: false, maxResults: 50 });
         activeRooms = all.filter((r: any) => !r.groupId);
       }
       setRooms(activeRooms);
+      setLoadFailed(false);
     } catch (error: any) {
       console.error('Error loading rooms:', error);
-      Alert.alert('Error', 'Failed to load rooms');
+      // Inline banner instead of an alert — this runs on a 5s interval,
+      // so a modal here would spam the user while offline.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,7 +49,7 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
 
   useEffect(() => {
     loadRooms();
-    
+
     // Refresh every 5 seconds
     const interval = setInterval(loadRooms, 5000);
     return () => clearInterval(interval);
@@ -55,17 +59,25 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
   useFocusEffect(
     useCallback(() => {
       loadRooms();
-    }, [])
+      // roomType dependency keeps this from refetching with a stale tab
+      // after navigating away and back
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [roomType])
   );
 
   const handleJoinRoom = async (room: Room) => {
     if (!userProfile) return;
-    
+
     try {
       await joinRoom(room.roomId, userProfile.uid, userProfile.username);
       // Navigate to game room
       navigation.navigate('GameRoom', { roomId: room.roomId });
     } catch (error: any) {
+      if (error?.code === 'ALREADY_IN_ROOM' || error.message === 'Already in room') {
+        // Already a member — just take them back into their game
+        navigation.navigate('GameRoom', { roomId: room.roomId });
+        return;
+      }
       Alert.alert('Error', error.message || 'Failed to join room');
     }
   };
@@ -86,7 +98,7 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
         <View style={styles.roomHeader}>
           <Text style={styles.roomName}>{item.name}</Text>
           <View style={[styles.statusBadge, item.status === 'waiting' ? styles.waitingBadge : styles.activeBadge]}>
-            <Text style={styles.statusText}>
+            <Text style={[styles.statusText, { color: item.status === 'waiting' ? COLORS.warning : COLORS.success }]}>
               {item.status === 'waiting' ? 'Waiting' : 'In Progress'}
             </Text>
           </View>
@@ -154,6 +166,14 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
           </Text>
         </TouchableOpacity>
       </View>
+
+      {loadFailed && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>
+            Couldn't refresh rooms. Check your connection — we'll keep retrying.
+          </Text>
+        </View>
+      )}
 
       <FlatList
         data={rooms}
@@ -244,7 +264,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderRadius: 8,
   },
   activeTab: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surfaceActive || COLORS.background,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -264,15 +284,32 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: 12 + tabletHorizontalPadding,
   },
   roomCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border || 'rgba(255, 255, 255, 0.08)',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.41
+  },
+  errorBanner: {
+    marginHorizontal: 12,
+    marginBottom: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: (COLORS.error || '#EF4444') + '20',
+    borderWidth: 1,
+    borderColor: (COLORS.error || '#EF4444') + '40',
+  },
+  errorBannerText: {
+    fontSize: 13,
+    color: COLORS.error || '#EF4444',
+    textAlign: 'center',
   },
   roomHeader: {
     flexDirection: 'row',

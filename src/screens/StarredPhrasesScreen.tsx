@@ -147,7 +147,7 @@ const PhraseCard: React.FC<{
 };
 
 export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { userProfile } = useAuth();
+  const { user, userProfile } = useAuth();
   const { colors: COLORS } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>('community');
   const [myPhrases, setMyPhrases] = useState<StarredPhrase[]>([]);
@@ -158,6 +158,14 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
   const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
 
   const handleReport = (phrase: StarredPhrase) => {
+    // The reports rule requires reporterId == auth.uid, so never fall back
+    // to a placeholder id — that write is guaranteed to be rejected.
+    const reporterId = userProfile?.uid || user?.uid;
+    if (!reporterId) {
+      Alert.alert('Sign In Required', 'You need to be signed in to report content.');
+      return;
+    }
+
     Alert.alert(
       'Report this phrase?',
       'It will be hidden for you and sent to the moderation team for review.',
@@ -172,12 +180,22 @@ export const StarredPhrasesScreen: React.FC<{ navigation: any }> = ({ navigation
               await reportContent({
                 contentType: 'starredPhrase',
                 contentId: phrase.matchId,
-                reporterId: userProfile?.uid || 'anonymous',
+                reporterId,
                 reportedUserId: phrase.userId,
                 contentText: phrase.phrase,
               });
             } catch (error) {
               console.error('Failed to submit report:', error);
+              // Un-hide the phrase so the user knows the report did not land
+              setReportedIds(prev => {
+                const next = new Set(prev);
+                next.delete(phrase.matchId);
+                return next;
+              });
+              Alert.alert(
+                'Report Failed',
+                "We couldn't submit your report. Please check your connection and try again."
+              );
             }
           },
         },

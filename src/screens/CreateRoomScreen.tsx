@@ -25,12 +25,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const handleCreateRoom = async () => {
-    console.log('=== handleCreateRoom CALLED ===');
-    console.log('User Profile:', userProfile);
-    console.log('Room Name:', roomName);
-    
     if (!userProfile) {
-      console.error('NO USER PROFILE!');
       Alert.alert('Error', 'User profile not loaded. Please try again.');
       return;
     }
@@ -40,9 +35,7 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
     // Validate room name
     const roomNameError = validateRoomName(roomName);
-    console.log('Room name validation result:', roomNameError);
     if (roomNameError) {
-      console.log('Room name validation failed:', roomNameError);
       setErrors({ roomName: roomNameError });
       Alert.alert('Validation Error', roomNameError);
       return;
@@ -52,7 +45,6 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
     const maxPlayersNum = parseInt(maxPlayers);
     if (isNaN(maxPlayersNum) || maxPlayersNum < 3 || maxPlayersNum > 12) {
       const error = 'Max players must be between 3 and 12';
-      console.log('Max players validation failed:', error);
       setErrors({ maxPlayers: error });
       Alert.alert('Validation Error', error);
       return;
@@ -62,7 +54,6 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
     const submissionTimeNum = parseInt(submissionTime);
     if (isNaN(submissionTimeNum) || submissionTimeNum < 15 || submissionTimeNum > 60) {
       const error = 'Submission time must be between 15 and 60 seconds';
-      console.log('Submission time validation failed:', error);
       setErrors({ submissionTime: error });
       Alert.alert('Validation Error', error);
       return;
@@ -72,7 +63,6 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
     const votingTimeNum = parseInt(votingTime);
     if (isNaN(votingTimeNum) || votingTimeNum < 5 || votingTimeNum > 30) {
       const error = 'Voting time must be between 5 and 30 seconds';
-      console.log('Voting time validation failed:', error);
       setErrors({ votingTime: error });
       Alert.alert('Validation Error', error);
       return;
@@ -80,7 +70,6 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
     // Winning votes is now fixed at 20 (WINNING_VOTES constant)
 
-    console.log('All validations passed, creating room...');
     setLoading(true);
 
     try {
@@ -109,9 +98,8 @@ export const CreateRoomScreen: React.FC<{ navigation: any; route: any }> = ({ na
         groupName
       );
 
-      console.log('Room created successfully with ID:', roomId);
       setLoading(false);
-      
+
       // Navigate to the game room
       navigation.navigate('GameRoom', { roomId });
     } catch (error: any) {

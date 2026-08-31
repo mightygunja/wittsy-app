@@ -3,7 +3,7 @@
  * Manage seasons, progression, and rewards
  */
 
-import { doc, getDoc, setDoc, updateDoc, increment, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, collection, query, where, getDocs, limit, orderBy, runTransaction, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { firestore } from './firebase';
 import { analytics } from './analytics';
 import { monetization } from './monetization';
@@ -17,6 +17,15 @@ import {
   XP_REWARDS,
   LEVEL_SKIP_PRICES,
 } from '../types/battlePass';
+
+/**
+ * Firestore document shape for a user's battle pass.
+ * `claimedRewards` tracks the FREE track; `claimedPremiumRewards` tracks the
+ * premium track, so upgrading to premium never voids rewards on either track.
+ */
+export interface UserBattlePassDoc extends UserBattlePass {
+  claimedPremiumRewards?: number[];
+}
 
 class BattlePassService {
   private currentSeason: BattlePassSeason = SEASON_1;
@@ -190,45 +199,68 @@ class BattlePassService {
   }
 
   /**
-   * Claim reward at specific level
+   * Claim reward at specific level.
+   * Grants every unclaimed track at that level (free always; premium too when
+   * the user owns premium), and marks the claim inside a transaction so a
+   * double-tap or a concurrent "Claim All" can never grant the same reward twice.
    */
-  async claimReward(userId: string, level: number, isPremium: boolean): Promise<boolean> {
+  async claimReward(userId: string, level: number, _isPremium?: boolean): Promise<boolean> {
     try {
-      const battlePass = await this.getUserBattlePass(userId);
-      if (!battlePass) return false;
-
-      // Check if user has reached this level
-      if (battlePass.currentLevel < level) {
-        return false;
-      }
-
-      // Check if already claimed
-      if (battlePass.claimedRewards.includes(level)) {
-        return false;
-      }
-
-      // Get reward
       const reward = this.currentSeason.rewards.find((r) => r.level === level);
       if (!reward) return false;
 
-      const rewardItem = isPremium && battlePass.isPremium ? reward.premium : reward.free;
-      if (!rewardItem) return false;
-
-      // Grant reward
-      await this.grantReward(userId, rewardItem);
-
-      // Mark as claimed
       const bpRef = doc(firestore, 'battlePasses', userId);
-      await updateDoc(bpRef, {
-        claimedRewards: [...battlePass.claimedRewards, level],
+
+      // Atomically mark unclaimed tracks as claimed before granting anything.
+      const toGrant = await runTransaction(firestore, async (tx) => {
+        const snap = await tx.get(bpRef);
+        if (!snap.exists()) return [] as { item: any; track: 'free' | 'premium' }[];
+
+        const bp = snap.data() as UserBattlePassDoc;
+        if (bp.currentLevel < level) return [];
+
+        const claimedFree = bp.claimedRewards || [];
+        const claimedPremium = bp.claimedPremiumRewards || [];
+        const grants: { item: any; track: 'free' | 'premium' }[] = [];
+        const updates: any = {};
+
+        if (reward.free && !claimedFree.includes(level)) {
+          grants.push({ item: reward.free, track: 'free' });
+          updates.claimedRewards = arrayUnion(level);
+        }
+        if (bp.isPremium && reward.premium && !claimedPremium.includes(level)) {
+          grants.push({ item: reward.premium, track: 'premium' });
+          updates.claimedPremiumRewards = arrayUnion(level);
+        }
+
+        if (grants.length === 0) return [];
+        tx.update(bpRef, updates);
+        return grants;
       });
 
-      analytics.logEvent('battle_pass_reward_claimed', {
-        user_id: userId,
-        level,
-        reward_type: rewardItem.type,
-        is_premium: isPremium,
-      });
+      if (toGrant.length === 0) return false;
+
+      for (const grant of toGrant) {
+        try {
+          await this.grantReward(userId, grant.item);
+        } catch (grantError) {
+          // The claim mark committed but the grant failed — roll the mark
+          // back so the reward isn't permanently burned and can be retried.
+          const field = grant.track === 'free' ? 'claimedRewards' : 'claimedPremiumRewards';
+          await updateDoc(bpRef, { [field]: arrayRemove(level) }).catch((rollbackError) =>
+            console.error('Failed to roll back claim mark:', rollbackError)
+          );
+          console.error('Battle pass grant failed; claim rolled back for retry:', grantError);
+          return false;
+        }
+
+        analytics.logEvent('battle_pass_reward_claimed', {
+          user_id: userId,
+          level,
+          reward_type: grant.item.type,
+          is_premium: grant.track === 'premium',
+        });
+      }
 
       return true;
     } catch (error) {
@@ -344,12 +376,17 @@ class BattlePassService {
         (this.currentSeason.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
 
+      const claimedLevels = new Set([
+        ...(battlePass.claimedRewards || []),
+        ...((battlePass as UserBattlePassDoc).claimedPremiumRewards || []),
+      ]);
+
       return {
         totalXP: battlePass.currentLevel * nextLevelXP + battlePass.currentXP,
         currentLevel: battlePass.currentLevel,
         nextLevelXP,
         progressPercent,
-        claimedRewards: battlePass.claimedRewards.length,
+        claimedRewards: claimedLevels.size,
         totalRewards,
         daysRemaining,
         isPremium: battlePass.isPremium,
@@ -399,13 +436,22 @@ class BattlePassService {
    * Auto-claim all available rewards
    */
   async claimAllRewards(userId: string): Promise<number> {
-    const battlePass = await this.getUserBattlePass(userId);
+    const battlePass = (await this.getUserBattlePass(userId)) as UserBattlePassDoc | null;
     if (!battlePass) return 0;
 
+    const claimedFree = battlePass.claimedRewards || [];
+    const claimedPremium = battlePass.claimedPremiumRewards || [];
+
     let claimed = 0;
-    for (let level = 1; level <= battlePass.currentLevel; level++) {
-      if (!battlePass.claimedRewards.includes(level)) {
-        const success = await this.claimReward(userId, level, battlePass.isPremium);
+    for (const reward of this.currentSeason.rewards) {
+      if (reward.level > battlePass.currentLevel) continue;
+
+      const freeUnclaimed = !!reward.free && !claimedFree.includes(reward.level);
+      const premiumUnclaimed =
+        battlePass.isPremium && !!reward.premium && !claimedPremium.includes(reward.level);
+
+      if (freeUnclaimed || premiumUnclaimed) {
+        const success = await this.claimReward(userId, reward.level);
         if (success) claimed++;
       }
     }

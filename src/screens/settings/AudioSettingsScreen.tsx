@@ -18,6 +18,7 @@ import { BackButton } from '../../components/common/BackButton';
 import { SPACING } from '../../utils/constants';
 import { createSettingsStyles } from '../../styles/settingsStyles';
 import { audioService } from '../../services/audioService';
+import { hapticService } from '../../services/haptics';
 
 export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { settings, updateAudio } = useSettings();
@@ -33,8 +34,15 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
       await audioService.setSFXEnabled(value);
     } else if (key === 'muteAll') {
       await audioService.setMuteAll(value);
+    } else if (key === 'enableVibration') {
+      // SettingsContext also syncs this on load; apply immediately here and
+      // give a haptic tick so the user feels the change.
+      hapticService.setEnabled(value);
+      if (value) {
+        await hapticService.trigger('light');
+      }
     }
-    
+
     if (!value || key !== 'muteAll') {
       audioService.playClick();
     }
@@ -60,13 +68,11 @@ export const AudioSettingsScreen: React.FC<{ navigation: any }> = ({ navigation 
     { key: 'masterVolume', label: 'Master Volume', icon: '🔊' },
     { key: 'musicVolume', label: 'Music', icon: '🎵' },
     { key: 'sfxVolume', label: 'Sound Effects', icon: '🔔' },
-    { key: 'voiceVolume', label: 'Voice Chat (Coming Soon)', icon: '🎤' },
   ];
 
   const toggleSettings = [
     { key: 'enableMusic', label: 'Enable Music', description: 'Background music during gameplay' },
     { key: 'enableSFX', label: 'Enable Sound Effects', description: 'Button clicks, notifications' },
-    { key: 'enableVoice', label: 'Enable Voice Chat', description: 'In-game voice communication (Coming Soon)' },
     { key: 'enableVibration', label: 'Enable Vibration', description: 'Haptic feedback' },
   ];
 

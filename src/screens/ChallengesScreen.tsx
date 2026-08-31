@@ -20,6 +20,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Challenge } from '../types/social';
 import {
   claimChallengeReward,
+  getActiveChallenges,
 } from '../services/challenges';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -29,7 +30,7 @@ import { useTheme } from '../hooks/useTheme';
 import { BackButton } from '../components/common/BackButton';;
 import { tabletHorizontalPadding } from '../utils/responsive';
 
-type TabType = 'daily' | 'weekly' | 'seasonal' | 'skill' | 'social';
+type TabType = 'daily' | 'weekly' | 'skill' | 'social';
 
 export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
@@ -43,8 +44,6 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
 
   useEffect(() => {
-    console.log('🎯 ChallengesScreen mounted, user:', user?.uid || 'NO USER');
-    
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
@@ -53,28 +52,19 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
     if (user?.uid) {
       loadChallenges();
-    } else {
-      console.log('⏳ Waiting for user authentication...');
     }
   }, [user]);
 
   const loadChallenges = async () => {
-    if (!user?.uid) {
-      console.log('⚠️ No user authenticated, cannot load challenges');
-      return;
-    }
+    if (!user?.uid) return;
 
-    console.log('📋 Loading challenges for user:', user.uid);
     setLoading(true);
     try {
-      const { getActiveChallenges } = require('../services/challenges');
       const allChallenges = await getActiveChallenges(user.uid);
-      console.log('✅ Loaded challenges:', allChallenges.length);
       setChallenges(allChallenges);
     } catch (error: any) {
-      console.error('❌ Error loading challenges:', error.message);
-      console.log('🔐 User auth state:', user ? 'Logged in' : 'Not logged in');
-      Alert.alert('Error', 'Failed to load challenges. Please try logging in again.');
+      console.error('Error loading challenges:', error?.message || error);
+      Alert.alert('Error', 'Failed to load challenges. Pull down to try again.');
     } finally {
       setLoading(false);
     }
@@ -109,21 +99,22 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     }
   };
 
-  const renderChallengeCard = (challenge: any) => {
+  const renderChallengeCard = (challenge: Challenge) => {
     const progress = challenge.progress || 0;
-    const goal = (challenge as any).goal || 1;
+    const goal = challenge.requirement || 1;
     const progressPercent = Math.min((progress / goal) * 100, 100);
-    const isCompleted = progress >= goal;
+    // The Claim button is driven by the server-side completed flag, not raw progress
+    const isCompleted = challenge.completed === true;
     const isClaimed = challenge.claimed || false;
 
-    // Get icon based on type
+    // Get icon based on category/type
     const getIcon = () => {
+      if (challenge.category === 'skill') return '🎓';
+      if (challenge.category === 'social') return '👥';
       switch (challenge.type) {
         case 'daily': return '📅';
         case 'weekly': return '📆';
         case 'seasonal': return '🏆';
-        case 'skill': return '🎓';
-        case 'social': return '👥';
         default: return '🎯';
       }
     };
@@ -157,22 +148,34 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         <View style={styles.rewardsSection}>
           <Text style={styles.rewardsLabel}>Rewards:</Text>
           <View style={styles.rewardsList}>
-            {(challenge as any).rewards?.xp && (
+            {!!challenge.reward?.xp && (
               <View style={styles.rewardItem}>
                 <Text style={styles.rewardIcon}>⭐</Text>
-                <Text style={styles.rewardText}>{(challenge as any).rewards.xp} XP</Text>
+                <Text style={styles.rewardText}>{challenge.reward.xp} XP</Text>
               </View>
             )}
-            {(challenge as any).rewards?.coins && (
+            {!!challenge.reward?.coins && (
               <View style={styles.rewardItem}>
                 <Text style={styles.rewardIcon}>🪙</Text>
-                <Text style={styles.rewardText}>{(challenge as any).rewards.coins} coins</Text>
+                <Text style={styles.rewardText}>{challenge.reward.coins} coins</Text>
               </View>
             )}
-            {(challenge as any).rewards?.gems && (
+            {!!challenge.reward?.badge && (
               <View style={styles.rewardItem}>
-                <Text style={styles.rewardIcon}>💎</Text>
-                <Text style={styles.rewardText}>{(challenge as any).rewards.gems} gems</Text>
+                <Text style={styles.rewardIcon}>🏅</Text>
+                <Text style={styles.rewardText}>Badge</Text>
+              </View>
+            )}
+            {!!challenge.reward?.title && (
+              <View style={styles.rewardItem}>
+                <Text style={styles.rewardIcon}>👑</Text>
+                <Text style={styles.rewardText}>{challenge.reward.title}</Text>
+              </View>
+            )}
+            {!!challenge.reward?.emote && (
+              <View style={styles.rewardItem}>
+                <Text style={styles.rewardIcon}>😄</Text>
+                <Text style={styles.rewardText}>Emote</Text>
               </View>
             )}
           </View>
@@ -206,8 +209,15 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     );
   };
 
+  // Daily/Weekly are challenge types; Skill/Social are categories that exist on
+  // both daily and weekly challenges — filter accordingly so those tabs have content
+  const matchesTab = (c: Challenge): boolean =>
+    activeTab === 'skill' || activeTab === 'social'
+      ? c.category === activeTab
+      : c.type === activeTab;
+
   const renderStats = () => {
-    const filteredChallenges = challenges.filter((c: Challenge) => c.type === activeTab);
+    const filteredChallenges = challenges.filter(matchesTab);
     const completed = filteredChallenges.filter((c: Challenge) => c.completed).length;
     const claimed = filteredChallenges.filter((c: Challenge) => c.claimed).length;
     const total = filteredChallenges.length;
@@ -234,7 +244,7 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     );
   };
 
-  const filteredChallenges = challenges.filter((c: Challenge) => c.type === activeTab);
+  const filteredChallenges = challenges.filter(matchesTab);
 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
@@ -260,14 +270,6 @@ export const ChallengesScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           >
             <Text style={[styles.tabText, activeTab === 'weekly' && styles.activeTabText]}>
               📆 Weekly
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'seasonal' && styles.activeTab]}
-            onPress={() => setActiveTab('seasonal')}
-          >
-            <Text style={[styles.tabText, activeTab === 'seasonal' && styles.activeTabText]}>
-              🏆 Seasonal
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

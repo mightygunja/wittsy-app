@@ -276,6 +276,19 @@ interface FinalResultsScreenProps {
   onPlayAgain: () => void;
   onLeave: () => void;
   playAgainLoading?: boolean;
+  /** This player's earned rewards, shown as a strip above the buttons. */
+  rewards?: {
+    coins: number;
+    battlePassXP: number;
+    battlePassLevelUp?: boolean;
+    newBattlePassLevel?: number;
+  } | null;
+  /** This player's rating change (server-settled), when the game was ranked. */
+  myRatingChange?: {
+    oldRating: number;
+    newRating: number;
+    ratingChange: number;
+  } | null;
 }
 
 export const FinalResultsScreen: React.FC<FinalResultsScreenProps> = ({
@@ -286,6 +299,8 @@ export const FinalResultsScreen: React.FC<FinalResultsScreenProps> = ({
   onPlayAgain,
   onLeave,
   playAgainLoading = false,
+  rewards = null,
+  myRatingChange = null,
 }) => {
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
@@ -402,6 +417,39 @@ export const FinalResultsScreen: React.FC<FinalResultsScreenProps> = ({
             />
           ))}
         </ScrollView>
+
+        {/* Your rewards + rating change (previously computed but never shown) */}
+        {(rewards || myRatingChange) && (
+          <View style={styles.rewardsStrip}>
+            {rewards && (
+              <View style={styles.rewardsItem}>
+                <Text style={styles.rewardsValue}>+{rewards.coins} 🪙</Text>
+                <Text style={styles.rewardsLabel}>Coins</Text>
+              </View>
+            )}
+            {rewards && (
+              <View style={styles.rewardsItem}>
+                <Text style={styles.rewardsValue}>
+                  +{rewards.battlePassXP} XP{rewards.battlePassLevelUp ? ` · Lv ${rewards.newBattlePassLevel}!` : ''}
+                </Text>
+                <Text style={styles.rewardsLabel}>Battle Pass</Text>
+              </View>
+            )}
+            {myRatingChange && (
+              <View style={styles.rewardsItem}>
+                <Text
+                  style={[
+                    styles.rewardsValue,
+                    { color: myRatingChange.ratingChange >= 0 ? COLORS.success : COLORS.error },
+                  ]}
+                >
+                  {myRatingChange.ratingChange >= 0 ? '+' : ''}{myRatingChange.ratingChange} ({myRatingChange.newRating})
+                </Text>
+                <Text style={styles.rewardsLabel}>Rating</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Buttons */}
         <View style={styles.buttons}>
@@ -555,6 +603,35 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  rewardsStrip: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 4,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  rewardsItem: {
+    alignItems: 'center',
+  },
+  rewardsValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  rewardsLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: COLORS.textTertiary,
+    marginTop: 2,
   },
   buttons: {
     flexDirection: 'row',

@@ -328,12 +328,23 @@ export const joinRoom = async (
   if (preDoc.data().isRanked) {
     const alreadyInRankedGame = await isUserInActiveRankedGame(userId);
     if (alreadyInRankedGame) {
-      throw new Error('You are already in an active ranked game. Please finish or leave that game before joining another ranked game.');
+      const err: any = new Error('You are already in an active ranked game. Please finish or leave that game before joining another ranked game.');
+      err.code = 'ALREADY_IN_RANKED';
+      throw err;
     }
   }
 
-  // Load user's avatar config before the transaction
+  // Load user's avatar config + rating before the transaction (the rating is
+  // stamped on the player object so room-average ELO covers all players)
   const userAvatar = await avatarService.getUserAvatar(userId);
+  let userRating: number | null = null;
+  try {
+    const userDoc = await getDoc(doc(firestore, 'users', userId));
+    if (userDoc.exists()) {
+      const u = userDoc.data();
+      userRating = u.rankedRating || u.rating || null;
+    }
+  } catch (_) { /* rating is optional */ }
 
   // Transactional join: the old read-modify-write of the players array meant
   // two players joining at the same moment silently dropped one of them.
@@ -353,12 +364,17 @@ export const joinRoom = async (
 
   // Check if user is already in the room
   if (players.find((p: Player) => p.userId === userId)) {
-    console.warn('⚠️ User already in room, skipping join');
-    throw new Error('Already in room');
+    const err: any = new Error('Already in room');
+    err.code = 'ALREADY_IN_ROOM';
+    throw err;
   }
   
-  // Check if any player has reached the join lock threshold
-  const maxVotes = Math.max(0, ...Object.values(scores).map((s: any) => s?.totalVotes || 0));
+  // Check if any CURRENT player has reached the join lock threshold.
+  // (Scores of departed players are kept for rejoin, but must not lock joins.)
+  const currentPlayerIds = new Set(players.map((p: Player) => p.userId));
+  const maxVotes = Math.max(0, ...Object.entries(scores)
+    .filter(([id]) => currentPlayerIds.has(id))
+    .map(([, s]: [string, any]) => s?.totalVotes || 0));
   const joinLockThreshold = roomData.settings.joinLockVoteThreshold || JOIN_LOCK_THRESHOLD;
 
   // Prevent joining if any player has reached vote threshold
@@ -370,7 +386,7 @@ export const joinRoom = async (
     throw new Error('Room is full');
   }
 
-  const newPlayer = {
+  const newPlayer: any = {
     userId,
     username,
     isReady: false,
@@ -379,6 +395,9 @@ export const joinRoom = async (
     avatar: null,
     avatarConfig: userAvatar?.config || null, // Include custom avatar configuration
   };
+  if (userRating !== null) {
+    newPlayer.rating = userRating; // room-average ELO uses real ratings only
+  }
 
   const updatedPlayers = [...players, newPlayer];
 
@@ -425,6 +444,17 @@ export const joinRoom = async (
 export const deleteRoom = async (roomId: string): Promise<void> => {
   const roomRef = doc(firestore, 'rooms', roomId);
   await deleteDoc(roomRef);
+
+  // Clean up the room's live RTDB state (game, submissions, chat, typing) —
+  // orphaned nodes previously accumulated forever.
+  try {
+    await remove(ref(realtimeDb, `rooms/${roomId}`));
+    await remove(ref(realtimeDb, `chat/${roomId}`));
+    await remove(ref(realtimeDb, `typing/${roomId}`));
+  } catch (rtdbError) {
+    console.error('Failed to clean RTDB state for deleted room:', rtdbError);
+  }
+
   console.log(`🗑️ Room ${roomId} deleted by host`);
 };
 
@@ -559,8 +589,7 @@ export const createRematchRoom = async (
     currentPrompt: null,
   };
 
-  const { addDoc, collection: col } = await import('firebase/firestore');
-  const newRef = await addDoc(col(firestore, 'rooms'), newRoomData);
+  const newRef = await addDoc(collection(firestore, 'rooms'), newRoomData);
   const newRoomId = newRef.id;
 
   // Signal all clients in the old room to navigate to the new one
@@ -818,25 +847,10 @@ export const getLeaderboard = async (
 
 // ==================== MATCH HISTORY OPERATIONS ====================
 
-/**
- * Save completed match to history
- */
-export const saveMatchHistory = async (roomData: Room): Promise<void> => {
-  const matchData = {
-    roomName: roomData.name,
-    players: roomData.players,
-    scores: roomData.scores,
-    totalRounds: roomData.currentRound,
-    winner: Object.entries(roomData.scores)
-      .sort(([, a], [, b]) => (b as any).roundWins - (a as any).roundWins)[0]?.[0],
-    duration: roomData.startedAt 
-      ? Date.now() - (roomData.startedAt as any).toDate().getTime()
-      : 0,
-    createdAt: Timestamp.now()
-  };
-  
-  await addDoc(collection(firestore, 'matches'), matchData);
-};
+// NOTE: match history is written exclusively by the endGame Cloud Function
+// (one doc per player, id `${userId}_${roomId}`). The old client-side
+// saveMatchHistory here wrote room-shaped docs no reader could find, with
+// winner decided by roundWins instead of totalVotes — removed as dead code.
 
 /**
  * Get user's match history

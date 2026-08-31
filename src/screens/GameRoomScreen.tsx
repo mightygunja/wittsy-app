@@ -19,7 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
-import { leaveRoom, startGame, deleteRoom, restartGame, createRematchRoom } from '../services/database';
+import { leaveRoom, startGame, deleteRoom, createRematchRoom } from '../services/database';
 import { saveCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { gameTimerService } from '../services/gameTimer';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -45,7 +45,6 @@ import { functions } from '../services/firebase';
 import { rewards, REWARD_AMOUNTS } from '../services/rewardsService';
 import { incrementChallengeProgress } from '../services/challenges';
 import { battlePass } from '../services/battlePassService';
-import { GameEndSummary } from '../components/game/GameEndSummary';
 import { FinalResultsScreen, FinalPlayer } from '../components/game/FinalResultsScreen';
 import { StarCelebration } from '../components/game/StarCelebration';
 import { VictoryCelebration } from '../components/game/VictoryCelebration';
@@ -148,7 +147,11 @@ const GameRoomScreen: React.FC = () => {
     totalVotes: number;
   }> | null>(null);
   const [winStreak, setWinStreak] = useState(0);
-  const [lastRoundWinner, setLastRoundWinner] = useState<string | null>(null);
+  const [, setLastRoundWinner] = useState<string | null>(null);
+  // Live refs mirroring the streak state for use inside the long-lived
+  // game-state subscription callback (its closed-over state is stale).
+  const winStreakRef = useRef(0);
+  const lastRoundWinnerRef = useRef<string | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [phrase, setPhrase] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -159,7 +162,6 @@ const GameRoomScreen: React.FC = () => {
   const [shuffledSubmissions, setShuffledSubmissions] = useState<[string, string][]>([]);
   const [multiplayerRatingChanges, setMultiplayerRatingChanges] = useState<Record<string, RatingUpdate> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [showGameEndSummary, setShowGameEndSummary] = useState(false);
   const [gameEndRewards, setGameEndRewards] = useState<{
     coins: number;
     xp: number;
@@ -219,10 +221,10 @@ const GameRoomScreen: React.FC = () => {
 
       let battlePassResult: { leveledUp: boolean; newLevel?: number } = { leveledUp: false };
       if (firstSettlement) {
-        // Grant participation rewards to current user
-        await rewards.grantParticipationRewards(user.uid);
-
-        // Get Battle Pass level up info
+        // Participation coins + ONE battle pass XP grant. (The old flow called
+        // grantParticipationRewards — which already grants XP internally — and
+        // then addXP again, double-granting participation XP every game.)
+        await rewards.grantCoins(user.uid, REWARD_AMOUNTS.GAME_PARTICIPATION, 'game_participation');
         battlePassResult = await battlePass.addXP(
           user.uid,
           REWARD_AMOUNTS.GAME_PARTICIPATION_XP,
@@ -271,13 +273,17 @@ const GameRoomScreen: React.FC = () => {
       }
 
       setFinalScores(scores);
-      setGameEndRewards({
-        coins: REWARD_AMOUNTS.GAME_PARTICIPATION,
-        xp: 0,
-        battlePassXP: REWARD_AMOUNTS.GAME_PARTICIPATION_XP,
-        battlePassLevelUp: battlePassResult.leveledUp,
-        newBattlePassLevel: battlePassResult.newLevel,
-      });
+      // Only show the rewards strip when rewards were actually granted this
+      // run — a remount into a finished room must not display unearned coins.
+      if (firstSettlement) {
+        setGameEndRewards({
+          coins: REWARD_AMOUNTS.GAME_PARTICIPATION,
+          xp: 0,
+          battlePassXP: REWARD_AMOUNTS.GAME_PARTICIPATION_XP,
+          battlePassLevelUp: battlePassResult.leveledUp,
+          newBattlePassLevel: battlePassResult.newLevel,
+        });
+      }
       
       // Show vibrant victory celebration for winner(s)
       const topScore = sortedScores[0]?.score || 0;
@@ -326,22 +332,9 @@ const GameRoomScreen: React.FC = () => {
     }
   };
 
-  const handleGameEndContinue = async () => {
-    setShowGameEndSummary(false);
-    gameEndProcessedRef.current = false;
-    
-    // Leave room and go back
-    if (user?.uid && room) {
-      try {
-        await leaveRoom(roomId, user.uid);
-        clearCurrentRoom();
-        navigation.goBack();
-      } catch (error) {
-        console.error('Error leaving room:', error);
-      }
-    }
-  };
-  
+  // (GameEndSummary modal removed — rewards and rating changes are shown on
+  // the FinalResultsScreen rewards strip instead.)
+
   // Host taps "Play Again" on FinalResultsScreen
   const handlePlayAgain = async () => {
     if (!user?.uid) return;
@@ -363,24 +356,11 @@ const GameRoomScreen: React.FC = () => {
     if (user?.uid && room) {
       try {
         await leaveRoom(roomId, user.uid);
-        clearCurrentRoom();
-        navigation.goBack();
       } catch (error) {
-        console.error('Error leaving room:', error);
+        console.error('Error leaving room (navigating anyway):', error);
       }
-    }
-  };
-
-  const handleGameRestart = async () => {
-    setShowGameEndSummary(false);
-    gameEndProcessedRef.current = false;
-
-    try {
-      await restartGame(roomId);
-      console.log('🔄 Game restarted, waiting for host to start');
-    } catch (error) {
-      console.error('Error restarting game:', error);
-      Alert.alert('Error', 'Failed to restart game');
+      clearCurrentRoom();
+      navigation.goBack();
     }
   };
 
@@ -394,15 +374,6 @@ const GameRoomScreen: React.FC = () => {
       if (!roomUnsubscribeRef.current) return;
       if (snapshot.exists()) {
         const roomData = snapshot.data() as Room;
-        console.log('🔄 Room updated:', {
-          roomId,
-          status: roomData.status,
-          gameState: roomData.gameState,
-          playerCount: roomData.players?.length || 0,
-          players: roomData.players?.map(p => p.username) || [],
-          currentUserId: user?.uid,
-          isCurrentUserInRoom: roomData.players?.some(p => p.userId === user?.uid)
-        });
         setRoom(roomData);
         setLoading(false);
 
@@ -488,11 +459,9 @@ const GameRoomScreen: React.FC = () => {
     if (!roomId) return;
 
     const unsubscribe = subscribeToGameState(roomId, (state) => {
-      console.log('🎮 Game state update received:', state);
       if (state) {
         const previousPhase = previousPhaseRef.current;
-        console.log(`📍 Phase: ${state.phase}, Prompt: ${state.currentPrompt}, Round: ${state.currentRound}`);
-        
+
         // Calculate timeRemaining from phaseStartTime and phaseDuration
         if (state.phaseStartTime && state.phaseDuration) {
           const elapsed = (Date.now() - state.phaseStartTime) / 1000;
@@ -520,24 +489,27 @@ const GameRoomScreen: React.FC = () => {
         } else if (state.phase === 'results' && previousPhase !== 'results') {
           console.log('🏆 Entering results phase - calculating winner');
           
-          // Track win streaks for engagement
+          // Track win streaks for engagement. Read/write via refs: this
+          // callback lives inside a subscription created on mount, so the
+          // lastRoundWinner/winStreak state values it closes over are frozen
+          // at their initial values (the streak badge could never trigger).
           if (state.lastWinners && state.lastWinners.length > 0 && user?.uid) {
             const currentWinner = state.lastWinners[0];
             if (currentWinner === user.uid) {
-              if (lastRoundWinner === user.uid) {
-                setWinStreak(prev => prev + 1);
-                if (winStreak + 1 >= 2) {
-                  haptics.success();
-                  console.log(`🔥 WIN STREAK: ${winStreak + 1}!`);
-                }
-              } else {
-                setWinStreak(1);
+              const newStreak = lastRoundWinnerRef.current === user.uid ? winStreakRef.current + 1 : 1;
+              winStreakRef.current = newStreak;
+              setWinStreak(newStreak);
+              if (newStreak >= 2) {
+                haptics.success();
               }
+              lastRoundWinnerRef.current = user.uid;
               setLastRoundWinner(user.uid);
             } else {
-              if (lastRoundWinner === user.uid) {
+              if (lastRoundWinnerRef.current === user.uid) {
+                winStreakRef.current = 0;
                 setWinStreak(0);
               }
+              lastRoundWinnerRef.current = currentWinner;
               setLastRoundWinner(currentWinner);
             }
           }
@@ -972,6 +944,17 @@ const GameRoomScreen: React.FC = () => {
           { text: 'Leave', style: 'destructive', onPress: performLeaveRoom },
         ]
       );
+    } else if (room?.status === 'active') {
+      // Casual games confirm too — a stray Android back press was silently
+      // removing the player from a live game.
+      Alert.alert(
+        'Leave Game?',
+        'The game is still going. Leave anyway?',
+        [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: performLeaveRoom },
+        ]
+      );
     } else {
       performLeaveRoom();
     }
@@ -1311,7 +1294,16 @@ const GameRoomScreen: React.FC = () => {
               </View>
             )}
 
-            {/* ── Winner hero card ── */}
+            {/* ── Winner hero card (or the no-votes state for rounds where
+                 nobody voted — the gold card with empty quotes and "0 votes"
+                 looked broken) ── */}
+            {winners.length === 0 ? (
+              <View style={styles.noVoteContainer}>
+                <Text style={styles.noVoteIcon}>🤷</Text>
+                <Text style={styles.noVoteTitle}>No votes this round</Text>
+                <Text style={styles.noVoteSubtitle}>Nobody voted, so nobody wins this one. Next round!</Text>
+              </View>
+            ) : (
             <LinearGradient
               colors={['#2a1f00', '#3d2d00', '#2a1f00']}
               start={{ x: 0, y: 0 }}
@@ -1390,6 +1382,7 @@ const GameRoomScreen: React.FC = () => {
                 </View>
               )}
             </LinearGradient>
+            )}
 
             {/* ── Non-winner ranked list ── */}
             {nonWinners.length > 0 && (
@@ -1457,6 +1450,7 @@ const GameRoomScreen: React.FC = () => {
             <Timer
               timeRemaining={gameState.timeRemaining}
               phase={gameState.phase}
+              phaseDuration={gameState.phaseDuration}
             />
           </View>
         )}
@@ -1736,23 +1730,22 @@ const GameRoomScreen: React.FC = () => {
         onPlayAgain={handlePlayAgain}
         onLeave={handleFinalResultsLeave}
         playAgainLoading={playAgainLoading}
+        rewards={gameEndRewards ? {
+          coins: gameEndRewards.coins,
+          battlePassXP: gameEndRewards.battlePassXP,
+          battlePassLevelUp: gameEndRewards.battlePassLevelUp,
+          newBattlePassLevel: gameEndRewards.newBattlePassLevel,
+        } : null}
+        myRatingChange={(() => {
+          const updates = (room as any)?.ratingUpdates;
+          const mine = user?.uid && updates ? updates[user.uid] : null;
+          return mine ? {
+            oldRating: mine.oldRating,
+            newRating: mine.newRating,
+            ratingChange: mine.ratingChange,
+          } : null;
+        })()}
       />
-
-      {/* Game End Summary Modal (rewards/XP — kept for reference, shown after FinalResults) */}
-      {showGameEndSummary && gameEndRewards && (
-        <GameEndSummary
-          visible={showGameEndSummary}
-          rewards={gameEndRewards}
-          finalScores={finalScores}
-          ratingChanges={ratingChanges}
-          multiplayerRatingChanges={multiplayerRatingChanges}
-          currentUserId={user?.uid}
-          isHost={room?.hostId === user?.uid}
-          playerCount={room?.players.length}
-          onContinue={handleGameEndContinue}
-          onRestart={handleGameRestart}
-        />
-      )}
 
       {/* Star Celebration Animation */}
       {showStarCelebration && starCelebrationData && (

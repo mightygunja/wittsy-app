@@ -339,8 +339,10 @@ class MonetizationService {
         return;
       }
 
-      // Handle battle pass premium
-      if (purchase.productId === 'com.wittz.battlepass.premium') {
+      // Handle battle pass premium (platform-selected id — the old hardcoded
+      // iOS id meant Android premium purchases were charged but never granted
+      // and never finished)
+      if (purchase.productId === BATTLE_PASS_PRODUCTS.PREMIUM) {
         await import('./battlePassService');
         const userRef = doc(firestore, 'battlePasses', this.currentUserId);
         
@@ -367,9 +369,11 @@ class MonetizationService {
         return;
       }
 
-      // Handle level skips
-      if (purchase.productId.startsWith('com.wittz.battlepass.skip.')) {
-        const levels = parseInt(purchase.productId.split('.').pop() || '0');
+      // Handle level skips — both id shapes: iOS 'com.wittz.battlepass.skip.5'
+      // and Android 'battlepass_skip_5'
+      const skipMatch = purchase.productId.match(/skip[._](\d+)$/);
+      if (skipMatch) {
+        const levels = parseInt(skipMatch[1], 10);
         if (levels > 0) {
           const { battlePass } = await import('./battlePassService');
           const userBP = await battlePass.getUserBattlePass(this.currentUserId);
@@ -765,7 +769,7 @@ class MonetizationService {
           }
 
           // Handle battle pass premium restoration
-          if (purchase.productId === 'com.wittz.battlepass.premium' && this.currentUserId) {
+          if (purchase.productId === BATTLE_PASS_PRODUCTS.PREMIUM && this.currentUserId) {
             try {
               const { battlePass } = await import('./battlePassService');
               const userBP = await battlePass.getUserBattlePass(this.currentUserId);

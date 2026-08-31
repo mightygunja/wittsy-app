@@ -41,10 +41,35 @@ import { tabletHorizontalPadding } from '../utils/responsive';
 
 type TabType = 'friends' | 'requests' | 'search';
 
-export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+const isTabType = (value: any): value is TabType =>
+  value === 'friends' || value === 'requests' || value === 'search';
+
+/**
+ * Map internal/service errors to copy a user can act on. Known service
+ * messages are already human-readable; raw Firebase errors are not.
+ */
+const friendlyError = (error: any, fallback: string): string => {
+  const message = typeof error?.message === 'string' ? error.message : '';
+  const knownMessages = [
+    'Already friends',
+    'Friend request already sent',
+    'Friend request not found',
+    'Request already processed',
+    'Friendship not found',
+  ];
+  if (knownMessages.includes(message)) {
+    return message;
+  }
+  console.warn('Friends action failed:', error);
+  return fallback;
+};
+
+export const FriendsScreen: React.FC<{ navigation: any; route?: any }> = ({ navigation, route }) => {
   const { colors: COLORS } = useTheme();
   const { user, userProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('friends');
+  const [activeTab, setActiveTab] = useState<TabType>(
+    isTabType(route?.params?.tab) ? route.params.tab : 'friends'
+  );
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
@@ -65,6 +90,14 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
 
     loadData();
   }, []);
+
+  // Respect the requested tab when navigated to while already mounted
+  // (e.g. tapping a friend-request notification).
+  useEffect(() => {
+    if (isTabType(route?.params?.tab)) {
+      setActiveTab(route.params.tab);
+    }
+  }, [route?.params?.tab]);
 
   const loadData = async () => {
     if (!user?.uid) return;
@@ -117,7 +150,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       Alert.alert('Success', `Friend request sent to ${toUsername}`);
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send friend request');
+      Alert.alert('Error', friendlyError(error, 'Could not send the friend request. Please try again.'));
     }
   };
 
@@ -129,7 +162,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       Alert.alert('Success', 'Friend request accepted!');
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to accept request');
+      Alert.alert('Error', friendlyError(error, 'Could not accept the request. Pull to refresh and try again.'));
     }
   };
 
@@ -140,7 +173,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       await rejectFriendRequest(requestId, user.uid);
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to reject request');
+      Alert.alert('Error', friendlyError(error, 'Could not decline the request. Please try again.'));
     }
   };
 
@@ -151,7 +184,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       await cancelFriendRequest(requestId, user.uid);
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to cancel request');
+      Alert.alert('Error', friendlyError(error, 'Could not cancel the request. Please try again.'));
     }
   };
 
@@ -171,7 +204,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               await removeFriend(user.uid, friendId);
               await loadData();
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to remove friend');
+              Alert.alert('Error', friendlyError(error, 'Could not remove this friend. Please try again.'));
             }
           },
         },
@@ -186,7 +219,7 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       await toggleFavoriteFriend(user.uid, friendId);
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update favorite');
+      Alert.alert('Error', friendlyError(error, 'Could not update favorite. Please try again.'));
     }
   };
 
@@ -216,15 +249,6 @@ export const FriendsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           <Text style={styles.actionButtonText}>
             {friend.favorited ? '★' : '☆'}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.inviteButton]}
-          onPress={() => {
-            // Navigate to create room or send invite
-            Alert.alert('Invite', 'Game invite feature coming soon!');
-          }}
-        >
-          <Text style={styles.actionButtonText}>✉️ Invite</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.removeButton]}
@@ -585,9 +609,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderRadius: 8,
     backgroundColor: COLORS.surface,
     alignItems: 'center',
-  },
-  inviteButton: {
-    backgroundColor: COLORS.primary,
   },
   removeButton: {
     backgroundColor: COLORS.error,

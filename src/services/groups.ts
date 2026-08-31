@@ -8,9 +8,7 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
   updateDoc,
-  deleteDoc,
   setDoc,
   query,
   where,
@@ -20,10 +18,12 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
+  writeBatch,
 } from 'firebase/firestore';
 import { Share, Alert } from 'react-native';
 import { firestore } from './firebase';
 import { Group, GroupMember, GroupMemberStats } from '../types/social';
+import { DEEP_LINK_SCHEMES } from '../types/platform';
 
 // ==================== HELPERS ====================
 
@@ -34,6 +34,30 @@ const generateInviteCode = (): string => {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
+};
+
+/**
+ * Map raw Firebase errors to copy a user can act on.
+ * Our own thrown errors (e.g. "Only admins can remove members") pass through.
+ */
+export const getGroupErrorMessage = (error: any, fallback: string): string => {
+  const code: string = error?.code || '';
+  const message: string = String(error?.message || '');
+  if (code === 'permission-denied' || message.includes('insufficient permissions')) {
+    return "You don't have permission to do that. Pull to refresh the group and try again.";
+  }
+  if (
+    code === 'unavailable' ||
+    code === 'deadline-exceeded' ||
+    message.toLowerCase().includes('network')
+  ) {
+    return 'Network problem — check your connection and try again.';
+  }
+  // Errors we threw ourselves are already user-friendly
+  if (!code && message && !message.includes('Firebase') && !message.includes('firestore')) {
+    return message;
+  }
+  return fallback;
 };
 
 // ==================== GROUP CRUD ====================
@@ -56,10 +80,21 @@ export const createGroup = async (
     members: [createdBy],
   };
 
-  const groupRef = await addDoc(collection(firestore, 'groups'), groupData);
+  const groupRef = doc(collection(firestore, 'groups'));
   const groupId = groupRef.id;
 
-  // Add creator as admin member
+  // Step 1 (atomic): group doc + creator's userGroups index entry, so the group
+  // always appears in the creator's list even if a later write fails.
+  const batch = writeBatch(firestore);
+  batch.set(groupRef, groupData);
+  batch.set(
+    doc(firestore, 'userGroups', createdBy, 'groups', groupId),
+    { groupId, name: name.trim(), joinedAt: new Date().toISOString() }
+  );
+  await batch.commit();
+
+  // Step 2: creator's roster doc. Security rules verify membership via get() on
+  // the committed group doc, so this write cannot join step 1's batch.
   await setDoc(
     doc(firestore, 'groups', groupId, 'groupMembers', createdBy),
     {
@@ -70,24 +105,8 @@ export const createGroup = async (
     }
   );
 
-  // Add to userGroups index for cheap HomeScreen queries
-  await setDoc(
-    doc(firestore, 'userGroups', createdBy, 'groups', groupId),
-    { groupId, name: name.trim(), joinedAt: new Date().toISOString() }
-  );
-
-  // Initialize creator stats
-  await setDoc(
-    doc(firestore, 'groups', groupId, 'groupStats', createdBy),
-    {
-      userId: createdBy,
-      username: creatorUsername,
-      gamesPlayed: 0,
-      wins: 0,
-      totalPoints: 0,
-      placements: {},
-    }
-  );
+  // Note: groupStats docs are created/settled exclusively by the endGame Cloud
+  // Function (client writes to groupStats are denied by rules).
 
   return groupId;
 };
@@ -112,7 +131,6 @@ export const getUserGroups = async (userId: string): Promise<Group[]> => {
   } catch (error: any) {
     // If permission denied, user likely has no groups yet or auth not ready
     if (error?.code === 'permission-denied') {
-      console.log('No groups access for user (likely no groups yet)');
       return [];
     }
     throw error;
@@ -159,52 +177,78 @@ export const joinGroupViaInviteCode = async (
     const groupId = groupDoc.id;
     const groupData = groupDoc.data() as Group;
 
-    // Check if already a member
+    const memberDocRef = doc(firestore, 'groups', groupId, 'groupMembers', userId);
+    const indexDocRef = doc(firestore, 'userGroups', userId, 'groups', groupId);
+
+    // Already a member — self-heal roster/index docs in case an earlier join
+    // was interrupted partway, then navigate.
     if (groupData.members?.includes(userId)) {
-      return { success: true, groupId }; // Already in group — just navigate
+      try {
+        const existing = await getDoc(memberDocRef);
+        const healBatch = writeBatch(firestore);
+        if (!existing.exists()) {
+          healBatch.set(memberDocRef, {
+            userId,
+            username,
+            avatar: avatar || null,
+            role: 'member',
+            joinedAt: new Date().toISOString(),
+          });
+        }
+        healBatch.set(
+          indexDocRef,
+          { groupId, name: groupData.name, joinedAt: new Date().toISOString() },
+          { merge: true }
+        );
+        await healBatch.commit();
+      } catch {
+        // Best effort — membership itself is already established
+      }
+      return { success: true, groupId };
     }
 
-    // Add member
-    await setDoc(
-      doc(firestore, 'groups', groupId, 'groupMembers', userId),
-      {
-        userId,
-        username,
-        avatar: avatar || null,
-        role: 'member',
-        joinedAt: new Date().toISOString(),
-      }
-    );
-
-    // Update group members array + count
+    // Step 1: append self to the group's member list. Rules only permit a
+    // non-member to change exactly members(+self) and memberCount(+1).
     await updateDoc(doc(firestore, 'groups', groupId), {
       members: arrayUnion(userId),
       memberCount: increment(1),
     });
 
-    // Add to userGroups index
-    await setDoc(
-      doc(firestore, 'userGroups', userId, 'groups', groupId),
-      { groupId, name: groupData.name, joinedAt: new Date().toISOString() }
-    );
-
-    // Initialize member stats
-    await setDoc(
-      doc(firestore, 'groups', groupId, 'groupStats', userId),
-      {
+    // Step 2 (atomic): roster doc + userGroups index together. Rules check
+    // membership via get() on the committed group doc, so this must follow
+    // step 1 and cannot share its batch.
+    try {
+      const batch = writeBatch(firestore);
+      batch.set(memberDocRef, {
         userId,
         username,
-        gamesPlayed: 0,
-        wins: 0,
-        totalPoints: 0,
-        placements: {},
-      }
-    );
+        avatar: avatar || null,
+        role: 'member',
+        joinedAt: new Date().toISOString(),
+      });
+      batch.set(indexDocRef, {
+        groupId,
+        name: groupData.name,
+        joinedAt: new Date().toISOString(),
+      });
+      await batch.commit();
+    } catch (error: any) {
+      // Membership was granted but roster/index writes failed. Re-entering the
+      // invite code hits the self-heal branch above and completes the join.
+      console.error('joinGroupViaInviteCode roster write failed:', error);
+      return {
+        success: false,
+        error: 'We hit a problem partway through joining. Enter the invite code again to finish.',
+      };
+    }
+
+    // Note: groupStats docs are created/settled exclusively by the endGame
+    // Cloud Function (client writes to groupStats are denied by rules).
 
     return { success: true, groupId };
   } catch (error: any) {
     console.error('joinGroupViaInviteCode error:', error);
-    return { success: false, error: error.message || 'Failed to join group' };
+    return { success: false, error: getGroupErrorMessage(error, 'Failed to join group') };
   }
 };
 
@@ -218,47 +262,38 @@ export const addMemberFromFriends = async (
   if (!group) throw new Error('Group not found');
   if (group.members?.includes(userId)) return; // already a member
 
-  await setDoc(
-    doc(firestore, 'groups', groupId, 'groupMembers', userId),
-    {
-      userId,
-      username,
-      avatar: avatar || null,
-      role: 'member',
-      joinedAt: new Date().toISOString(),
-    }
-  );
-
-  await updateDoc(doc(firestore, 'groups', groupId), {
+  // Single atomic batch — the caller (an existing member) satisfies the
+  // membership checks in rules for every write here.
+  const batch = writeBatch(firestore);
+  batch.set(doc(firestore, 'groups', groupId, 'groupMembers', userId), {
+    userId,
+    username,
+    avatar: avatar || null,
+    role: 'member',
+    joinedAt: new Date().toISOString(),
+  });
+  batch.update(doc(firestore, 'groups', groupId), {
     members: arrayUnion(userId),
     memberCount: increment(1),
   });
-
-  await setDoc(
-    doc(firestore, 'userGroups', userId, 'groups', groupId),
-    { groupId, name: group.name, joinedAt: new Date().toISOString() }
-  );
-
-  await setDoc(
-    doc(firestore, 'groups', groupId, 'groupStats', userId),
-    {
-      userId,
-      username,
-      gamesPlayed: 0,
-      wins: 0,
-      totalPoints: 0,
-      placements: {},
-    }
-  );
+  batch.set(doc(firestore, 'userGroups', userId, 'groups', groupId), {
+    groupId,
+    name: group.name,
+    joinedAt: new Date().toISOString(),
+  });
+  await batch.commit();
 };
 
 export const leaveGroup = async (groupId: string, userId: string): Promise<void> => {
-  await deleteDoc(doc(firestore, 'groups', groupId, 'groupMembers', userId));
-  await updateDoc(doc(firestore, 'groups', groupId), {
+  // Single atomic batch so membership state can never end up half-removed.
+  const batch = writeBatch(firestore);
+  batch.delete(doc(firestore, 'groups', groupId, 'groupMembers', userId));
+  batch.update(doc(firestore, 'groups', groupId), {
     members: arrayRemove(userId),
     memberCount: increment(-1),
   });
-  await deleteDoc(doc(firestore, 'userGroups', userId, 'groups', groupId));
+  batch.delete(doc(firestore, 'userGroups', userId, 'groups', groupId));
+  await batch.commit();
 };
 
 export const removeMember = async (
@@ -272,6 +307,52 @@ export const removeMember = async (
     throw new Error('Only admins can remove members');
   }
   await leaveGroup(groupId, targetUserId);
+};
+
+export const promoteMember = async (
+  groupId: string,
+  adminId: string,
+  targetUserId: string
+): Promise<void> => {
+  // Verify caller is admin
+  const adminDoc = await getDoc(doc(firestore, 'groups', groupId, 'groupMembers', adminId));
+  if (!adminDoc.exists() || adminDoc.data()?.role !== 'admin') {
+    throw new Error('Only admins can promote members');
+  }
+  await updateDoc(doc(firestore, 'groups', groupId, 'groupMembers', targetUserId), {
+    role: 'admin',
+  });
+};
+
+/**
+ * Delete a group entirely (creator only, enforced by security rules).
+ * Removes every member's roster doc and userGroups index entry plus the group
+ * doc itself in one atomic batch, so the invite code stops resolving.
+ * groupStats docs are server-owned and become unreachable once the group doc
+ * is gone (their read rule depends on the group doc existing).
+ */
+export const deleteGroup = async (groupId: string, userId: string): Promise<void> => {
+  const group = await getGroup(groupId);
+  if (!group) return; // already gone
+  // The creator can always delete; a sole remaining member can too (rules
+  // allow it) — otherwise the last non-creator leaver would orphan the group
+  // with a live invite code.
+  const isSoleMember = (group.members || []).length === 1 && group.members[0] === userId;
+  if (group.createdBy !== userId && !isSoleMember) {
+    throw new Error('Only the group creator can delete the group');
+  }
+
+  const membersSnap = await getDocs(collection(firestore, 'groups', groupId, 'groupMembers'));
+  const memberIds = new Set<string>(group.members || []);
+  membersSnap.docs.forEach((d) => memberIds.add(d.id));
+
+  const batch = writeBatch(firestore);
+  membersSnap.docs.forEach((d) => batch.delete(d.ref));
+  memberIds.forEach((uid) =>
+    batch.delete(doc(firestore, 'userGroups', uid, 'groups', groupId))
+  );
+  batch.delete(doc(firestore, 'groups', groupId));
+  await batch.commit();
 };
 
 // ==================== MEMBERS & STATS ====================
@@ -301,36 +382,8 @@ export const getGroupStandings = async (groupId: string): Promise<GroupMemberSta
   return snap.docs.map((d) => d.data() as GroupMemberStats);
 };
 
-export const updateGroupStats = async (
-  groupId: string,
-  results: { userId: string; username: string; place: number; points: number }[]
-): Promise<void> => {
-  const batch = results.map(async ({ userId, username, place, points }) => {
-    const statsRef = doc(firestore, 'groups', groupId, 'groupStats', userId);
-
-    // Ensure doc exists before incrementing
-    const snap = await getDoc(statsRef);
-    if (!snap.exists()) {
-      await setDoc(statsRef, {
-        userId,
-        username,
-        gamesPlayed: 0,
-        wins: 0,
-        totalPoints: 0,
-        placements: {},
-      });
-    }
-
-    const placementKey = `placements.${place}`;
-    await updateDoc(statsRef, {
-      gamesPlayed: increment(1),
-      wins: place === 1 ? increment(1) : increment(0),
-      totalPoints: increment(points),
-      [placementKey]: increment(1),
-    });
-  });
-  await Promise.all(batch);
-};
+// Note: group stats are settled exclusively by the endGame Cloud Function
+// (client writes to groups/{id}/groupStats are denied by security rules).
 
 // ==================== GROUP GAMES ====================
 
@@ -367,9 +420,11 @@ export const regenerateInviteCode = async (
 };
 
 export const buildGroupInviteLink = (inviteCode: string): string => {
-  // Use custom scheme — guaranteed to open the app when installed.
-  // Universal links (https://wittz.app/group/...) require an AASA file on the server.
-  return `wittsy://group/${inviteCode}`;
+  // Universal link, same as game-room shares: opens the app when installed and
+  // falls back to the website otherwise. The custom wittsy:// scheme shows an
+  // error dialog on iOS when the app is not installed (see deepLinking.ts).
+  // deepLinking's urlToConfig already parses /group/{code}.
+  return `${DEEP_LINK_SCHEMES.universal}/group/${inviteCode}`;
 };
 
 export const shareGroupInviteLink = async (

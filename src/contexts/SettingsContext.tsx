@@ -3,9 +3,9 @@
  * Global settings management with persistence
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance } from 'react-native';
+import { hapticService } from '../services/haptics';
 import {
   UserSettings,
   ThemeSettings,
@@ -18,7 +18,7 @@ import {
   DEFAULT_USER_SETTINGS,
 } from '../types/settings';
 
-const SETTINGS_STORAGE_KEY = '@wittz_settings';
+export const SETTINGS_STORAGE_KEY = '@wittz_settings';
 
 interface SettingsContextType {
   settings: UserSettings;
@@ -38,31 +38,23 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
+  // Always holds the latest settings — updates derive from this, never from a
+  // stale render closure.
+  const settingsRef = useRef<UserSettings>(DEFAULT_USER_SETTINGS);
 
   // Load settings on mount
   useEffect(() => {
     loadSettings();
   }, []);
 
-  // Listen to system theme changes
+  // NOTE: system theme changes are handled by ThemeProvider (mode === 'auto' +
+  // useColorScheme). No Appearance listener here — a listener that rewrote
+  // theme.mode used to clobber the 'auto' selection with a stale settings copy.
+
+  // Keep the haptic service in sync with the vibration setting
   useEffect(() => {
-    if (settings.theme.useSystemTheme) {
-      try {
-        const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-          updateTheme({ mode: colorScheme === 'dark' ? 'dark' : 'light' });
-        });
-        return () => {
-          try {
-            subscription?.remove();
-          } catch (error) {
-            console.error('Error removing appearance listener:', error);
-          }
-        };
-      } catch (error) {
-        console.error('Error adding appearance listener:', error);
-      }
-    }
-  }, [settings.theme.useSystemTheme]);
+    hapticService.setEnabled(settings.audio.enableVibration);
+  }, [settings.audio.enableVibration]);
 
   const loadSettings = async () => {
     try {
@@ -70,137 +62,63 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (stored) {
         const parsed = JSON.parse(stored);
         // Merge with defaults to ensure all properties exist
-        setSettings({ ...DEFAULT_USER_SETTINGS, ...parsed });
+        settingsRef.current = { ...DEFAULT_USER_SETTINGS, ...parsed };
       } else {
         // No stored settings, use defaults
-        setSettings(DEFAULT_USER_SETTINGS);
+        settingsRef.current = DEFAULT_USER_SETTINGS;
       }
+      setSettings(settingsRef.current);
     } catch (error) {
       console.error('Error loading settings:', error);
       // On error, use defaults to prevent crash
+      settingsRef.current = DEFAULT_USER_SETTINGS;
       setSettings(DEFAULT_USER_SETTINGS);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveSettings = async (newSettings: UserSettings) => {
+  // Functional update: always derives the next settings from the LATEST state
+  // (never a stale closure), then persists the result.
+  const applySettingsUpdate = async (
+    updater: (prev: UserSettings) => UserSettings
+  ): Promise<void> => {
+    const next = updater(settingsRef.current);
+    settingsRef.current = next;
+    setSettings(next);
     try {
-      // Validate settings object before saving
-      if (!newSettings || typeof newSettings !== 'object') {
-        console.error('Invalid settings object:', newSettings);
-        return;
-      }
-      
-      // Update state first (optimistic update)
-      setSettings(newSettings);
-      
-      // Then persist to storage
-      await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+      await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));
     } catch (error) {
       console.error('Error saving settings:', error);
       // Don't crash, just log the error
     }
   };
 
-  const updateTheme = async (theme: Partial<ThemeSettings>) => {
-    try {
-      const newSettings = {
-        ...settings,
-        theme: { ...settings.theme, ...theme },
-        lastUpdated: new Date().toISOString(),
-      };
-      await saveSettings(newSettings);
-    } catch (error) {
-      console.error('Error updating theme:', error);
-    }
-  };
+  const updateSection = <K extends keyof Omit<UserSettings, 'lastUpdated'>>(
+    section: K,
+    partial: Partial<UserSettings[K]>
+  ): Promise<void> =>
+    applySettingsUpdate(prev => ({
+      ...prev,
+      [section]: { ...prev[section], ...partial },
+      lastUpdated: new Date().toISOString(),
+    }));
 
-  const updateAudio = async (audio: Partial<AudioSettings>) => {
-    try {
-      const newSettings = {
-        ...settings,
-        audio: { ...settings.audio, ...audio },
-        lastUpdated: new Date().toISOString(),
-      };
-      await saveSettings(newSettings);
-    } catch (error) {
-      console.error('Error updating audio:', error);
-    }
-  };
+  const updateTheme = (theme: Partial<ThemeSettings>) => updateSection('theme', theme);
+  const updateAudio = (audio: Partial<AudioSettings>) => updateSection('audio', audio);
+  const updateGameplay = (gameplay: Partial<GameplaySettings>) => updateSection('gameplay', gameplay);
+  const updatePrivacy = (privacy: Partial<PrivacySettings>) => updateSection('privacy', privacy);
+  const updateNotifications = (notifications: Partial<NotificationSettings>) =>
+    updateSection('notifications', notifications);
+  const updateAccessibility = (accessibility: Partial<AccessibilitySettings>) =>
+    updateSection('accessibility', accessibility);
+  const updateLanguage = (language: Partial<LanguageSettings>) => updateSection('language', language);
 
-  const updateGameplay = async (gameplay: Partial<GameplaySettings>) => {
-    try {
-      const newSettings = {
-        ...settings,
-        gameplay: { ...settings.gameplay, ...gameplay },
-        lastUpdated: new Date().toISOString(),
-      };
-      await saveSettings(newSettings);
-    } catch (error) {
-      console.error('Error updating gameplay:', error);
-    }
-  };
-
-  const updatePrivacy = async (privacy: Partial<PrivacySettings>) => {
-    try {
-      const newSettings = {
-        ...settings,
-        privacy: { ...settings.privacy, ...privacy },
-        lastUpdated: new Date().toISOString(),
-      };
-      await saveSettings(newSettings);
-    } catch (error) {
-      console.error('Error updating privacy:', error);
-    }
-  };
-
-  const updateNotifications = async (notifications: Partial<NotificationSettings>) => {
-    try {
-      const newSettings = {
-        ...settings,
-        notifications: { ...settings.notifications, ...notifications },
-        lastUpdated: new Date().toISOString(),
-      };
-      await saveSettings(newSettings);
-    } catch (error) {
-      console.error('Error updating notifications:', error);
-    }
-  };
-
-  const updateAccessibility = async (accessibility: Partial<AccessibilitySettings>) => {
-    try {
-      const newSettings = {
-        ...settings,
-        accessibility: { ...settings.accessibility, ...accessibility },
-        lastUpdated: new Date().toISOString(),
-      };
-      await saveSettings(newSettings);
-    } catch (error) {
-      console.error('Error updating accessibility:', error);
-    }
-  };
-
-  const updateLanguage = async (language: Partial<LanguageSettings>) => {
-    try {
-      const newSettings = {
-        ...settings,
-        language: { ...settings.language, ...language },
-        lastUpdated: new Date().toISOString(),
-      };
-      await saveSettings(newSettings);
-    } catch (error) {
-      console.error('Error updating language:', error);
-    }
-  };
-
-  const resetSettings = async () => {
-    try {
-      await saveSettings(DEFAULT_USER_SETTINGS);
-    } catch (error) {
-      console.error('Error resetting settings:', error);
-    }
-  };
+  const resetSettings = () =>
+    applySettingsUpdate(() => ({
+      ...DEFAULT_USER_SETTINGS,
+      lastUpdated: new Date().toISOString(),
+    }));
 
   return (
     <SettingsContext.Provider

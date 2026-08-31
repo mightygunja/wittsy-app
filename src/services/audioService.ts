@@ -63,13 +63,13 @@ class AudioService {
     // Note: These are placeholder files - will fail gracefully if files are empty
     try {
       const effects = {
-        click: require('../../assets/audio/click.mp3'),
-        success: require('../../assets/audio/success.mp3'),
-        error: require('../../assets/audio/error.mp3'),
-        notification: require('../../assets/audio/notification.mp3'),
-        vote: require('../../assets/audio/vote.mp3'),
-        win: require('../../assets/audio/win.mp3'),
-        star: require('../../assets/audio/star.mp3'),
+        click: require('../../assets/audio/click.wav'),
+        success: require('../../assets/audio/success.wav'),
+        error: require('../../assets/audio/error.wav'),
+        notification: require('../../assets/audio/notification.wav'),
+        vote: require('../../assets/audio/vote.wav'),
+        win: require('../../assets/audio/win.wav'),
+        star: require('../../assets/audio/star.wav'),
       };
 
       for (const [name, source] of Object.entries(effects)) {

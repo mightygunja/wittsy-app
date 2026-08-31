@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
+import { dailyRewardsService } from './dailyRewardsService';
 import { User, Avatar } from '../types';
 
 // Helper to create default avatar
@@ -133,9 +134,7 @@ export const linkGuestToAccount = async (
     
     // Initialize daily rewards if not already exists
     try {
-      const { dailyRewardsService } = await import('./dailyRewardsService');
       await dailyRewardsService.getDailyRewardsData(linkedUser.uid);
-      console.log('✅ Daily rewards initialized for converted account');
     } catch (error) {
       console.error('⚠️ Failed to initialize daily rewards during conversion:', error);
     }

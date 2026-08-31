@@ -34,7 +34,7 @@ import {
   RARITY_COLORS,
   RARITY_GRADIENTS,
 } from '../types/avatar';
-import { contentWidth, gridColumns, tabletHorizontalPadding } from '../utils/responsive';
+import { contentWidth } from '../utils/responsive';
 
 const width = contentWidth;
 
@@ -57,9 +57,11 @@ export const AvatarShopScreen: React.FC<{
   const [selectedRarity, setSelectedRarity] = useState<AvatarRarity | 'all'>('all');
   const [sortBy, setSortBy] = useState<'price_low' | 'price_high' | 'rarity' | 'newest'>('newest');
   const [showFilters, setShowFilters] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -67,9 +69,20 @@ export const AvatarShopScreen: React.FC<{
       duration: 500,
       useNativeDriver: true,
     }).start();
-
-    loadShopData();
   }, []);
+
+  // Load once auth is available (re-runs if `user` arrives after mount, so
+  // the screen can never hang on "Loading shop...")
+  useEffect(() => {
+    if (hasLoadedRef.current) return;
+
+    if (user) {
+      hasLoadedRef.current = true;
+      loadShopData();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (userProfile?.coins !== undefined) {
@@ -78,23 +91,26 @@ export const AvatarShopScreen: React.FC<{
   }, [userProfile?.coins]);
 
   const loadShopData = async () => {
-    if (!user || !userProfile) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoadError(false);
       const avatarData = await avatarService.getUserAvatar(user.uid);
       const unlocked = avatarData?.unlockedItems || [];
       setUnlockedItems(unlocked);
 
-      setUserCoins(userProfile.coins || 0);
+      setUserCoins(userProfile?.coins || 0);
 
       const allItems = avatarShopService.getAllShopItems();
       const availableItems = allItems.filter(item => !unlocked.includes(item.id));
-      
+
       setShopItems(availableItems);
-      
-      console.log(`🛍️ Avatar Shop loaded: ${availableItems.length} items available`);
     } catch (error) {
       console.error('Failed to load shop data:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -394,6 +410,25 @@ export const AvatarShopScreen: React.FC<{
   );
 
   const renderEmpty = () => (
+    loadError ? (
+      <Card variant="glass" style={styles.emptyCard}>
+        <Text style={styles.emptyIcon}>📡</Text>
+        <Text style={styles.emptyTitle}>Couldn't Load Shop</Text>
+        <Text style={styles.emptyText}>
+          Check your connection and try again.
+        </Text>
+        <Button
+          title="Retry"
+          onPress={() => {
+            setLoading(true);
+            loadShopData();
+          }}
+          variant="primary"
+          size="md"
+          style={styles.emptyButton}
+        />
+      </Card>
+    ) : (
     <Card variant="glass" style={styles.emptyCard}>
       <Text style={styles.emptyIcon}>🔍</Text>
       <Text style={styles.emptyTitle}>No Items Found</Text>
@@ -414,6 +449,7 @@ export const AvatarShopScreen: React.FC<{
         />
       )}
     </Card>
+    )
   );
 
   if (loading) {

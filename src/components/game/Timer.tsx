@@ -7,9 +7,12 @@ import { formatTime } from '../../utils/helpers';
 interface TimerProps {
   timeRemaining: number;
   phase: GamePhase;
+  /** Actual configured duration of the current phase (rooms can customize
+   *  submission/voting times); falls back to the defaults when absent. */
+  phaseDuration?: number;
 }
 
-const Timer: React.FC<TimerProps> = ({ timeRemaining, phase }) => {
+const Timer: React.FC<TimerProps> = ({ timeRemaining, phase, phaseDuration }) => {
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const isUrgent = timeRemaining <= 5;
@@ -50,15 +53,17 @@ const Timer: React.FC<TimerProps> = ({ timeRemaining, phase }) => {
   };
 
   const progressPercentage = () => {
-    const maxTime = {
+    const defaults: Record<string, number> = {
       prompt: 3,
       submission: 25,
       voting: 10,
       waiting: 5,
       results: 8,
-    }[phase] || 30;
+    };
+    const defaultMax = defaults[phase] || 30;
+    const maxTime = phaseDuration && phaseDuration > 0 ? phaseDuration : defaultMax;
 
-    return (timeRemaining / maxTime) * 100;
+    return Math.min(100, (timeRemaining / maxTime) * 100);
   };
 
   return (

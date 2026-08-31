@@ -67,22 +67,73 @@ exports.updateLeaderboard = functions.firestore
 exports.cleanupOldRooms = functions.pubsub
   .schedule('every 24 hours')
   .onRun(async (context) => {
-    const cutoff = Date.now() - (24 * 60 * 60 * 1000);
-    
+    // createdAt is a Firestore Timestamp — comparing against an ISO string
+    // never matched, so finished rooms were accumulating forever.
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - (24 * 60 * 60 * 1000));
+
     const oldRooms = await db.collection('rooms')
-      .where('createdAt', '<', new Date(cutoff).toISOString())
+      .where('createdAt', '<', cutoff)
       .where('status', '==', 'finished')
       .get();
 
+    if (oldRooms.empty) return null;
+
     const batch = db.batch();
+    const rtdbCleanups = [];
     oldRooms.docs.forEach(doc => {
       batch.delete(doc.ref);
+      // Clean the room's live RTDB state too — collected and awaited, or the
+      // runtime freezes the instance before fire-and-forget removals finish.
+      rtdbCleanups.push(rtdb.ref(`rooms/${doc.id}`).remove().catch(err =>
+        console.error(`Failed to clean RTDB for ${doc.id}:`, err)));
+      rtdbCleanups.push(rtdb.ref(`chat/${doc.id}`).remove().catch(() => {}));
     });
 
     await batch.commit();
+    await Promise.allSettled(rtdbCleanups);
     console.log(`Cleaned up ${oldRooms.size} old rooms`);
-    
+
     return null;
+  });
+
+// ============================================
+// CLEANUP STALE RANKED ROOMS (abandoned lobbies)
+// ============================================
+
+exports.cleanupStaleRankedRooms = functions.pubsub
+  .schedule('every 1 hours')
+  .onRun(async (context) => {
+    // Ranked rooms stuck in 'waiting' (host abandoned the lobby) previously
+    // lived forever and Quick Play kept funneling players into them. The
+    // client also age-filters these; this removes the orphaned docs.
+    const oneHourAgo = admin.firestore.Timestamp.fromMillis(Date.now() - (60 * 60 * 1000));
+
+    try {
+      const staleRooms = await db.collection('rooms')
+        .where('isRanked', '==', true)
+        .where('status', '==', 'waiting')
+        .where('createdAt', '<', oneHourAgo)
+        .get();
+
+      if (staleRooms.empty) return null;
+
+      const batch = db.batch();
+      const rtdbCleanups = [];
+      staleRooms.docs.forEach(doc => {
+        batch.delete(doc.ref);
+        rtdbCleanups.push(rtdb.ref(`rooms/${doc.id}`).remove().catch(err =>
+          console.error(`Failed to clean RTDB for ${doc.id}:`, err)));
+        rtdbCleanups.push(rtdb.ref(`chat/${doc.id}`).remove().catch(() => {}));
+      });
+
+      await batch.commit();
+      await Promise.allSettled(rtdbCleanups);
+      console.log(`Cleaned up ${staleRooms.size} stale ranked lobbies`);
+      return null;
+    } catch (error) {
+      console.error('Error cleaning up stale ranked rooms:', error);
+      return null;
+    }
   });
 
 // ============================================

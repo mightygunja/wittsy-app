@@ -27,6 +27,7 @@ import {
   registerForEvent,
   unregisterFromEvent,
   checkEventRequirements,
+  isUserRegistered,
 } from '../services/events';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -39,6 +40,7 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, userProfile } = useAuth();
   const [featuredEvents, setFeaturedEvents] = useState<Event[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
+  const [registeredEventIds, setRegisteredEventIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -53,7 +55,7 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }).start();
 
     loadEvents();
-  }, []);
+  }, [user?.uid]);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -65,6 +67,22 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
       setFeaturedEvents(featured);
       setAllEvents(active);
+
+      // Load the user's registration state so cards can offer Unregister
+      // instead of a Register button that errors with "Already registered"
+      if (user?.uid) {
+        const uniqueIds = Array.from(new Set([...featured, ...active].map(e => e.id)));
+        const flags = await Promise.all(
+          uniqueIds.map(id => isUserRegistered(id, user.uid).catch(() => false))
+        );
+        const registered = new Set<string>();
+        uniqueIds.forEach((id, i) => {
+          if (flags[i]) registered.add(id);
+        });
+        setRegisteredEventIds(registered);
+      } else {
+        setRegisteredEventIds(new Set());
+      }
     } catch (error) {
       console.error('Error loading events:', error);
       Alert.alert('Error', 'Failed to load events');
@@ -83,15 +101,24 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     if (!user?.uid || !userProfile) return;
 
     // Check requirements
-    const { eligible, reasons } = await checkEventRequirements(user.uid, event);
-    if (!eligible) {
-      Alert.alert('Not Eligible', reasons.join('\n'));
+    try {
+      const { eligible, reasons } = await checkEventRequirements(user.uid, event);
+      if (!eligible) {
+        Alert.alert('Not Eligible', reasons.join('\n'));
+        return;
+      }
+    } catch (error: any) {
+      Alert.alert('Error', 'Could not check event requirements. Please try again.');
       return;
     }
 
+    const feeNote = event.entryFee
+      ? `\n\nEntry fee: ${event.entryFee} coins (deducted when you register).`
+      : '';
+
     Alert.alert(
       'Register for Event',
-      `Do you want to register for ${event.name}?`,
+      `Do you want to register for ${event.name}?${feeNote}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -119,9 +146,14 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleUnregister = async (event: Event) => {
     if (!user?.uid) return;
 
+    const refundNote =
+      event.entryFee && event.status === 'registration'
+        ? ` Your ${event.entryFee} coin entry fee will be refunded.`
+        : '';
+
     Alert.alert(
       'Unregister',
-      `Are you sure you want to unregister from ${event.name}?`,
+      `Are you sure you want to unregister from ${event.name}?${refundNote}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -130,7 +162,7 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress: async () => {
             try {
               await unregisterFromEvent(event.id, user.uid);
-              Alert.alert('Success', 'You have been unregistered');
+              Alert.alert('Success', `You have been unregistered.${refundNote}`);
               await loadEvents();
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to unregister');
@@ -160,7 +192,10 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const isFull = event.maxParticipants
       ? event.currentParticipants >= event.maxParticipants
       : false;
-    const canRegister = event.status === 'registration' && !isFull;
+    const isRegistered = registeredEventIds.has(event.id);
+    const canRegister = event.status === 'registration' && !isFull && !isRegistered;
+    const canUnregister =
+      isRegistered && ['registration', 'upcoming'].includes(event.status);
 
     return (
       <Card
@@ -248,6 +283,11 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
         {/* Action Buttons */}
         <View style={styles.eventActions}>
+          {isRegistered && (
+            <View style={styles.registeredBadge}>
+              <Text style={styles.registeredText}>✓ Registered</Text>
+            </View>
+          )}
           {canRegister && (
             <Button
               title="Register"
@@ -256,20 +296,19 @@ export const EventsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               style={styles.registerButton}
             />
           )}
-          {isFull && event.status === 'registration' && (
+          {canUnregister && (
+            <Button
+              title="Unregister"
+              onPress={() => handleUnregister(event)}
+              variant="outline"
+              size="sm"
+            />
+          )}
+          {isFull && !isRegistered && event.status === 'registration' && (
             <View style={styles.fullBadge}>
               <Text style={styles.fullText}>Event Full</Text>
             </View>
           )}
-          <Button
-            title="View Details"
-            onPress={() => {
-              // Navigate to event details
-              Alert.alert('Event Details', 'Detailed view coming soon!');
-            }}
-            variant="secondary"
-            size="sm"
-          />
         </View>
       </Card>
     );
@@ -539,6 +578,21 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   registerButton: {
     marginBottom: 8,
+  },
+  registeredBadge: {
+    backgroundColor: COLORS.success + '30',
+    borderWidth: 1,
+    borderColor: COLORS.success,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  registeredText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.success,
   },
   fullBadge: {
     backgroundColor: COLORS.error,

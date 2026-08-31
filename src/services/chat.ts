@@ -39,17 +39,16 @@ export const sendChatMessage = async (
     userId,
     username,
     type,
-    content,
+    // Mask slurs/explicit terms before the message ever reaches other players
+    content: type === 'text' ? filterProfanity(content) : content,
     timestamp: Date.now(),
     replyTo: replyTo || null,
     reactions: {},
   };
 
-  console.log('💬 Sending chat message:', { roomId, username, content });
   const messagesRef = ref(realtimeDb, `chat/${roomId}/messages`);
   const newMessageRef = push(messagesRef);
   await set(newMessageRef, messageData);
-  console.log('✅ Chat message sent successfully:', newMessageRef.key);
 
   return newMessageRef.key!;
 };
@@ -303,19 +302,42 @@ export const REACTIONS: Reaction[] = [
 // ==================== CHAT FILTERS ====================
 
 /**
- * Filter profanity from message
+ * Filter profanity from message.
+ * Masks slurs and explicit terms (word-boundary, case-insensitive, common
+ * leetspeak collapsed). Mirrors the word list in functions/contentFilter.js —
+ * the server list remains the gate for public surfaces (starred gallery);
+ * this masks in-room chat, which previously had NO live moderation at all.
  */
+const BLOCKED_WORDS = [
+  'anal', 'anus', 'blowjob', 'boner', 'clit', 'cock', 'cum', 'cunt',
+  'dick', 'dildo', 'ejaculate', 'erection', 'fap', 'fellatio', 'handjob',
+  'horny', 'jerkoff', 'jizz', 'masturbate', 'milf', 'orgasm', 'penis',
+  'porn', 'porno', 'pussy', 'rimjob', 'semen', 'slut',
+  'tits', 'titties', 'vagina', 'wank', 'whore',
+  'fag', 'faggot', 'kike', 'nigga', 'nigger', 'retard', 'retarded',
+  'spic', 'tranny',
+  'motherfucker',
+  'rape', 'rapist', 'kys',
+  'hoer', 'kanker', 'neuken', 'ficken',
+];
+
+const LEET_MAP: Record<string, string> = {
+  '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's', '!': 'i',
+};
+
+const normalizeWord = (word: string): string =>
+  word.toLowerCase().replace(/[0134578@$!]/g, (c) => LEET_MAP[c] || c).replace(/[^a-z]/g, '');
+
+const BLOCKED_SET = new Set(BLOCKED_WORDS);
+
 export const filterProfanity = (message: string): string => {
-  // Basic profanity filter - replace with asterisks
-  const profanityList = ['badword1', 'badword2']; // Add actual words
-  let filtered = message;
-  
-  profanityList.forEach(word => {
-    const regex = new RegExp(word, 'gi');
-    filtered = filtered.replace(regex, '*'.repeat(word.length));
-  });
-  
-  return filtered;
+  return message
+    .split(/(\s+)/)
+    .map(token => {
+      if (/^\s+$/.test(token)) return token;
+      return BLOCKED_SET.has(normalizeWord(token)) ? '*'.repeat(token.length) : token;
+    })
+    .join('');
 };
 
 /**

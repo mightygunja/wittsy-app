@@ -1,5 +1,5 @@
 import { firestore } from './firebase';
-import { collection, query, where, orderBy, limit, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, getDoc, doc, documentId } from 'firebase/firestore';
 
 /**
  * Leaderboard Service
@@ -360,20 +360,56 @@ export const getUserGlobalPosition = async (userId: string): Promise<number> => 
       return -1;
     }
     
-    const userRating = userDoc.data().rating || 0;
-    
-    // Count users with higher rating
+    // Rank by rankedRating — the same field the global leaderboard is ordered
+    // by — so the banner position matches the list below it.
+    const data = userDoc.data();
+    const userRating = data.rankedRating || data.rating || 0;
+
+    // Count users with higher ranked rating
     const q = query(
       collection(firestore, 'users'),
-      where('rating', '>', userRating)
+      where('rankedRating', '>', userRating)
     );
-    
+
     const snapshot = await getDocs(q);
     return snapshot.size + 1;
   } catch (error) {
     console.error('Error fetching user position:', error);
     return -1;
   }
+};
+
+/**
+ * Batch-fetch username/avatar for a list of user ids (10 per query, in parallel).
+ * Used to hydrate leaderboards whose source docs don't denormalize usernames.
+ */
+export const getUsersSummary = async (
+  userIds: string[]
+): Promise<Record<string, { username: string; avatar?: any }>> => {
+  const result: Record<string, { username: string; avatar?: any }> = {};
+  if (userIds.length === 0) return result;
+
+  try {
+    const chunks: string[][] = [];
+    for (let i = 0; i < userIds.length; i += 10) {
+      chunks.push(userIds.slice(i, i + 10));
+    }
+
+    await Promise.all(
+      chunks.map(async (chunk) => {
+        const q = query(collection(firestore, 'users'), where(documentId(), 'in', chunk));
+        const snapshot = await getDocs(q);
+        snapshot.docs.forEach((userDoc) => {
+          const data = userDoc.data();
+          result[userDoc.id] = { username: data.username, avatar: data.avatar };
+        });
+      })
+    );
+  } catch (error) {
+    console.error('Error batch-fetching user summaries:', error);
+  }
+
+  return result;
 };
 
 /**

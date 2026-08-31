@@ -101,7 +101,12 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
       icon: '🎨',
       description: 'Dark/Light mode, colors',
       screen: 'ThemeSettings',
-      badge: settings.theme.mode === 'dark' ? 'Dark' : 'Light',
+      badge:
+        settings.theme.mode === 'auto'
+          ? 'Auto'
+          : settings.theme.mode === 'dark'
+            ? 'Dark'
+            : 'Light',
     },
     {
       id: 'audio',
@@ -120,34 +125,20 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
     },
     {
       id: 'privacy',
-      title: 'Privacy & Security',
+      title: 'Account & Privacy',
       icon: '🔒',
-      description: 'Profile visibility, blocking',
+      description: 'Your data, legal, account deletion',
       screen: 'PrivacySettings',
-      badge: settings.privacy.profileVisibility,
     },
+    // NOTE: Notification, Accessibility, and Language settings screens are
+    // intentionally not linked here — their options are not wired up to any
+    // live behavior yet. Re-add each entry once the feature actually works.
     {
-      id: 'notifications',
-      title: 'Notifications',
-      icon: '🔔',
-      description: 'Push, email, in-app alerts',
-      screen: 'NotificationSettings',
-      badge: settings.notifications.enabled ? 'On' : 'Off',
-    },
-    {
-      id: 'accessibility',
-      title: 'Accessibility',
-      icon: '♿',
-      description: 'Font size, contrast, colorblind',
-      screen: 'AccessibilitySettings',
-    },
-    {
-      id: 'language',
-      title: 'Language & Region',
-      icon: '🌍',
-      description: 'Language, date/time format',
-      screen: 'LanguageSettings',
-      badge: settings.language.language.toUpperCase(),
+      id: 'referral',
+      title: 'Invite Friends',
+      icon: '🎁',
+      description: 'Share your referral code, earn coins',
+      screen: 'Referral',
     },
     {
       id: 'feedback',
@@ -168,7 +159,6 @@ export const EnhancedSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
           if (category.action) {
             category.action();
           } else if (category.screen) {
-            console.log(`🔧 Navigating to: ${category.screen}`);
             navigation.navigate(category.screen);
           }
         } catch (error) {

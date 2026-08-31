@@ -16,7 +16,7 @@ import {
   linkWithPopup,
 } from 'firebase/auth';
 import { Platform } from 'react-native';
-import { doc, setDoc, getDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
 import { User, Avatar } from '../types';
 import { referralService } from './referralService';
@@ -136,6 +136,25 @@ export const registerUser = async (
   referralCode?: string
 ): Promise<User> => {
   try {
+    // Check username availability BEFORE creating the auth account — creating
+    // it first would strand a half-registered account on a name collision.
+    // Best-effort only: a signed-out registrant cannot read the users
+    // collection (rules require auth), so a permission failure here must
+    // NOT block the signup — skip the check rather than break registration.
+    try {
+      const nameTaken = await getDocs(
+        query(collection(firestore, 'users'), where('username', '==', username), limit(1))
+      );
+      if (!nameTaken.empty) {
+        throw new Error('That username is already taken. Try another one.');
+      }
+    } catch (checkError: any) {
+      if (checkError.message === 'That username is already taken. Try another one.') {
+        throw checkError;
+      }
+      console.warn('Username availability pre-check skipped:', checkError?.code || checkError?.message);
+    }
+
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
 

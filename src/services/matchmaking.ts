@@ -9,10 +9,7 @@ import {
   where,
   getDocs,
   addDoc,
-  updateDoc,
-  doc,
   serverTimestamp,
-  Timestamp,
 } from 'firebase/firestore';
 import { firestore } from './firebase';
 import { Room, RoomSettings } from '../types';
@@ -21,6 +18,42 @@ import { getCurrentSeason } from './seasons';
 import { avatarService } from './avatarService';
 
 const ELO_RANGE = 200; // ±200 ELO for matchmaking
+const DEFAULT_RATING = 1200; // Matches the rating new profiles are created with (auth.ts)
+const STALE_WAITING_ROOM_MS = 30 * 60 * 1000; // Waiting rooms older than 30 min are considered abandoned
+
+/**
+ * Average rating of the players in a room, based on the ratings actually
+ * stored on the player objects. Returns null when no player carries a
+ * rating (older rooms / players joined through paths that don't stamp it),
+ * so callers can skip ELO filtering instead of comparing against a
+ * made-up number.
+ */
+const getRoomAvgElo = (room: Room): number | null => {
+  const ratings = (room.players || [])
+    .map(p => (p as { rating?: number }).rating)
+    .filter((r): r is number => typeof r === 'number' && !Number.isNaN(r));
+  if (ratings.length === 0) return null;
+  return ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+};
+
+/**
+ * createdAt can be a Firestore Timestamp (new rooms) or an ISO string
+ * (legacy). Returns epoch millis, or null when unknown.
+ */
+const getCreatedAtMillis = (createdAt: unknown): number | null => {
+  if (!createdAt) return null;
+  if (typeof (createdAt as { toMillis?: () => number }).toMillis === 'function') {
+    return (createdAt as { toMillis: () => number }).toMillis();
+  }
+  const ms = new Date(createdAt as string).getTime();
+  return Number.isNaN(ms) ? null : ms;
+};
+
+const isStaleWaitingRoom = (room: Room): boolean => {
+  const createdMs = getCreatedAtMillis((room as { createdAt?: unknown }).createdAt);
+  if (createdMs === null) return false; // unknown age — don't over-filter
+  return Date.now() - createdMs > STALE_WAITING_ROOM_MS;
+};
 
 /**
  * Find available ranked room for Quick Play
@@ -30,8 +63,6 @@ export const findAvailableRankedRoom = async (
   userElo: number
 ): Promise<Room | null> => {
   try {
-    console.log(`🔍 Searching for ranked rooms (User ELO: ${userElo})`);
-    
     const q = query(
       collection(firestore, 'rooms'),
       where('isRanked', '==', true),
@@ -39,62 +70,38 @@ export const findAvailableRankedRoom = async (
     );
 
     const snapshot = await getDocs(q);
-    
+
     if (snapshot.empty) {
-      console.log('❌ No ranked rooms found in waiting state');
       return null;
     }
 
-    console.log(`📋 Found ${snapshot.docs.length} waiting ranked rooms`);
-
-    // Filter by available space and countdown status
+    // Filter by available space, countdown status, and staleness
+    // (abandoned lobbies whose players force-quit stay 'waiting' forever —
+    // don't funnel new players into them)
     const availableRooms = snapshot.docs
       .map(doc => ({ roomId: doc.id, ...doc.data() } as Room))
       .filter(room => {
         const hasSpace = room.players.length < room.settings.maxPlayers;
-        const countdownNotFinished = !room.countdownStartedAt || 
+        const countdownNotFinished = !room.countdownStartedAt ||
           (Date.now() - new Date(room.countdownStartedAt).getTime()) < (room.countdownDuration || 30) * 1000;
-        const isJoinable = hasSpace && countdownNotFinished;
-        
-        if (!isJoinable) {
-          console.log(`⏭️ Skipping room ${room.roomId}: hasSpace=${hasSpace}, countdownOk=${countdownNotFinished}`);
-        }
-        
-        return isJoinable;
+        return hasSpace && countdownNotFinished && !isStaleWaitingRoom(room);
       });
 
     if (availableRooms.length === 0) {
-      console.log('❌ No joinable rooms after filtering');
       return null;
     }
 
-    console.log(`✅ Found ${availableRooms.length} joinable rooms`);
+    // Sort by ELO proximity (closest match first). Rooms with no rating
+    // data sort behind rooms known to be in range, ahead of far ones.
+    const eloDistance = (room: Room): number => {
+      const avg = getRoomAvgElo(room);
+      return avg === null ? ELO_RANGE / 2 : Math.abs(avg - userElo);
+    };
+    availableRooms.sort((a, b) => eloDistance(a) - eloDistance(b));
 
-    // Sort by ELO proximity (closest match first)
-    availableRooms.sort((a, b) => {
-      const avgEloA = a.players.length > 0 
-        ? a.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / a.players.length
-        : 1000;
-      const avgEloB = b.players.length > 0
-        ? b.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / b.players.length
-        : 1000;
-      
-      const diffA = Math.abs(avgEloA - userElo);
-      const diffB = Math.abs(avgEloB - userElo);
-      
-      return diffA - diffB;
-    });
-
-    const selectedRoom = availableRooms[0];
-    const avgElo = selectedRoom.players.length > 0
-      ? selectedRoom.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / selectedRoom.players.length
-      : 1000;
-    
-    console.log(`🎯 Selected room ${selectedRoom.roomId} (Avg ELO: ${avgElo.toFixed(0)}, Players: ${selectedRoom.players.length}/${selectedRoom.settings.maxPlayers})`);
-    
-    return selectedRoom;
+    return availableRooms[0];
   } catch (error) {
-    console.error('❌ Error finding ranked room:', error);
+    console.error('Error finding ranked room:', error);
     return null;
   }
 };
@@ -104,19 +111,16 @@ export const findAvailableRankedRoom = async (
  */
 export const createRankedRoom = async (
   userId: string,
-  username: string
+  username: string,
+  hostRating?: number
 ): Promise<string> => {
   try {
-    console.log(`🎮 Creating new ranked room for ${username} (${userId})`);
-    
     // Get current active season
     const currentSeason = await getCurrentSeason();
     if (!currentSeason) {
-      console.warn('⚠️ No active season found, creating ranked room without season link');
-    } else {
-      console.log(`📅 Linking to season: ${currentSeason.name} (${currentSeason.id})`);
+      console.warn('No active season found, creating ranked room without season link');
     }
-    
+
     // Get all active room names to ensure uniqueness
     const activeRoomsQuery = query(
       collection(firestore, 'rooms'),
@@ -124,14 +128,13 @@ export const createRankedRoom = async (
     );
     const activeRoomsSnapshot = await getDocs(activeRoomsQuery);
     const existingNames = activeRoomsSnapshot.docs.map(doc => doc.data().name);
-    
+
     // Generate a unique room name
     const roomName = generateUniqueRoomName(existingNames);
-    console.log(`📝 Generated room name: "${roomName}"`);
-    
+
     // Load host's avatar config
     const hostAvatar = await avatarService.getUserAvatar(userId);
-    
+
     const roomData = {
       name: roomName,
       hostId: userId,
@@ -143,6 +146,8 @@ export const createRankedRoom = async (
         joinedAt: new Date().toISOString(),
         avatar: null,
         avatarConfig: hostAvatar?.config || undefined,
+        // Stamp the host's rating so ELO matchmaking/browse filtering has real data
+        rating: typeof hostRating === 'number' ? hostRating : DEFAULT_RATING,
       }],
       spectators: [],
       status: 'waiting' as const,
@@ -176,10 +181,9 @@ export const createRankedRoom = async (
     };
 
     const docRef = await addDoc(collection(firestore, 'rooms'), roomData);
-    console.log(`✅ Successfully created ranked room: "${roomName}" (${docRef.id})`);
     return docRef.id;
   } catch (error) {
-    console.error('❌ Error creating ranked room:', error);
+    console.error('Error creating ranked room:', error);
     throw new Error(`Failed to create ranked room: ${error}`);
   }
 };
@@ -191,8 +195,6 @@ export const getBrowsableRankedRooms = async (
   userElo: number
 ): Promise<Room[]> => {
   try {
-    console.log(`📋 Fetching browsable ranked rooms (User ELO: ${userElo})`);
-    
     const q = query(
       collection(firestore, 'rooms'),
       where('isRanked', '==', true),
@@ -200,38 +202,29 @@ export const getBrowsableRankedRooms = async (
     );
 
     const snapshot = await getDocs(q);
-    
+
     const rooms = snapshot.docs
       .map(doc => ({ roomId: doc.id, ...doc.data() } as Room))
       .filter(room => {
         const hasSpace = room.players.length < room.settings.maxPlayers;
-        const countdownNotFinished = !room.countdownStartedAt || 
+        const countdownNotFinished = !room.countdownStartedAt ||
           (Date.now() - new Date(room.countdownStartedAt).getTime()) < (room.countdownDuration || 30) * 1000;
-        
-        // Calculate average ELO of players in room
-        const avgRoomElo = room.players.length > 0
-          ? room.players.reduce((sum, p) => sum + (p.rating || 1000), 0) / room.players.length
-          : 1000;
-        
-        // Only show rooms within ±200 ELO range
-        const eloDiff = Math.abs(avgRoomElo - userElo);
-        const withinEloRange = eloDiff <= ELO_RANGE;
-        
-        if (!withinEloRange) {
-          console.log(`⏭️ Filtering out room ${room.roomId}: ELO diff ${eloDiff.toFixed(0)} (Room: ${avgRoomElo.toFixed(0)}, User: ${userElo})`);
-        }
-        
-        return hasSpace && countdownNotFinished && withinEloRange;
+
+        // Only apply the ±200 ELO filter when the room actually has rating
+        // data; rooms without it must not be hidden from everyone.
+        const avgRoomElo = getRoomAvgElo(room);
+        const withinEloRange = avgRoomElo === null || Math.abs(avgRoomElo - userElo) <= ELO_RANGE;
+
+        return hasSpace && countdownNotFinished && withinEloRange && !isStaleWaitingRoom(room);
       })
       .sort((a, b) => {
         // Sort by player count (more players = more attractive)
         return b.players.length - a.players.length;
-    });
-  
-  console.log(`✅ Returning ${rooms.length} ELO-filtered ranked rooms`);
-  return rooms;
+      });
+
+    return rooms;
   } catch (error) {
-    console.error('❌ Error getting browsable ranked rooms:', error);
+    console.error('Error getting browsable ranked rooms:', error);
     return [];
   }
 };

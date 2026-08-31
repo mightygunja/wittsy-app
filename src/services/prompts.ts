@@ -12,12 +12,10 @@ import {
   updateDoc,
   query, 
   where, 
-  orderBy, 
+  orderBy,
   limit,
   increment,
-  Timestamp,
-  addDoc,
-  deleteDoc
+  addDoc
 } from 'firebase/firestore';
 import { firestore } from './firebase';
 import { 
@@ -298,6 +296,31 @@ export const submitPrompt = async (
   } catch (error) {
     console.error('Error submitting prompt:', error);
     throw error;
+  }
+};
+
+/**
+ * Get the current user's prompt submissions (newest first).
+ * Single-field query + client-side sort so no composite index is needed.
+ */
+export const getUserPromptSubmissions = async (
+  userId: string,
+  limitCount: number = 20
+): Promise<PromptSubmission[]> => {
+  try {
+    const q = query(
+      collection(firestore, 'promptSubmissions'),
+      where('submittedBy', '==', userId)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as PromptSubmission))
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+      .slice(0, limitCount);
+  } catch (error) {
+    console.error('Error getting user prompt submissions:', error);
+    return [];
   }
 };
 

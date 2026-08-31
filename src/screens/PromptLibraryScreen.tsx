@@ -7,12 +7,11 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getPromptsByCategory, getPromptPacks, getCategoryCounts, getActiveCategories } from '../services/prompts';
-import { Prompt, PromptPack, PromptCategory } from '../types/prompts';
+import { getPromptsByCategory, getCategoryCounts, getActiveCategories } from '../services/prompts';
+import { Prompt, PromptCategory } from '../types/prompts';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants';
 import { useTheme } from '../hooks/useTheme';
 import { tabletHorizontalPadding } from '../utils/responsive';
@@ -50,7 +49,6 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
   const { colors: COLORS } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<PromptCategory>('food');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [packs, setPacks] = useState<PromptPack[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
@@ -73,15 +71,16 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
 
   const loadData = async () => {
     try {
-      const [packsData, counts, categories] = await Promise.all([
-        getPromptPacks(),
+      const [counts, categories] = await Promise.all([
         getCategoryCounts(),
         getActiveCategories(),
       ]);
-      setPacks(packsData);
+      // getActiveCategories returns [] on failure — keep the hardcoded
+      // defaults rather than emptying the category tabs
+      if (categories.length === 0) return;
       setCategoryCounts(counts);
       setActiveCategories(categories);
-      
+
       // Update selected category to first in sorted list
       const sorted = [...categories].sort((a, b) => {
         const countA = counts[a] || 0;
@@ -199,40 +198,6 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
           ))}
         </ScrollView>
 
-        {/* Featured Packs */}
-        {packs.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🎁 Featured Packs</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.packsContainer}
-            >
-              {packs.slice(0, 5).map((pack) => (
-                <TouchableOpacity
-                  key={pack.id}
-                  style={styles.packCard}
-                  onPress={() => Alert.alert('Coming Soon', 'Prompt pack details will be available in a future update!')}
-                >
-                  <LinearGradient
-                    colors={[COLORS.primaryLight, COLORS.primary]}
-                    style={styles.packGradient}
-                  >
-                    <Text style={styles.packIcon}>{pack.icon}</Text>
-                    <Text style={styles.packName}>{pack.name}</Text>
-                    <Text style={styles.packCount}>{pack.promptIds.length} prompts</Text>
-                    {pack.isPremium && (
-                      <View style={styles.premiumBadge}>
-                        <Text style={styles.premiumText}>PREMIUM</Text>
-                      </View>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
         {/* Prompts List */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -274,6 +239,11 @@ export const PromptLibraryScreen: React.FC<{ navigation: any }> = ({ navigation 
                     )}
                   </View>
                   <Text style={styles.promptText}>{prompt.text}</Text>
+                  {!prompt.isOfficial && (prompt as Prompt & { createdByName?: string }).createdByName && (
+                    <Text style={styles.promptCreator}>
+                      by {(prompt as Prompt & { createdByName?: string }).createdByName}
+                    </Text>
+                  )}
                   <View style={styles.promptFooter}>
                     <View style={styles.promptTags}>
                       {(prompt.tags || []).slice(0, 3).map((tag, i) => (
@@ -436,52 +406,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingVertical: SPACING.xxs,
     borderRadius: RADIUS.full,
   },
-  packsContainer: {
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.md,
-  },
-  packCard: {
-    width: 160,
-    height: 180,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    ...SHADOWS.md,
-  },
-  packGradient: {
-    flex: 1,
-    padding: SPACING.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  packIcon: {
-    fontSize: 48,
-    marginBottom: SPACING.sm,
-  },
-  packName: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: SPACING.xs,
-  },
-  packCount: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.textSecondary,
-  },
-  premiumBadge: {
-    position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
-    backgroundColor: COLORS.gold,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-  },
-  premiumText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
   promptsList: {
     paddingHorizontal: SPACING.xl,
     gap: SPACING.md,
@@ -533,6 +457,12 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.sm,
     lineHeight: 22,
+  },
+  promptCreator: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+    marginBottom: SPACING.sm,
   },
   promptFooter: {
     flexDirection: 'row',

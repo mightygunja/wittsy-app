@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
-import { submitPrompt, containsProfanity, getActiveCategories, getCategoryCounts } from '../services/prompts';
-import { PromptCategory, PromptDifficulty } from '../types/prompts';
+import { submitPrompt, containsProfanity, getActiveCategories, getCategoryCounts, getUserPromptSubmissions } from '../services/prompts';
+import { PromptCategory, PromptDifficulty, PromptSubmission } from '../types/prompts';
 import { SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
 import { Button } from '../components/common/Button';
@@ -21,8 +21,8 @@ import { tabletHorizontalPadding } from '../utils/responsive';
 // Category metadata mapping
 const CATEGORY_METADATA: Record<string, { name: string; icon: string }> = {
   'general': { name: 'General', icon: '💬' },
-  'food': { name: 'Food', icon: '�' },
-  'entertainment': { name: 'Entertainment', icon: '�' },
+  'food': { name: 'Food', icon: '🍕' },
+  'entertainment': { name: 'Entertainment', icon: '🎬' },
   'technology': { name: 'Tech', icon: '💻' },
   'sports': { name: 'Sports', icon: '⚽' },
   'music': { name: 'Music', icon: '🎵' },
@@ -32,13 +32,13 @@ const CATEGORY_METADATA: Record<string, { name: string; icon: string }> = {
   'relationships': { name: 'Love', icon: '💕' },
   'work': { name: 'Work', icon: '💼' },
   'gaming': { name: 'Gaming', icon: '🎮' },
-  'fashion': { name: 'Fashion', icon: '�' },
-  'social-media': { name: 'Social Media', icon: '�' },
+  'fashion': { name: 'Fashion', icon: '👗' },
+  'social-media': { name: 'Social Media', icon: '📱' },
 };
 
 const getDefaultCategoryMetadata = (category: string) => ({
   name: category.charAt(0).toUpperCase() + category.slice(1).replace(/-/g, ' '),
-  icon: '�',
+  icon: '📝',
 });
 
 const DIFFICULTIES: { id: PromptDifficulty; name: string; description: string }[] = [
@@ -63,11 +63,23 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
     'sports', 'music', 'animals', 'travel', 'history', 'science'
   ] as PromptCategory[]);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [mySubmissions, setMySubmissions] = useState<PromptSubmission[]>([]);
 
   useEffect(() => {
     // Load categories immediately
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    getUserPromptSubmissions(user.uid, 10).then(submissions => {
+      if (!cancelled) setMySubmissions(submissions);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
   const loadCategories = async () => {
     try {
@@ -75,8 +87,17 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
         getActiveCategories(),
         getCategoryCounts(),
       ]);
+      // getActiveCategories returns [] on failure — keep the hardcoded
+      // defaults rather than wiping the grid down to just "Custom"
+      if (categories.length === 0) return;
       setActiveCategories(categories);
       setCategoryCounts(counts);
+      // Make sure the selected chip is one that is actually rendered
+      // (the grid shows the top 12 by prompt count)
+      const visible = [...categories]
+        .sort((a, b) => (counts[b] || 0) - (counts[a] || 0))
+        .slice(0, 12);
+      setSelectedCategory(prev => (visible.includes(prev) ? prev : visible[0]));
     } catch (error) {
       console.error('Error loading categories:', error);
     }
@@ -101,6 +122,14 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
       return;
     }
 
+    if (showCustomCategory && !customCategory.trim()) {
+      Alert.alert(
+        'Category Needed',
+        'Enter a name for your custom category, or pick one from the list.'
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const tagArray = tags
@@ -120,6 +149,9 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
         tagArray
       );
 
+      // Refresh the submissions list so the new one shows as pending
+      getUserPromptSubmissions(user.uid, 10).then(setMySubmissions);
+
       Alert.alert(
         'Submitted Successfully! 🎉',
         'Your prompt is now in the approval queue. Our team will review it shortly and you\'ll be credited as the creator if approved!',
@@ -130,7 +162,6 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
             onPress: () => {
               setPromptText('');
               setTags('');
-              setSelectedCategory('general');
               setCustomCategory('');
               setShowCustomCategory(false);
               setSelectedDifficulty('medium');
@@ -327,6 +358,38 @@ export const SubmitPromptScreen: React.FC<{ navigation: any }> = ({ navigation }
             fullWidth
           />
         </View>
+
+        {/* My Submissions */}
+        {mySubmissions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.label}>My Submissions</Text>
+            {mySubmissions.map(submission => (
+              <View key={submission.id} style={styles.submissionRow}>
+                <Text style={styles.submissionRowText}>{submission.text}</Text>
+                <View style={styles.submissionRowFooter}>
+                  <View style={styles.statusBadge}>
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        submission.status === 'approved' && styles.statusBadgeTextApproved,
+                        submission.status === 'rejected' && styles.statusBadgeTextRejected,
+                      ]}
+                    >
+                      {submission.status === 'approved'
+                        ? '✅ Approved'
+                        : submission.status === 'rejected'
+                          ? '❌ Not approved'
+                          : '🕐 In review'}
+                    </Text>
+                  </View>
+                  <Text style={styles.submissionRowDate}>
+                    {new Date(submission.submittedAt).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Info Card */}
         <View style={styles.infoCard}>
@@ -527,6 +590,45 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   submitContainer: {
     paddingHorizontal: SPACING.xl,
     marginBottom: SPACING.lg,
+  },
+  submissionRow: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  submissionRowText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  submissionRowFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    backgroundColor: COLORS.backgroundElevated,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  statusBadgeText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  statusBadgeTextApproved: {
+    color: COLORS.success,
+  },
+  statusBadgeTextRejected: {
+    color: COLORS.error,
+  },
+  submissionRowDate: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
   },
   infoCard: {
     flexDirection: 'row',

@@ -7,6 +7,7 @@ import { UserProfile } from '../types';
 import { monetization } from '../services/monetization';
 import { battlePass } from '../services/battlePassService';
 import { analytics } from '../services/analytics';
+import { friendlyAuthError } from '../utils/authErrors';
 
 interface AuthContextType {
   user: User | null;
@@ -153,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('✅ Guest sign in completed');
     } catch (error) {
       console.error('❌ Guest sign in failed:', error);
-      Alert.alert('Error', `Failed to start game: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      Alert.alert('Couldn\'t Start', friendlyAuthError(error instanceof Error ? error.message : undefined));
     } finally {
       setLoading(false);
     }

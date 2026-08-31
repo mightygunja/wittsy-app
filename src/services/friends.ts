@@ -123,12 +123,17 @@ export const acceptFriendRequest = async (
   await createFriendship(request.fromUserId, request.toUserId);
   await createFriendship(request.toUserId, request.fromUserId);
 
-  // Notify sender
-  await createNotification(request.fromUserId, 'friend_accepted', {
-    title: 'Friend Request Accepted',
-    message: `${request.toUsername} accepted your friend request`,
-    userId: request.toUserId,
-  });
+  // Notify sender. Best-effort: the friendship is already created, so a
+  // failure here must not surface as a failed acceptance to the user.
+  try {
+    await createNotification(request.fromUserId, 'friend_accepted', {
+      title: 'Friend Request Accepted',
+      message: `${request.toUsername} accepted your friend request`,
+      fromUserId: request.toUserId,
+    });
+  } catch (error) {
+    console.warn('Failed to create friend_accepted notification:', error);
+  }
 };
 
 /**
@@ -200,21 +205,27 @@ export const getFriends = async (userId: string): Promise<Friend[]> => {
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
-      const friendData = await getUserData(data.friendId);
-      const presence = await getUserPresence(data.friendId);
+      // Guard each friend individually: a single deleted account (missing
+      // users doc) must not blank the whole friends list.
+      try {
+        const friendData = await getUserData(data.friendId);
+        const presence = await getUserPresence(data.friendId);
 
-      friends.push({
-        userId: data.friendId,
-        username: friendData.username,
-        avatar: friendData.avatar,
-        rating: friendData.rating,
-        rank: friendData.rank,
-        isOnline: presence.isOnline,
-        lastActive: presence.lastActive,
-        addedAt: data.addedAt,
-        gamesPlayedTogether: data.gamesPlayedTogether || 0,
-        favorited: data.favorited || false,
-      });
+        friends.push({
+          userId: data.friendId,
+          username: friendData.username,
+          avatar: friendData.avatar,
+          rating: friendData.rating,
+          rank: friendData.rank,
+          isOnline: presence.isOnline,
+          lastActive: presence.lastActive,
+          addedAt: data.addedAt,
+          gamesPlayedTogether: data.gamesPlayedTogether || 0,
+          favorited: data.favorited || false,
+        });
+      } catch (error) {
+        console.warn(`Skipping friend ${data.friendId} (profile unavailable):`, error);
+      }
     }
 
     return friends;
@@ -268,7 +279,6 @@ export const getSentRequests = async (userId: string): Promise<FriendRequest[]> 
  * Remove a friend
  */
 export const removeFriend = async (userId: string, friendId: string): Promise<void> => {
-  // Remove both friendship documents
   const q1 = query(
     collection(firestore, 'friendships'),
     where('userId', '==', userId),
@@ -282,12 +292,16 @@ export const removeFriend = async (userId: string, friendId: string): Promise<vo
 
   const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
 
-  const deletePromises = [
-    ...snapshot1.docs.map(doc => deleteDoc(doc.ref)),
-    ...snapshot2.docs.map(doc => deleteDoc(doc.ref)),
-  ];
+  // Delete our own direction first — this is the delete the security rules
+  // guarantee (resource.data.userId == auth.uid). If this fails, the whole
+  // operation genuinely failed and the error should propagate.
+  await Promise.all(snapshot1.docs.map(doc => deleteDoc(doc.ref)));
 
-  await Promise.all(deletePromises);
+  // Delete the reverse direction too — the rules allow deleting a friendship
+  // doc where friendId == auth.uid, so a failure here is real (e.g. network)
+  // and must propagate: swallowing it leaves the removed friend with a stale
+  // one-sided friendship where you still appear in their list.
+  await Promise.all(snapshot2.docs.map(reverseDoc => deleteDoc(reverseDoc.ref)));
 };
 
 /**
@@ -569,10 +583,13 @@ const createNotification = async (
   type: string,
   data: any
 ): Promise<void> => {
+  // Spread data first so payload fields can never override the recipient
+  // (userId) or the type — a data.userId key previously rerouted the
+  // friend_accepted notification back to the accepter.
   await addDoc(collection(firestore, 'notifications'), {
+    ...data,
     userId,
     type,
-    ...data,
     read: false,
     createdAt: new Date().toISOString(),
   });
@@ -583,19 +600,55 @@ const createNotification = async (
  */
 export const searchUsers = async (searchTerm: string, currentUserId: string): Promise<any[]> => {
   try {
-    const usersRef = collection(firestore, 'users');
-    const q = query(usersRef, limit(100));
-    
-    const snapshot = await getDocs(q);
-    const users = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(user => 
-        user.id !== currentUserId &&
-        user.username?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .slice(0, 20);
+    const term = searchTerm.trim();
+    if (!term) return [];
 
-    return users;
+    const usersRef = collection(firestore, 'users');
+
+    // Server-side prefix search on the indexed `username` field so ANY user
+    // can be found, not just those in an arbitrary first page. Firestore range
+    // queries are case-sensitive and there is no lowercased mirror field, so
+    // run the common casing variants of the term and merge the results.
+    const lower = term.toLowerCase();
+    const variants = Array.from(
+      new Set([
+        term,
+        lower,
+        term.toUpperCase(),
+        lower.charAt(0).toUpperCase() + lower.slice(1),
+      ])
+    );
+
+    const snapshots = await Promise.all(
+      variants.map(variant =>
+        getDocs(
+          query(
+            usersRef,
+            where('username', '>=', variant),
+            where('username', '<=', variant + ''),
+            limit(20)
+          )
+        )
+      )
+    );
+
+    const seen = new Map<string, any>();
+    for (const snapshot of snapshots) {
+      for (const docSnap of snapshot.docs) {
+        if (!seen.has(docSnap.id)) {
+          seen.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+        }
+      }
+    }
+
+    return Array.from(seen.values())
+      .filter(
+        user =>
+          user.id !== currentUserId &&
+          user.username?.toLowerCase().startsWith(lower)
+      )
+      .sort((a, b) => (a.username || '').localeCompare(b.username || ''))
+      .slice(0, 20);
   } catch (error) {
     console.error('Search error:', error);
     throw new Error('Failed to search users');

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNotifications } from '../hooks/useNotifications';
@@ -9,8 +9,7 @@ import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors: COLORS } = useTheme();
-  const { notifications, loading, markAsRead } = useNotifications();
-  const [refreshing, setRefreshing] = useState(false);
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications();
 
   const styles = useMemo(() => StyleSheet.create({
     container: {
@@ -89,6 +88,9 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'flex-end',
+      paddingHorizontal: SPACING.md + tabletHorizontalPadding,
+      paddingTop: SPACING.sm,
     },
     markAllButton: {
       paddingHorizontal: SPACING.md,
@@ -100,11 +102,6 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
       fontWeight: '600',
     },
   }), [SPACING]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 500);
-  };
 
   const handleNotificationPress = async (notification: any) => {
     await markAsRead(notification.id);
@@ -158,13 +155,14 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
   return (
     <LinearGradient colors={COLORS.gradientPrimary as any} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FFFFFF" />
-          }
-        >
+        {unreadCount > 0 && (
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.markAllButton} onPress={markAllAsRead}>
+              <Text style={styles.markAllText}>Mark all read</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           {notifications.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📭</Text>

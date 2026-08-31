@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
-  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,6 +42,7 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
   const [selectedDifficulty, setSelectedDifficulty] = useState<{ [key: string]: PromptDifficulty }>({});
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1 },
@@ -180,23 +181,26 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
   }, []);
 
   const handleApprove = async (submission: PromptSubmission) => {
-    if (!user) return;
-    
+    if (!user || processingId) return;
+
     const difficulty = selectedDifficulty[submission.id] || submission.suggestedDifficulty;
-    
+
+    setProcessingId(submission.id);
     try {
       await approvePromptSubmission(submission.id, user.uid, difficulty);
       Alert.alert('Success', 'Prompt approved!');
       loadSubmissions();
     } catch (error) {
       console.error('Error approving prompt:', error);
-      Alert.alert('Error', 'Failed to approve prompt');
+      Alert.alert('Error', 'Failed to approve prompt. Please try again.');
+    } finally {
+      setProcessingId(null);
     }
   };
 
   const handleReject = async (submissionId: string) => {
-    if (!user) return;
-    
+    if (!user || processingId) return;
+
     Alert.alert(
       'Reject Prompt',
       'Are you sure you want to reject this prompt?',
@@ -206,13 +210,16 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
           text: 'Reject',
           style: 'destructive',
           onPress: async () => {
+            setProcessingId(submissionId);
             try {
               await rejectPromptSubmission(submissionId, user.uid, 'Rejected by admin');
               Alert.alert('Success', 'Prompt rejected');
               loadSubmissions();
             } catch (error) {
               console.error('Error rejecting prompt:', error);
-              Alert.alert('Error', 'Failed to reject prompt');
+              Alert.alert('Error', 'Failed to reject prompt. Please try again.');
+            } finally {
+              setProcessingId(null);
             }
           },
         },
@@ -248,7 +255,12 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
             </Card>
           </View>
 
-          {submissions.length === 0 ? (
+          {loading ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={styles.emptySubtext}>Loading submissions...</Text>
+            </View>
+          ) : submissions.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No pending submissions</Text>
               <Text style={styles.emptySubtext}>All prompts have been reviewed!</Text>
@@ -298,6 +310,8 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
                     variant="success"
                     size="sm"
                     style={styles.approveButton}
+                    loading={processingId === submission.id}
+                    disabled={processingId !== null}
                   />
                   <Button
                     title="Reject"
@@ -305,6 +319,7 @@ export const PromptApprovalScreen: React.FC<{ navigation: any }> = ({ navigation
                     variant="danger"
                     size="sm"
                     style={styles.rejectButton}
+                    disabled={processingId !== null}
                   />
                 </View>
               </Card>

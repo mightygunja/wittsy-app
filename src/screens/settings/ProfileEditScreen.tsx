@@ -44,6 +44,10 @@ export const ProfileEditScreen: React.FC = () => {
     return emailRegex.test(email);
   };
 
+  // Must match the registration rule in firestore.rules (isValidUsername):
+  // 3-20 chars, letters/numbers/underscores only
+  const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+
   const validatePassword = (password: string): boolean => {
     return password.length >= 6;
   };
@@ -62,8 +66,11 @@ export const ProfileEditScreen: React.FC = () => {
   const handleSave = async () => {
     if (!user || !userProfile) return;
 
-    if (username.trim().length < 3) {
-      Alert.alert('Error', 'Username must be at least 3 characters');
+    if (!USERNAME_REGEX.test(username.trim())) {
+      Alert.alert(
+        'Invalid Username',
+        'Usernames must be 3-20 characters and can only contain letters, numbers, and underscores.'
+      );
       return;
     }
 

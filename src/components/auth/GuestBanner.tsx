@@ -44,8 +44,7 @@ export const GuestBanner: React.FC<GuestBannerProps> = ({ onUpgrade }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: SPACING.lg,
-    marginVertical: SPACING.md,
+    marginBottom: SPACING.md,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
   },

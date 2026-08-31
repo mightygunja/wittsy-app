@@ -13,12 +13,17 @@ import { Badge } from '../components/common/Badge';
 import { CurrencyDisplay } from '../components/common/CurrencyDisplay';
 import { GameplayTutorial } from '../components/tutorial/GameplayTutorial';
 import { DailyRewardModal } from '../components/DailyRewardModal';
+import { GuestBanner } from '../components/auth/GuestBanner';
+import { AccountUpgradeModal } from '../components/auth/AccountUpgradeModal';
+import { useGuestUpgrade } from '../hooks/useGuestUpgrade';
 import { dailyRewardsService } from '../services/dailyRewardsService';
 import { deepLinking } from '../services/deepLinking';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
-import { getActiveRooms, subscribeToActiveRooms, createRoom, joinRoom, getUserActiveRoom, getUserActiveCasualRoom, getRoomByCode } from '../services/database';
+import { getActiveRooms, subscribeToActiveRooms, createRoom, joinRoom, leaveRoom, getUserActiveRoom, getUserActiveCasualRoom, getRoomByCode } from '../services/database';
+import { getCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
+import { RejoinRoomPrompt } from '../components/game/RejoinRoomPrompt';
 import { getUserGroups, subscribeToGroupActiveRooms, joinGroupViaInviteCode } from '../services/groups';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 import { isUserAdmin } from '../utils/adminCheck';
 import { getBrowsableRankedRooms } from '../services/matchmaking';
@@ -33,11 +38,22 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, userProfile, refreshUserProfile } = useAuth();
   const { unreadCount } = useNotifications();
   const { colors: COLORS } = useTheme();
+  const {
+    isGuest,
+    showUpgradeModal,
+    upgradeReason,
+    guestProgress,
+    promptUpgrade,
+    closeUpgradeModal,
+    handleUpgradeSuccess,
+  } = useGuestUpgrade();
   const [quickMatchLoading, setQuickMatchLoading] = useState(false);
   const [joinCodeOpen, setJoinCodeOpen] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joinCodeError, setJoinCodeError] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
+  const [rejoinTarget, setRejoinTarget] = useState<{ roomId: string; roomName: string } | null>(null);
+  const rejoinCheckedRef = useRef(false);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userActiveRoom, setUserActiveRoom] = useState<any | null>(null);
   const [userActiveCasualRoom, setUserActiveCasualRoom] = useState<any | null>(null);
@@ -132,6 +148,78 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     checkTutorial();
   }, [user, userProfile]);
 
+  // Offer to rejoin a live game after an app kill/refresh. GameRoomScreen
+  // saves the current room session; if it was never cleared by a normal
+  // leave and the room is still running, prompt instead of silently
+  // leaving the player as a ghost in the game.
+  useEffect(() => {
+    if (!user?.uid || !userProfile || rejoinCheckedRef.current) return;
+    rejoinCheckedRef.current = true;
+
+    (async () => {
+      try {
+        const session = await getCurrentRoom();
+        if (!session || session.userId !== user.uid) return;
+
+        // Sessions older than 30 minutes are stale — the game is long over.
+        if (Date.now() - new Date(session.joinedAt).getTime() > 30 * 60 * 1000) {
+          await clearCurrentRoom();
+          return;
+        }
+
+        const roomSnap = await getDoc(doc(firestore, 'rooms', session.roomId));
+        if (!roomSnap.exists() || roomSnap.data().status === 'finished') {
+          await clearCurrentRoom();
+          return;
+        }
+
+        setRejoinTarget({
+          roomId: session.roomId,
+          roomName: session.roomName || roomSnap.data().name || 'your game',
+        });
+      } catch (error) {
+        console.error('Rejoin check failed:', error);
+      }
+    })();
+  }, [user?.uid, userProfile]);
+
+  const handleRejoin = async () => {
+    if (!rejoinTarget || !user?.uid || !userProfile) return;
+    const target = rejoinTarget;
+    setRejoinTarget(null);
+    try {
+      // Ghost-player case: after an app kill the player is usually STILL in
+      // the room's players array. Navigate straight in — calling joinRoom
+      // would trip its own already-in-a-ranked-game pre-check against this
+      // very room and wrongly clear the session.
+      const roomSnap = await getDoc(doc(firestore, 'rooms', target.roomId));
+      const stillInRoom = roomSnap.exists() &&
+        (roomSnap.data().players || []).some((p: any) => p.userId === user.uid);
+
+      if (!stillInRoom) {
+        await joinRoom(target.roomId, user.uid, userProfile.username);
+      }
+    } catch (error: any) {
+      if (error?.code !== 'ALREADY_IN_ROOM' && error?.message !== 'Already in room') {
+        await clearCurrentRoom();
+        Alert.alert('Couldn\'t Rejoin', error?.message || 'That game may have already ended.');
+        return;
+      }
+    }
+    navigation.navigate('GameRoom', { roomId: target.roomId });
+  };
+
+  const handleRejoinDismiss = async () => {
+    const target = rejoinTarget;
+    setRejoinTarget(null);
+    if (target && user?.uid) {
+      try {
+        await leaveRoom(target.roomId, user.uid);
+      } catch (_) { /* already gone */ }
+    }
+    await clearCurrentRoom();
+  };
+
   // Handle deep links for game room invites
   useEffect(() => {
     if (!user || !userProfile) return;
@@ -171,7 +259,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           console.error('❌ Failed to join room from deep link:', error);
           
           // If already in room, just navigate
-          if (error.message === 'Already in room') {
+          if (error?.code === 'ALREADY_IN_ROOM' || error.message === 'Already in room') {
             console.log('ℹ️ Already in room, navigating anyway...');
             navigation.navigate('GameRoom', { roomId });
           } else {
@@ -404,7 +492,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       navigation.navigate('GameRoom', { roomId });
     } catch (error: any) {
       // If user is already in room, just navigate to it
-      if (error.message === 'Already in room') {
+      if (error?.code === 'ALREADY_IN_ROOM' || error.message === 'Already in room') {
         navigation.navigate('GameRoom', { roomId });
       } else {
         Alert.alert('Error', error.message || 'Failed to join room');
@@ -489,7 +577,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       console.error('Error with quick match:', error);
       
       let errorMessage = 'Failed to start quick match';
-      if (error.message?.includes('Already in room')) {
+      if (error?.code === 'ALREADY_IN_ROOM' || error.message?.includes('Already in room')) {
         errorMessage = 'You are already in a room. Please leave it first.';
       } else if (error.message?.includes('permission')) {
         errorMessage = 'Permission denied. Please check your connection.';
@@ -524,6 +612,23 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onClaimed={handleDailyRewardClaimed}
         />
       )}
+
+      {isGuest && (
+        <AccountUpgradeModal
+          visible={showUpgradeModal}
+          onClose={closeUpgradeModal}
+          onSuccess={handleUpgradeSuccess}
+          progress={guestProgress}
+          reason={upgradeReason}
+        />
+      )}
+
+      <RejoinRoomPrompt
+        visible={!!rejoinTarget}
+        roomName={rejoinTarget?.roomName || ''}
+        onRejoin={handleRejoin}
+        onDismiss={handleRejoinDismiss}
+      />
       
       {/* Animated Background */}
       <LinearGradient
@@ -609,6 +714,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             </View>
           </View>
         </Animated.View>
+
+        {/* Guest upgrade nudge — tapping opens the save-progress modal */}
+        {isGuest && <GuestBanner onUpgrade={promptUpgrade} />}
 
 
         {/* Quick Play - Hero Button */}

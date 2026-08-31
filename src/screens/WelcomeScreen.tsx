@@ -33,6 +33,21 @@ interface WelcomeScreenProps {
   onGuestStart: () => void;
 }
 
+// auth.ts reports user-initiated cancels with slightly different wording per
+// provider ('Sign in was cancelled' for Google, 'Sign-in was cancelled' for
+// Apple). Dismissing the sheet is not an error — don't alert on it.
+const isSignInCancelled = (error: any): boolean => {
+  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+  return (
+    message.includes('sign in was cancelled') ||
+    message.includes('sign-in was cancelled') ||
+    error?.code === 'ERR_CANCELED' ||
+    error?.code === 'SIGN_IN_CANCELLED' ||
+    error?.code === 'auth/popup-closed-by-user' ||
+    error?.code === 'auth/cancelled-popup-request'
+  );
+};
+
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGuestStart }) => {
   const { colors: COLORS } = useTheme();
   const { signInWithGoogle, signInWithApple } = useAuth();
@@ -171,8 +186,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                   await signInWithApple();
                   console.log('✅ WelcomeScreen: Apple Sign-In successful');
                 } catch (error: any) {
+                  // User dismissed the Apple sheet — not an error, no alert
+                  if (isSignInCancelled(error)) {
+                    return;
+                  }
+
                   console.error('❌ WelcomeScreen: Apple Sign-In error:', error);
-                  
+
                   // Check if this is an account linking request
                   if (error.message === 'ACCOUNT_LINKING_REQUIRED') {
                     console.log('🔗 Account linking required, prompting for password...');
@@ -270,8 +290,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, onGues
                   await signInWithGoogle();
                   console.log('✅ WelcomeScreen: Google Sign-In successful');
                 } catch (error: any) {
+                  // User dismissed the Google sheet/popup — not an error, no alert
+                  if (isSignInCancelled(error)) {
+                    return;
+                  }
+
                   console.error('❌ WelcomeScreen: Google Sign-In error:', error);
-                  
+
                   let errorMessage = 'An error occurred during sign-in';
                   
                   if (error.message) {

@@ -19,18 +19,18 @@ import {
   getLeaderboard,
   getUserGlobalPosition,
   getAvailableRegions,
+  getUsersSummary,
   LeaderboardEntry,
   SpecializedLeaderboardEntry,
   LeaderboardType,
 } from '../services/leaderboards';
-import { getCommunityStarredPhrases, StarredPhrase } from '../services/starredPhrases';
 import { getCurrentSeason, getSeasonLeaderboard, getDaysRemainingInSeason } from '../services/seasons';
 import { RANK_TIERS } from '../services/ranking';
 import { useTheme } from '../hooks/useTheme';
 import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
 import { tabletHorizontalPadding } from '../utils/responsive';
 
-type TabType = 'global' | 'friends' | 'specialized' | 'season' | 'starred';
+type TabType = 'global' | 'friends' | 'specialized' | 'season';
 
 type LeaderboardNavigationProp = StackNavigationProp<any, 'Leaderboard'>;
 
@@ -41,7 +41,7 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('global');
   const [specializedType, setSpecializedType] = useState<LeaderboardType>('hall_of_fame');
   const [leaderboard, setLeaderboard] = useState<(LeaderboardEntry | SpecializedLeaderboardEntry)[]>([]);
-  const [starredPhrases, setStarredPhrases] = useState<StarredPhrase[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userPosition, setUserPosition] = useState<number>(-1);
@@ -76,25 +76,26 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
 
   const loadLeaderboard = async () => {
     setLoading(true);
+    setLoadError(false);
+    // Clear the previous tab's data so it isn't shown under the new tab's label
+    setLeaderboard([]);
     try {
       let data: (LeaderboardEntry | SpecializedLeaderboardEntry)[] = [];
 
-      // Add timeout to prevent hanging (500ms)
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 500)
+      // Safety timeout so a stalled query can't hang the screen forever
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
       );
 
       const loadPromise = (async () => {
-        if (activeTab === 'starred') {
-          // Load community starred phrases
-          const phrases = await getCommunityStarredPhrases(50);
-          setStarredPhrases(phrases);
-          return [];
-        } else if (activeTab === 'season' && currentSeason) {
+        if (activeTab === 'season' && currentSeason) {
           const seasonData = await getSeasonLeaderboard(currentSeason.id, 100);
+          // seasonStats docs don't store usernames — hydrate them in batches
+          const userSummaries = await getUsersSummary(seasonData.map((s) => s.userId));
           return seasonData.map((s, index) => ({
             userId: s.userId,
-            username: '', // Would need to fetch from users collection
+            username: userSummaries[s.userId]?.username || '',
+            avatar: userSummaries[s.userId]?.avatar,
             rating: s.currentRating,
             rank: s.rank,
             tier: s.tier,
@@ -116,7 +117,7 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
       setLeaderboard(data);
     } catch (error: any) {
       console.warn('Leaderboard load failed:', error?.message || error);
-      // Don't clear leaderboard - just stop loading
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -375,6 +376,15 @@ export const EnhancedLeaderboardScreen: React.FC = () => {
           <View style={styles.leaderboardList}>
             {leaderboard.map((entry, index) => renderLeaderboardEntry(entry, index))}
           </View>
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>📡</Text>
+            <Text style={styles.emptyText}>Couldn't load the leaderboard</Text>
+            <Text style={styles.emptySubtext}>Check your connection and try again.</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadLeaderboard}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🏆</Text>
@@ -617,5 +627,17 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   emptySubtext: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
+  },
+  retryButton: {
+    marginTop: SPACING.lg,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.md,
+  },
+  retryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
   },
 });

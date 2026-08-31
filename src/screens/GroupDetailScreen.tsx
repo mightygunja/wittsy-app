@@ -27,9 +27,12 @@ import {
   subscribeToGroupActiveRooms,
   leaveGroup,
   removeMember,
+  promoteMember,
+  deleteGroup,
   regenerateInviteCode,
   shareGroupInviteLink,
   addMemberFromFriends,
+  getGroupErrorMessage,
 } from '../services/groups';
 import { getFriends } from '../services/friends';
 import { Friend } from '../types/social';
@@ -56,10 +59,16 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
   const [activeTab, setActiveTab] = useState<TabType>('members');
   const [friends, setFriends] = useState<Friend[]>([]);
   const [showAddFriends, setShowAddFriends] = useState(false);
+  const [loadingFriends, setLoadingFriends] = useState(false);
 
   const isAdmin = useMemo(
     () => members.find((m) => m.userId === user?.uid)?.role === 'admin',
     [members, user]
+  );
+  const isCreator = group?.createdBy === user?.uid;
+  const adminCount = useMemo(
+    () => members.filter((m) => m.role === 'admin').length,
+    [members]
   );
 
   const loadAll = useCallback(async () => {
@@ -72,7 +81,9 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
       ]);
       setGroup(g);
       setMembers(m);
-      setStandings(s);
+      // Standings can contain users who have since left or been removed —
+      // only show current members on the leaderboard.
+      setStandings(g?.members ? s.filter((st) => g.members.includes(st.userId)) : s);
     } catch (error) {
       console.error('GroupDetailScreen load error:', error);
     } finally {
@@ -119,7 +130,30 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
               const newCode = await regenerateInviteCode(groupId, user.uid);
               setGroup((prev) => prev ? { ...prev, inviteCode: newCode } : prev);
             } catch (error: any) {
-              Alert.alert('Error', error.message);
+              Alert.alert('Error', getGroupErrorMessage(error, 'Failed to regenerate the invite code. Please try again.'));
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteGroup = () => {
+    if (!user) return;
+    Alert.alert(
+      'Delete Group',
+      `This permanently deletes "${group?.name}" for all ${group?.memberCount ?? ''} members, including its invite code and standings. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Group',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteGroup(groupId, user.uid);
+              navigation.goBack();
+            } catch (error: any) {
+              Alert.alert('Error', getGroupErrorMessage(error, 'Failed to delete the group. Please try again.'));
             }
           },
         },
@@ -129,6 +163,47 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
 
   const handleLeaveGroup = () => {
     if (!user) return;
+
+    const isLastMember = (group?.members?.length ?? members.length) <= 1;
+
+    // Sole admin of a group with other members: force succession first so the
+    // group is never left unmanageable.
+    if (isAdmin && adminCount <= 1 && !isLastMember) {
+      Alert.alert(
+        "You're the Only Admin",
+        isCreator
+          ? 'Make another member an admin first (tap "Make Admin" next to their name), or delete the group instead.'
+          : 'Make another member an admin first (tap "Make Admin" next to their name), then you can leave.'
+      );
+      return;
+    }
+
+    // Last member leaving: delete the group (creator OR sole member — the
+    // service and rules both allow it), so no orphaned group with a live
+    // invite code is left behind.
+    if (isLastMember) {
+      Alert.alert(
+        'Delete Group?',
+        "You're the last member — leaving will delete this group and its invite code.",
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete Group',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await deleteGroup(groupId, user.uid);
+                navigation.goBack();
+              } catch (error: any) {
+                Alert.alert('Error', getGroupErrorMessage(error, 'Failed to delete the group. Please try again.'));
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     Alert.alert(
       'Leave Group',
       'Are you sure you want to leave this group?',
@@ -142,7 +217,31 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
               await leaveGroup(groupId, user.uid);
               navigation.goBack();
             } catch (error: any) {
-              Alert.alert('Error', error.message);
+              Alert.alert('Error', getGroupErrorMessage(error, 'Failed to leave the group. Please try again.'));
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handlePromoteMember = (member: GroupMember) => {
+    if (!user) return;
+    Alert.alert(
+      'Make Admin',
+      `Make ${member.username} an admin? Admins can invite and remove members and refresh the invite code.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Make Admin',
+          onPress: async () => {
+            try {
+              await promoteMember(groupId, user.uid, member.userId);
+              setMembers((prev) =>
+                prev.map((m) => (m.userId === member.userId ? { ...m, role: 'admin' } : m))
+              );
+            } catch (error: any) {
+              Alert.alert('Error', getGroupErrorMessage(error, 'Failed to promote this member. Please try again.'));
             }
           },
         },
@@ -165,7 +264,7 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
               await removeMember(groupId, user.uid, member.userId);
               setMembers((prev) => prev.filter((m) => m.userId !== member.userId));
             } catch (error: any) {
-              Alert.alert('Error', error.message);
+              Alert.alert('Error', getGroupErrorMessage(error, 'Failed to remove this member. Please try again.'));
             }
           },
         },
@@ -174,11 +273,18 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
   };
 
   const handleAddFriends = async () => {
-    if (!user) return;
-    const allFriends = await getFriends(user.uid);
-    const memberIds = new Set(members.map((m) => m.userId));
-    setFriends(allFriends.filter((f) => !memberIds.has(f.userId)));
-    setShowAddFriends(true);
+    if (!user || loadingFriends) return;
+    setLoadingFriends(true);
+    try {
+      const allFriends = await getFriends(user.uid);
+      const memberIds = new Set(members.map((m) => m.userId));
+      setFriends(allFriends.filter((f) => !memberIds.has(f.userId)));
+      setShowAddFriends(true);
+    } catch (error: any) {
+      Alert.alert('Error', getGroupErrorMessage(error, "Couldn't load your friends list. Check your connection and try again."));
+    } finally {
+      setLoadingFriends(false);
+    }
   };
 
   const handleAddFriend = async (friend: Friend) => {
@@ -189,7 +295,7 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
       setFriends((prev) => prev.filter((f) => f.userId !== friend.userId));
       if (friends.length <= 1) setShowAddFriends(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', getGroupErrorMessage(error, 'Failed to add this friend. Please try again.'));
     }
   };
 
@@ -199,7 +305,7 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
       await joinRoom(room.roomId, user.uid, userProfile.username);
       navigation.navigate('GameRoom', { roomId: room.roomId });
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to join room');
+      Alert.alert('Error', getGroupErrorMessage(error, 'Failed to join this game. Please try again.'));
     }
   };
 
@@ -286,8 +392,16 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
         {activeTab === 'members' && (
           <>
             {isAdmin && (
-              <TouchableOpacity style={styles.addFriendsBtn} onPress={handleAddFriends}>
-                <Text style={styles.addFriendsBtnText}>+ Add Friends to Group</Text>
+              <TouchableOpacity
+                style={styles.addFriendsBtn}
+                onPress={handleAddFriends}
+                disabled={loadingFriends}
+              >
+                {loadingFriends ? (
+                  <ActivityIndicator color={COLORS.primary} size="small" />
+                ) : (
+                  <Text style={styles.addFriendsBtnText}>+ Add Friends to Group</Text>
+                )}
               </TouchableOpacity>
             )}
 
@@ -325,12 +439,22 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
                   <Text style={styles.memberRole}>{member.role === 'admin' ? '👑 Admin' : 'Member'}</Text>
                 </View>
                 {isAdmin && member.userId !== user?.uid && (
-                  <TouchableOpacity
-                    style={styles.removeBtn}
-                    onPress={() => handleRemoveMember(member)}
-                  >
-                    <Text style={styles.removeBtnText}>Remove</Text>
-                  </TouchableOpacity>
+                  <View style={styles.memberActions}>
+                    {member.role !== 'admin' && (
+                      <TouchableOpacity
+                        style={styles.promoteBtn}
+                        onPress={() => handlePromoteMember(member)}
+                      >
+                        <Text style={styles.promoteBtnText}>Make Admin</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() => handleRemoveMember(member)}
+                    >
+                      <Text style={styles.removeBtnText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
             ))}
@@ -338,6 +462,12 @@ export const GroupDetailScreen: React.FC<{ navigation: any; route: any }> = ({
             <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveGroup}>
               <Text style={styles.leaveBtnText}>Leave Group</Text>
             </TouchableOpacity>
+
+            {isCreator && (
+              <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGroup}>
+                <Text style={styles.deleteBtnText}>Delete Group</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -531,23 +661,40 @@ const createStyles = (COLORS: any) =>
     memberAvatarText: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
     memberName: { fontSize: 15, fontWeight: '600', color: COLORS.text },
     memberRole: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+    memberActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    promoteBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: COLORS.primary,
+    },
+    promoteBtnText: { color: COLORS.primary, fontSize: 12, fontWeight: '600' },
     removeBtn: {
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: '#e74c3c',
+      borderColor: COLORS.error,
     },
-    removeBtnText: { color: '#e74c3c', fontSize: 12, fontWeight: '600' },
+    removeBtnText: { color: COLORS.error, fontSize: 12, fontWeight: '600' },
     leaveBtn: {
       marginTop: 16,
       paddingVertical: 14,
       borderRadius: 12,
       alignItems: 'center',
       borderWidth: 1.5,
-      borderColor: '#e74c3c',
+      borderColor: COLORS.error,
     },
-    leaveBtnText: { color: '#e74c3c', fontWeight: '600', fontSize: 15 },
+    leaveBtnText: { color: COLORS.error, fontWeight: '600', fontSize: 15 },
+    deleteBtn: {
+      marginTop: 8,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+      backgroundColor: COLORS.error,
+    },
+    deleteBtnText: { color: COLORS.text, fontWeight: '700', fontSize: 15 },
     standingRow: {
       flexDirection: 'row',
       alignItems: 'center',

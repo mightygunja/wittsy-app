@@ -3,7 +3,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, ScrollView, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useTheme } from '../../hooks/useTheme';
@@ -16,16 +16,13 @@ export const GameplaySettingsScreen: React.FC<{ navigation: any }> = ({ navigati
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createSettingsStyles(COLORS, SPACING), [COLORS]);
 
+  // Only settings that the game actually honors are listed here.
+  // (confirmBeforeSubmit, autoReadyUp, quickChat, emotes, animations, and
+  // reducedMotion have no consumers yet — re-add each once it is wired up.)
   const gameplayToggles = [
     { key: 'autoSubmit', label: 'Auto Submit', description: 'Automatically submit when time runs out' },
-    { key: 'confirmBeforeSubmit', label: 'Confirm Before Submit', description: 'Ask for confirmation before submitting' },
     { key: 'showTimer', label: 'Show Timer', description: 'Display countdown timer' },
     { key: 'showTypingIndicators', label: 'Typing Indicators', description: 'Show when others are typing' },
-    { key: 'autoReadyUp', label: 'Auto Ready Up', description: 'Automatically ready for next round' },
-    { key: 'quickChatEnabled', label: 'Quick Chat', description: 'Enable quick chat messages' },
-    { key: 'emotesEnabled', label: 'Emotes', description: 'Enable emote reactions' },
-    { key: 'animationsEnabled', label: 'Animations', description: 'Enable UI animations' },
-    { key: 'reducedMotion', label: 'Reduced Motion', description: 'Minimize animations for accessibility' },
   ];
 
   return (

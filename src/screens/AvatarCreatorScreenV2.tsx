@@ -20,14 +20,14 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import { avatarService } from '../services/avatarService';
+import { getAllShopItems } from '../services/avatarShopService';
 import { haptics } from '../services/haptics';
 import { analytics } from '../services/analytics';
 import { firestore } from '../services/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { SPACING, RADIUS, SHADOWS } from '../utils/constants'
+import { SPACING, RADIUS } from '../utils/constants'
 import { useTheme } from '../hooks/useTheme';
 import {
   AvatarConfig,
@@ -38,10 +38,8 @@ import {
   DEFAULT_HAIR_STYLES,
   DEFAULT_ACCESSORIES,
   DEFAULT_BACKGROUNDS,
-  RARITY_COLORS,
-  AvatarRarity,
 } from '../types/avatar';
-import { SkinBase, Eyes, Mouths, Hair, Accessories, SKIN_COLORS, HAIR_COLORS } from '../components/avatar/AvatarFeatures';
+import { SkinBase, Eyes, Mouths, Hair, Accessories, HAIR_COLORS } from '../components/avatar/AvatarFeatures';
 import {
   EXPANDED_HAIR_STYLES,
   EXPANDED_ACCESSORIES,
@@ -93,6 +91,12 @@ const getHairColor = (hairId: string): string => {
   return HAIR_COLORS.brown;
 };
 
+// Item ids actually sold in the Avatar Shop. Locked items that are neither
+// unlocked nor in this set are hidden from the grid — otherwise the "Purchase
+// this item in the Avatar Shop!" prompt would send users hunting for items
+// (locked eyes/mouths/skins and default-only extras) the shop does not sell.
+const SHOP_ITEM_IDS = new Set(getAllShopItems().map((item) => item.id));
+
 interface DraggableFeature {
   id: string;
   type: 'eyes' | 'mouth' | 'hair' | 'accessory';
@@ -120,18 +124,58 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
 
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const hasLoadedRef = useRef(false);
+  // Tracks edits not yet saved to Firestore (guards back navigation)
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
-    console.log('🎨 AVATAR CREATOR V2 LOADED - NEW DRAG & DROP VERSION');
-    loadAvatar();
     analytics.screenView('AvatarCreatorV2');
-    
+
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Load the avatar as soon as auth is available (re-runs if `user` arrives
+  // after mount, so the screen can never hang on "Loading avatar creator...")
+  useEffect(() => {
+    if (hasLoadedRef.current) return;
+
+    if (user) {
+      hasLoadedRef.current = true;
+      loadAvatar();
+    } else {
+      // Auth momentarily unavailable — render defaults instead of a stuck
+      // loading screen; the real avatar loads when `user` resolves.
+      applyDefaultAvatar();
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!dirtyRef.current) return;
+
+      e.preventDefault();
+      Alert.alert(
+        'Discard Changes?',
+        'You have unsaved avatar changes. Leave without saving?',
+        [
+          { text: 'Keep Editing', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ]
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   // Real-time listener for unlocked items (detects purchases from Avatar Shop)
   useEffect(() => {
@@ -141,14 +185,39 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
     const unsubscribe = onSnapshot(avatarRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        const newUnlockedItems = data?.unlockedItems || [];
-        console.log('🔄 Avatar unlocked items updated:', newUnlockedItems.length);
-        setUnlockedItems(newUnlockedItems);
+        setUnlockedItems(data?.unlockedItems || []);
       }
     });
 
     return () => unsubscribe();
   }, [user]);
+
+  // Default avatar + unlocks, matching avatarService.getDefaultUnlockedItems
+  const applyDefaultAvatar = () => {
+    const defaultConfig: AvatarConfig = {
+      skin: 'skin_light',
+      eyes: 'eyes_normal',
+      mouth: 'mouth_smile',
+      hair: 'hair_short',
+      accessories: [],
+      clothing: 'clothing_casual',
+      background: 'bg_white',
+      effects: [],
+    };
+    const defaultUnlocked = [
+      'skin_light', 'skin_medium_light', 'skin_medium', 'skin_medium_dark', 'skin_dark',
+      'eyes_normal', 'eyes_happy',
+      'mouth_smile', 'mouth_grin',
+      'hair_short', 'hair_long', 'hair_bald',
+      'acc_none', 'acc_glasses',
+      'bg_white', 'bg_purple', 'bg_blue',
+      'fx_none',
+      'clothing_casual',
+    ];
+    setConfig(defaultConfig);
+    setUnlockedItems(defaultUnlocked);
+    initializeDraggableFeatures(defaultConfig);
+  };
 
   const loadAvatar = async () => {
     if (!user) return;
@@ -160,59 +229,11 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         setUnlockedItems(avatarData.unlockedItems);
         initializeDraggableFeatures(avatarData.config);
       } else {
-        // Create default avatar with only default unlocked items
-        const defaultConfig: AvatarConfig = {
-          skin: 'skin_light',
-          eyes: 'eyes_normal',
-          mouth: 'mouth_smile',
-          hair: 'hair_short',
-          accessories: [],
-          clothing: 'clothing_casual',
-          background: 'bg_white',
-          effects: [],
-        };
-        setConfig(defaultConfig);
-        // Use the same default unlocked items as avatarService
-        const defaultUnlocked = [
-          'skin_light', 'skin_medium_light', 'skin_medium', 'skin_medium_dark', 'skin_dark',
-          'eyes_normal', 'eyes_happy',
-          'mouth_smile', 'mouth_grin',
-          'hair_short', 'hair_long', 'hair_bald',
-          'acc_none', 'acc_glasses',
-          'bg_white', 'bg_purple', 'bg_blue',
-          'fx_none',
-          'clothing_casual',
-        ];
-        setUnlockedItems(defaultUnlocked);
-        initializeDraggableFeatures(defaultConfig);
+        applyDefaultAvatar();
       }
     } catch (error) {
       console.error('Failed to load avatar:', error);
-      // Create default on error with only default unlocked items
-      const defaultConfig: AvatarConfig = {
-        skin: 'skin_light',
-        eyes: 'eyes_normal',
-        mouth: 'mouth_smile',
-        hair: 'hair_short',
-        accessories: [],
-        clothing: 'clothing_casual',
-        background: 'bg_white',
-        effects: [],
-      };
-      setConfig(defaultConfig);
-      // Use the same default unlocked items as avatarService
-      const defaultUnlocked = [
-        'skin_light', 'skin_medium_light', 'skin_medium', 'skin_medium_dark', 'skin_dark',
-        'eyes_normal', 'eyes_happy',
-        'mouth_smile', 'mouth_grin',
-        'hair_short', 'hair_long', 'hair_bald',
-        'acc_none', 'acc_glasses',
-        'bg_white', 'bg_purple', 'bg_blue',
-        'fx_none',
-        'clothing_casual',
-      ];
-      setUnlockedItems(defaultUnlocked);
-      initializeDraggableFeatures(defaultConfig);
+      applyDefaultAvatar();
     } finally {
       setLoading(false);
     }
@@ -221,10 +242,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
   const initializeDraggableFeatures = (avatarConfig: AvatarConfig) => {
     const features: DraggableFeature[] = [];
     const savedPositions = avatarConfig.positions || {};
-    
-    console.log('🔧 initializeDraggableFeatures - config.accessories:', avatarConfig.accessories);
-    console.log('🔧 initializeDraggableFeatures - accessories count:', avatarConfig.accessories?.length || 0);
-    
+
     // Hair (if exists)
     if (avatarConfig.hair) {
       const hairItem = DEFAULT_HAIR_STYLES.find(h => h.id === avatarConfig.hair);
@@ -340,17 +358,8 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         positions,
       };
 
-      console.log('💾 Saving avatar config:', {
-        skin: config.skin,
-        eyes: config.eyes,
-        mouth: config.mouth,
-        hair: config.hair,
-        accessories: config.accessories,
-        background: config.background,
-        hasPositions: !!positions,
-      });
-      
       await avatarService.updateAvatarConfig(user.uid, configWithPositions);
+      dirtyRef.current = false;
       haptics.success();
       navigation.goBack();
     } catch (error) {
@@ -382,7 +391,6 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
   const handleItemSelect = (category: AvatarCategory, itemId: string) => {
     if (!config) return;
 
-    console.log(`🎨 Selecting ${category}: ${itemId}`);
     haptics.light();
 
     const newConfig = { ...config };
@@ -515,7 +523,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         break;
     }
 
-    console.log(`✅ Updated config`);
+    dirtyRef.current = true;
     setConfig(newConfig);
     setDraggableFeatures(newFeatures);
   };
@@ -554,7 +562,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
       case 'accessories':
         return config.accessories.includes(itemId);
       default:
-        return config[category] === itemId;
+        return (config as any)[category] === itemId;
     }
   };
 
@@ -575,7 +583,8 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
     );
   }
 
-  const bgItem = DEFAULT_BACKGROUNDS.find(b => b.id === config.background);
+  const bgItem = (DEFAULT_BACKGROUNDS as any[]).find(b => b.id === config.background)
+    || (EXPANDED_BACKGROUNDS as any[]).find(b => b.id === config.background);
   const bgColor = bgItem?.color || bgItem?.gradient?.[0] || '#E0E7FF';
 
   return (
@@ -605,6 +614,7 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
                 onSelect={() => setSelectedFeatureId(feature.id)}
                 styles={styles}
                 onPositionChange={(x, y) => {
+                  dirtyRef.current = true;
                   setDraggableFeatures(prev =>
                     prev.map(f => f.id === feature.id ? { ...f, x, y } : f)
                   );
@@ -643,6 +653,23 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
                 <TouchableOpacity
                   style={styles.deleteButton}
                   onPress={() => {
+                    // Clear the config field too — otherwise the feature is
+                    // saved anyway and resurrects on the next load
+                    if (config) {
+                      const newConfig = { ...config };
+                      if (selectedFeatureId === 'eyes') {
+                        newConfig.eyes = '';
+                      } else if (selectedFeatureId === 'mouth') {
+                        newConfig.mouth = '';
+                      } else if (selectedFeatureId === 'hair') {
+                        newConfig.hair = '';
+                      } else if (selectedFeatureId.startsWith('accessory_')) {
+                        const accId = selectedFeatureId.replace('accessory_', '');
+                        newConfig.accessories = newConfig.accessories.filter(id => id !== accId);
+                      }
+                      setConfig(newConfig);
+                    }
+                    dirtyRef.current = true;
                     setDraggableFeatures(prev => prev.filter(f => f.id !== selectedFeatureId));
                     setSelectedFeatureId(null);
                     haptics.success();
@@ -691,15 +718,19 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
                           setConfig(defaultConfig);
                           setDraggableFeatures([]);
                           setSelectedFeatureId(null);
-                          
+                          dirtyRef.current = true;
+
                           // Reinitialize with defaults
                           setTimeout(() => {
                             initializeDraggableFeatures(defaultConfig);
                           }, 100);
-                          
+
                           haptics.success();
-                          
-                          Alert.alert('Success', 'Avatar reset to defaults!');
+
+                          Alert.alert(
+                            'Avatar Reset',
+                            'Your avatar is back to the defaults. Tap Save to keep this change.'
+                          );
                         }
                       }
                     ]
@@ -747,7 +778,15 @@ export const AvatarCreatorScreenV2: React.FC<{ navigation: any }> = ({ navigatio
         {/* Items Grid */}
         <ScrollView style={styles.itemsContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.itemsGrid}>
-            {getCategoryItems(selectedCategory).map((item: any) => {
+            {getCategoryItems(selectedCategory)
+              .filter((item: any) =>
+                // Show items the user owns, has equipped, or can actually buy;
+                // hide locked items the shop does not sell (dead ends)
+                unlockedItems.includes(item.id) ||
+                isItemSelected(selectedCategory, item.id) ||
+                SHOP_ITEM_IDS.has(item.id)
+              )
+              .map((item: any) => {
               const isUnlocked = unlockedItems.includes(item.id);
               const isSelected = isItemSelected(selectedCategory, item.id);
 
@@ -827,49 +866,22 @@ const DraggableFeature: React.FC<{
     })
   ).current;
 
-  // Render SVG component based on feature type
+  // Render SVG component based on feature type (emoji fallback when no SVG)
   const renderFeature = () => {
     const size = 50;
-    
-    console.log(`🎨 Rendering feature: ${feature.id}, type: ${feature.type}, style: ${feature.style}`);
-    
+
+    let svgComponent: React.ReactNode | undefined;
     if (feature.id === 'eyes') {
-      const svgComponent = Eyes[feature.style as keyof typeof Eyes]?.(size);
-      if (svgComponent) {
-        console.log(`✅ Rendering SVG eyes: ${feature.style}`);
-        return svgComponent;
-      }
-      console.log(`⚠️ No SVG for eyes style: ${feature.style}, using emoji`);
-      return <Text style={{ fontSize: 40 }}>{feature.emoji}</Text>;
+      svgComponent = Eyes[feature.style as keyof typeof Eyes]?.(size);
     } else if (feature.id === 'mouth') {
-      const svgComponent = Mouths[feature.style as keyof typeof Mouths]?.(size);
-      if (svgComponent) {
-        console.log(`✅ Rendering SVG mouth: ${feature.style}`);
-        return svgComponent;
-      }
-      console.log(`⚠️ No SVG for mouth style: ${feature.style}, using emoji`);
-      return <Text style={{ fontSize: 40 }}>{feature.emoji}</Text>;
+      svgComponent = Mouths[feature.style as keyof typeof Mouths]?.(size);
     } else if (feature.id === 'hair') {
-      const svgComponent = Hair[feature.style as keyof typeof Hair]?.(size, feature.color || HAIR_COLORS.brown);
-      if (svgComponent) {
-        console.log(`✅ Rendering SVG hair: ${feature.style}`);
-        return svgComponent;
-      }
-      console.log(`⚠️ No SVG for hair style: ${feature.style}, using emoji`);
-      return <Text style={{ fontSize: 40 }}>{feature.emoji}</Text>;
+      svgComponent = Hair[feature.style as keyof typeof Hair]?.(size, feature.color || HAIR_COLORS.brown);
     } else if (feature.id.startsWith('accessory_')) {
-      const svgComponent = Accessories[feature.style as keyof typeof Accessories]?.(size);
-      if (svgComponent) {
-        console.log(`✅ Rendering SVG accessory: ${feature.style}`);
-        return svgComponent;
-      }
-      console.log(`⚠️ No SVG for accessory style: ${feature.style}, using emoji`);
-      return <Text style={{ fontSize: 40 }}>{feature.emoji}</Text>;
+      svgComponent = Accessories[feature.style as keyof typeof Accessories]?.(size);
     }
-    
-    // Fallback to emoji
-    console.log(`⚠️ Unknown feature type, using emoji`);
-    return <Text style={{ fontSize: 40 }}>{feature.emoji}</Text>;
+
+    return svgComponent || <Text style={{ fontSize: 40 }}>{feature.emoji}</Text>;
   };
 
   return (
@@ -1085,7 +1097,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: RADIUS.medium,
+    borderRadius: RADIUS.md,
   },
   lockIcon: {
     fontSize: 32,

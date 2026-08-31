@@ -39,22 +39,19 @@ export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     setStatusMessage('Searching for matches...');
     
     try {
-      // Use actual user ELO from profile (rating or default)
-      const userElo = userProfile.rating || 1000;
-      console.log(`🎮 Quick Play: User ELO = ${userElo}`);
-      
+      // Use actual user ELO from profile (rating or the new-profile default)
+      const userElo = (userProfile as any).rankedRating || userProfile.rating || 1200;
+
       // Try to find existing ranked room
       setStatusMessage('Looking for available games...');
       let room = await findAvailableRankedRoom(userElo);
 
       if (room) {
-        console.log('✅ Found existing room:', room.roomId);
         setStatusMessage('Joining game...');
-        
+
         const alreadyInRoom = room.players?.some(p => p.userId === user.uid);
-        
+
         if (alreadyInRoom) {
-          console.log('User already in room, navigating directly');
           navigation.navigate('GameRoom', { roomId: room.roomId });
         } else {
           await joinRoom(room.roomId, user.uid, userProfile.username);
@@ -62,27 +59,30 @@ export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         }
       } else {
         // No room found - AUTO-CREATE new ranked room (host is already added as a player)
-        console.log('⚠️ No rooms available - creating new ranked room');
         setStatusMessage('Creating new game...');
-        
-        const roomId = await createRankedRoom(user.uid, userProfile.username);
-        console.log(`✨ Created new ranked room: ${roomId}`);
-        
+
+        const roomId = await createRankedRoom(user.uid, userProfile.username, userElo);
+
         navigation.navigate('GameRoom', { roomId });
       }
     } catch (error: any) {
-      console.error('❌ Quick Play error:', error);
-      
+      console.error('Quick Play error:', error);
+
       let errorMessage = 'Failed to join game. Please try again.';
-      
-      if (error.message === 'Already in room') {
+
+      if (error?.code === 'ALREADY_IN_ROOM' || error.message === 'Already in room') {
         errorMessage = 'You are already in a game.';
+      } else if (error.message?.includes('active ranked game')) {
+        // Surface the real, actionable cause instead of a generic retry message
+        errorMessage = error.message;
+      } else if (error.message?.includes('Game is locked')) {
+        errorMessage = error.message;
       } else if (error.message?.includes('create')) {
         errorMessage = 'Failed to create game. Please try again.';
       } else if (error.message?.includes('join')) {
         errorMessage = 'Failed to join game. Please try again.';
       }
-      
+
       Alert.alert('Quick Play Error', errorMessage);
     } finally {
       setSearching(false);
@@ -137,7 +137,7 @@ export const QuickPlayScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 marginBottom: SPACING.xs,
               }
             ]}>
-              {userProfile?.rating || 1000}
+              {(userProfile as any)?.rankedRating || userProfile?.rating || 1200}
             </Text>
             <Text style={[styles.settingDescription, { textAlign: 'center' }]}>
               ELO Rating

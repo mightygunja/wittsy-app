@@ -20,21 +20,20 @@ import { getUserSeasonHistory, SeasonStats } from '../services/seasonHistory';
 import { AnimatedStatCard } from '../components/profile/AnimatedStatCard';
 import { AnimatedAchievementBadge } from '../components/profile/AnimatedAchievementBadge';
 import { AnimatedMatchHistoryItem } from '../components/profile/AnimatedMatchHistoryItem';
-import { XPProgressBar } from '../components/profile/XPProgressBar';
 import { TitleSelector } from '../components/profile/TitleSelector';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
 import { Achievement } from '../types';
 import { AvatarConfig } from '../types/avatar';
 import { avatarService } from '../services/avatarService';
 import { firestore } from '../services/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useTheme } from '../hooks/useTheme';
 import { SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../utils/constants';
 import { getRatingTier, getRatingColor } from '../services/eloRatingService';
 import { tabletHorizontalPadding } from '../utils/responsive';
 
 export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
-  const { userProfile: currentUserProfile } = useAuth();
+  const { userProfile: currentUserProfile, refreshUserProfile } = useAuth();
   const { colors: COLORS } = useTheme();
   
   // Get userId from route params, default to current user
@@ -50,6 +49,7 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
   const [refreshing, setRefreshing] = useState(false);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -92,22 +92,35 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
 
   const loadUserProfile = async () => {
     if (!viewingUserId) return;
-    
+
+    setProfileLoadFailed(false);
     try {
       if (isOwnProfile && currentUserProfile) {
         setUserProfile(currentUserProfile);
       } else {
         // Load other user's profile from Firestore
-        const { doc, getDoc } = await import('firebase/firestore');
         const userDoc = await getDoc(doc(firestore, 'users', viewingUserId));
         if (userDoc.exists()) {
           setUserProfile(userDoc.data());
+        } else {
+          // Deleted or nonexistent account — show an error state, not an
+          // endless spinner
+          setProfileLoadFailed(true);
         }
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
+      setProfileLoadFailed(true);
     }
   };
+
+  // Keep the local copy of our own profile in sync with the auth context
+  // (e.g. after changing the selected title)
+  useEffect(() => {
+    if (isOwnProfile && currentUserProfile) {
+      setUserProfile(currentUserProfile);
+    }
+  }, [isOwnProfile, currentUserProfile]);
 
   // Reload avatar when screen comes into focus (e.g., after saving in Avatar Creator)
   useEffect(() => {
@@ -118,23 +131,15 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
   }, [navigation, userProfile]);
 
   const loadAvatar = async () => {
-    if (!userProfile?.uid) {
-      console.log('❌ No user profile, cannot load avatar');
-      return;
-    }
-    
-    console.log('🔄 Loading avatar for user:', userProfile.uid);
+    if (!userProfile?.uid) return;
+
     try {
       const userAvatar = await avatarService.getUserAvatar(viewingUserId);
-      console.log('📦 Avatar data received:', userAvatar);
       if (userAvatar && userAvatar.config) {
-        console.log('✅ Setting avatar config:', userAvatar.config);
         setAvatarConfig(userAvatar.config);
-      } else {
-        console.log('⚠️ No avatar config found, using default');
       }
     } catch (error) {
-      console.error('❌ Error loading avatar:', error);
+      console.error('Error loading avatar:', error);
     }
   };
 
@@ -193,16 +198,40 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
   };
 
   const handleSelectTitle = async (titleId: string) => {
-    if (!userProfile?.uid) return;
+    // Titles can only be changed on your own profile
+    if (!isOwnProfile || !userProfile?.uid) return;
     try {
       await updateUserTitle(userProfile.uid, titleId);
-      // Refresh user profile would happen via auth context
+      // Update the local copy immediately so the badge/checkmark reflect the
+      // change, then refresh the auth context copy in the background
+      setUserProfile((prev: any) => (prev ? { ...prev, selectedTitle: titleId } : prev));
+      refreshUserProfile().catch(() => {});
     } catch (error) {
       console.error('Error updating title:', error);
+      Alert.alert('Title Not Updated', 'Something went wrong while saving your title. Please try again.');
     }
   };
 
   if (!userProfile) {
+    if (profileLoadFailed) {
+      return (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.emptyIcon}>🕵️</Text>
+            <Text style={styles.emptyText}>Player not found</Text>
+            <Text style={styles.emptySubtext}>
+              This account may have been deleted, or the profile could not be loaded.
+            </Text>
+            <TouchableOpacity
+              style={styles.notFoundBackButton}
+              onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
+            >
+              <Text style={styles.notFoundBackButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -228,17 +257,6 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
     ? TITLES[userProfile.selectedTitle.toUpperCase() as keyof typeof TITLES]
     : TITLES.NEWBIE;
 
-  console.log('🔥 ENHANCED PROFILE RENDERING - NEW VERSION WITH STATS ROW');
-  console.log('📊 Stats:', { wins: userProfile.stats.gamesWon, winRate, rating: userProfile.rating });
-  console.log('👤 Avatar config:', avatarConfig ? 'LOADED' : 'NOT LOADED');
-  console.log('⭐ XP Debug:', { 
-    totalXP: userProfile.xp, 
-    level: userProfile.level, 
-    current: xpProgress.current, 
-    required: xpProgress.required,
-    percentage: xpProgress.percentage 
-  });
-
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView 
@@ -259,38 +277,34 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
           ]}
         >
           <View style={styles.profileContent}>
-            {/* Avatar Section - REBUILT */}
+            {/* Avatar Section */}
             <View style={styles.avatarSection}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => navigation.navigate('AvatarCreator')}
                 activeOpacity={0.9}
+                disabled={!isOwnProfile}
               >
                 <View style={styles.avatarWrapper}>
                   {/* Avatar Circle */}
                   <View style={styles.avatarCircle}>
                     {avatarConfig ? (
-                      <>
-                        <AvatarDisplay config={avatarConfig} size={140} />
-                        {!avatarConfig.positions && (
-                          <View style={styles.warningBadge}>
-                            <Text style={styles.warningText}>!</Text>
-                          </View>
-                        )}
-                      </>
+                      <AvatarDisplay config={avatarConfig} size={140} />
                     ) : (
                       <Text style={styles.avatarEmoji}>👤</Text>
                     )}
                   </View>
-                  
+
                   {/* Level Badge */}
                   <View style={styles.levelBadge}>
                     <Text style={styles.levelBadgeText}>{userProfile.level}</Text>
                   </View>
-                  
-                  {/* Edit Badge */}
-                  <View style={styles.editBadge}>
-                    <Text style={styles.editIcon}>✏️</Text>
-                  </View>
+
+                  {/* Edit Badge — only on your own profile */}
+                  {isOwnProfile && (
+                    <View style={styles.editBadge}>
+                      <Text style={styles.editIcon}>✏️</Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             </View>
@@ -375,55 +389,43 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
                   ℹ️ Account XP unlocks titles, features & content. Separate from Battle Pass XP.
                 </Text>
               </View>
-              <TouchableOpacity 
-                style={styles.fixLevelButton}
-                onPress={async () => {
-                  const { getLevelFromXP } = await import('../services/progression');
-                  const correctLevel = getLevelFromXP(userProfile.xp);
-                  console.log(`🔧 Fixing level: Current=${userProfile.level}, Should be=${correctLevel}`);
-                  if (correctLevel !== userProfile.level) {
-                    await updateDoc(doc(firestore, 'users', userProfile.uid), { level: correctLevel });
-                    Alert.alert('Level Fixed!', `Your level has been corrected to ${correctLevel}`);
-                  } else {
-                    Alert.alert('Level OK', 'Your level is already correct');
-                  }
-                }}
-              >
-                <Text style={styles.fixLevelText}>Fix My Level</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </Animated.View>
 
-        {/* Title Selector */}
-        <View style={styles.content}>
-          <TitleSelector
-            availableTitles={availableTitles}
-            selectedTitle={userProfile.selectedTitle}
-            onSelectTitle={handleSelectTitle}
-          />
-        </View>
+        {/* Title Selector — editing titles is only possible on your own profile */}
+        {isOwnProfile && (
+          <View style={styles.content}>
+            <TitleSelector
+              availableTitles={availableTitles}
+              selectedTitle={userProfile.selectedTitle}
+              onSelectTitle={handleSelectTitle}
+            />
+          </View>
+        )}
 
-        {/* Starred Phrases Quick Access */}
-        <TouchableOpacity 
-          style={styles.starredPhrasesButton}
-          onPress={() => navigation.navigate('StarredPhrases')}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={['#FFD700', '#FFA500'] as any}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.starredPhrasesGradient}
+        {/* Starred Phrases Quick Access — links to YOUR list, so own profile only */}
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.starredPhrasesButton}
+            onPress={() => navigation.navigate('StarredPhrases')}
+            activeOpacity={0.8}
           >
-            <Text style={styles.starredPhrasesIcon}>⭐</Text>
-            <View style={styles.starredPhrasesTextContainer}>
-              <Text style={styles.starredPhrasesTitle}>View Your Starred Phrases</Text>
-              <Text style={styles.starredPhrasesSubtitle}>See all your best phrases that earned 4+ votes</Text>
-            </View>
-            <Text style={styles.starredPhrasesArrow}>→</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={['#FFD700', '#FFA500'] as any}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.starredPhrasesGradient}
+            >
+              <Text style={styles.starredPhrasesIcon}>⭐</Text>
+              <View style={styles.starredPhrasesTextContainer}>
+                <Text style={styles.starredPhrasesTitle}>View Your Starred Phrases</Text>
+                <Text style={styles.starredPhrasesSubtitle}>See all your best phrases that earned 4+ votes</Text>
+              </View>
+              <Text style={styles.starredPhrasesArrow}>→</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
         {/* Modern Tab Navigation */}
         <View style={styles.tabContainer}>
@@ -649,7 +651,7 @@ export const EnhancedProfileScreen: React.FC<{ navigation: any; route: any }> = 
               {loading ? (
                 <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
               ) : seasonHistory.length > 0 ? (
-                seasonHistory.map((season, index) => (
+                seasonHistory.map((season) => (
                   <Animated.View
                     key={season.seasonId}
                     style={[
@@ -776,6 +778,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+  },
+  notFoundBackButton: {
+    marginTop: SPACING.lg,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.full,
+    ...SHADOWS.sm,
+  },
+  notFoundBackButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: '#FFFFFF',
   },
   profileContainer: {
     paddingTop: SPACING.md,
@@ -808,29 +824,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   avatarEmoji: {
     fontSize: 56,
-  },
-  debugText: {
-    position: 'absolute',
-    bottom: 5,
-    fontSize: 8,
-    color: 'red',
-    fontWeight: 'bold',
-  },
-  warningBadge: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
-    backgroundColor: 'orange',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  warningText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   levelBadge: {
     position: 'absolute',
@@ -1056,19 +1049,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textSecondary,
     fontStyle: 'italic',
     textAlign: 'center',
-  },
-  fixLevelButton: {
-    backgroundColor: COLORS.gold,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.md,
-    alignSelf: 'center',
-    marginTop: SPACING.sm,
-  },
-  fixLevelText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   content: {
     paddingHorizontal: SPACING.lg + tabletHorizontalPadding,

@@ -43,8 +43,17 @@ const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
     analytics.screenView('CoinShop');
-    loadPurchaseStatus();
+  }, []);
 
+  // Re-run when auth resolves: mounting while `user` was momentarily null
+  // left the shop stuck on an empty product list forever.
+  useEffect(() => {
+    if (user) {
+      loadPurchaseStatus();
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,

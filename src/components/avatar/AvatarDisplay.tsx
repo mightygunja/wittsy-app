@@ -5,9 +5,9 @@
 
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { AvatarConfig, DEFAULT_SKIN_TONES } from '../../types/avatar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AvatarConfig, DEFAULT_SKIN_TONES, DEFAULT_BACKGROUNDS, EXPANDED_BACKGROUNDS } from '../../types/avatar';
 import { SkinBase, Eyes, Mouths, Hair, Accessories, HAIR_COLORS } from './AvatarFeatures';
-import { useTheme } from '../../hooks/useTheme';
 
 interface AvatarDisplayProps {
   config: AvatarConfig;
@@ -21,20 +21,43 @@ const getStyleFromId = (id: string): string => {
   return parts.length > 1 ? parts.slice(1).join('_') : parts[0];
 };
 
+// Merged background catalog (defaults first, de-duped by id) — same order the
+// creator uses, so an equipped background resolves identically everywhere.
+const ALL_BACKGROUNDS = (() => {
+  const seen = new Set(DEFAULT_BACKGROUNDS.map((bg) => bg.id));
+  return [
+    ...DEFAULT_BACKGROUNDS,
+    ...EXPANDED_BACKGROUNDS.filter((bg) => !seen.has(bg.id)),
+  ] as Array<{ id: string; color?: string; gradient?: string[]; animated?: boolean }>;
+})();
+
+// Resolve an equipped background id to renderable colors. Animated backgrounds
+// without explicit colors get a static deep-space gradient fallback.
+const resolveBackground = (
+  backgroundId?: string
+): { color?: string; gradient?: string[] } | null => {
+  if (!backgroundId) return null;
+  const bg = ALL_BACKGROUNDS.find((b) => b.id === backgroundId);
+  if (!bg) return null;
+  if (bg.gradient && bg.gradient.length >= 2) return { gradient: bg.gradient };
+  if (bg.color) return { color: bg.color };
+  if (bg.animated) return { gradient: ['#0F2027', '#203A43', '#2C5364'] };
+  return null;
+};
+
 export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100 }) => {
   const styles = useMemo(() => createStyles(), []);
-  console.log('🎨 AvatarDisplay rendering:', { size, config });
-  
+
   const skinColor = DEFAULT_SKIN_TONES.find(s => s.id === config.skin)?.color || '#FFE0BD';
   const eyeStyle = getStyleFromId(config.eyes);
   const mouthStyle = getStyleFromId(config.mouth);
   const hairStyle = config.hair ? getStyleFromId(config.hair) : null;
-  const accessoryStyles = config.accessories?.map(accId => getStyleFromId(accId)).filter(style => style !== 'none') || [];
-  
+  const background = resolveBackground(config.background);
+
   // Extract hair color from hair ID (e.g., 'hair_short_blue' -> 'blue', 'hair_pink' -> 'pink')
   const getHairColor = (hairId: string): string => {
     if (!hairId) return HAIR_COLORS.brown;
-    
+
     // Check for color in the ID
     const colorMap: { [key: string]: string } = {
       'blue': HAIR_COLORS.blue,
@@ -55,48 +78,43 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
       'founder_gold': HAIR_COLORS.blonde, // Gold for founder
       'champion': HAIR_COLORS.blonde, // Gold for champion
     };
-    
+
     // Check each color keyword in the ID
     for (const [keyword, color] of Object.entries(colorMap)) {
       if (hairId.includes(keyword)) {
         return color;
       }
     }
-    
+
     // Default to brown if no color found
     return HAIR_COLORS.brown;
   };
-  
+
   const hairColor = config.hair ? getHairColor(config.hair) : HAIR_COLORS.brown;
-  
-  console.log('🎨 Avatar features:', { skinColor, eyeStyle, mouthStyle, hairStyle, accessories: accessoryStyles });
 
   // Get saved positions or use defaults
   const positions = config.positions || {};
-  
+
   // Get the saved canvas size from positions
   const savedCanvasSize = positions.eyes?.canvasSize || positions.mouth?.canvasSize || positions.hair?.canvasSize;
-  
-  console.log('📏 Saved canvas size:', savedCanvasSize, 'Display size:', size);
-  
+
   // If we have saved positions, scale them proportionally
   let eyesPos, mouthPos, hairPos;
-  
+
   if (savedCanvasSize && positions.eyes) {
     const scaleFactor = size / savedCanvasSize;
-    console.log('🔢 Scale factor:', scaleFactor);
-    
-    eyesPos = { 
-      left: positions.eyes.x * scaleFactor, 
-      top: positions.eyes.y * scaleFactor 
+
+    eyesPos = {
+      left: positions.eyes.x * scaleFactor,
+      top: positions.eyes.y * scaleFactor
     };
     mouthPos = positions.mouth ? {
-      left: positions.mouth.x * scaleFactor, 
-      top: positions.mouth.y * scaleFactor 
+      left: positions.mouth.x * scaleFactor,
+      top: positions.mouth.y * scaleFactor
     } : { left: size * 0.25, top: size * 0.55 };
     hairPos = positions.hair ? {
-      left: positions.hair.x * scaleFactor, 
-      top: positions.hair.y * scaleFactor 
+      left: positions.hair.x * scaleFactor,
+      top: positions.hair.y * scaleFactor
     } : { left: size * 0.10, top: size * 0.05 };
   } else {
     // Use default centered positions
@@ -107,12 +125,28 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
 
   // Base face size - in creator it's 140px on ~280px canvas = 50%
   const faceSize = size * 0.5;
-  
+
   return (
-    <View style={[styles.container, { width: size, height: size }]}>
+    <View
+      style={[
+        styles.container,
+        { width: size, height: size, borderRadius: size / 2 },
+        background?.color ? { backgroundColor: background.color } : null,
+      ]}
+    >
+      {/* Equipped background (gradient variant) */}
+      {background?.gradient && (
+        <LinearGradient
+          colors={background.gradient as any}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      )}
+
       {/* Base Face - centered like in creator */}
-      <View style={[styles.baseLayer, { 
-        width: faceSize, 
+      <View style={[styles.baseLayer, {
+        width: faceSize,
         height: faceSize,
         top: (size - faceSize) / 2,
         left: (size - faceSize) / 2,
@@ -122,11 +156,7 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
 
       {/* Eyes - creator uses 50px on 280px canvas = 17.8% */}
       <View style={[styles.featureLayer, eyesPos]}>
-        {(() => {
-          const eyeComponent = Eyes[eyeStyle as keyof typeof Eyes]?.(size * 0.178);
-          console.log('👁️ Eyes rendering:', { eyeStyle, exists: !!eyeComponent, pos: eyesPos });
-          return eyeComponent || null;
-        })()}
+        {Eyes[eyeStyle as keyof typeof Eyes]?.(size * 0.178) || null}
       </View>
 
       {/* Mouth - creator uses 50px on 280px canvas = 17.8% */}
@@ -137,11 +167,7 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
       {/* Hair - creator uses 50px on 280px canvas = 17.8% */}
       {hairStyle && hairStyle !== 'none' && (
         <View style={[styles.featureLayer, hairPos]}>
-          {(() => {
-            const hairComponent = Hair[hairStyle as keyof typeof Hair]?.(size * 0.178, hairColor);
-            console.log('💇 Hair rendering:', { hairStyle, hairColor, exists: !!hairComponent, pos: hairPos });
-            return hairComponent || null;
-          })()}
+          {Hair[hairStyle as keyof typeof Hair]?.(size * 0.178, hairColor) || null}
         </View>
       )}
 
@@ -149,17 +175,16 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ config, size = 100
       {config.accessories?.filter(accId => accId && accId !== 'acc_none').map((accId, index) => {
         const accStyle = getStyleFromId(accId);
         if (accStyle === 'none') return null;
-        
+
         const accPos = positions.accessories?.[`accessory_${accId}`];
         const scaleFactor = savedCanvasSize ? size / savedCanvasSize : 1;
         const position = accPos ? {
           left: accPos.x * scaleFactor,
           top: accPos.y * scaleFactor
         } : { left: size * 0.25, top: size * 0.30 };
-        
+
         const accComponent = Accessories[accStyle as keyof typeof Accessories]?.(size * 0.178);
-        console.log(`👓 Rendering accessory ${index}:`, { accStyle, accId, exists: !!accComponent, position });
-        
+
         return accComponent ? (
           <View key={`acc_${accId}_${index}`} style={[styles.featureLayer, position]}>
             {accComponent}
@@ -175,6 +200,7 @@ const createStyles = () => StyleSheet.create({
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   baseLayer: {
     position: 'absolute',
@@ -187,5 +213,3 @@ const createStyles = () => StyleSheet.create({
     position: 'absolute',
   },
 });
-
-

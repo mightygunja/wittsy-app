@@ -29,6 +29,7 @@ import { Group } from '../types/social';
 import {
   getUserGroups,
   joinGroupViaInviteCode,
+  getGroupErrorMessage,
 } from '../services/groups';
 import { SPACING } from '../utils/constants';
 
@@ -52,14 +53,19 @@ export const GroupsScreen: React.FC<{ navigation: any; route: any }> = ({ naviga
     if (!inviteCode || !user || !userProfile) return;
     const autoJoin = async () => {
       try {
-        const result = await joinGroupViaInviteCode(inviteCode, user.uid, userProfile.username);
+        const result = await joinGroupViaInviteCode(
+          inviteCode,
+          user.uid,
+          userProfile.username,
+          userProfile.avatar
+        );
         if (result.success && result.groupId) {
           navigation.replace('GroupDetail', { groupId: result.groupId });
         } else {
           Alert.alert('Invalid Invite', result.error || 'This invite link is invalid or has expired.');
         }
       } catch (error: any) {
-        Alert.alert('Error', error.message || 'Failed to join group');
+        Alert.alert('Error', getGroupErrorMessage(error, 'Failed to join group. Please try again.'));
       }
     };
     autoJoin();
@@ -113,7 +119,7 @@ export const GroupsScreen: React.FC<{ navigation: any; route: any }> = ({ naviga
         Alert.alert('Error', result.error || 'Failed to join group');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to join group');
+      Alert.alert('Error', getGroupErrorMessage(error, 'Failed to join group. Please try again.'));
     } finally {
       setJoining(false);
     }

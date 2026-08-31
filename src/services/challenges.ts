@@ -14,9 +14,11 @@ import {
   where,
   Timestamp,
   increment,
+  runTransaction,
 } from 'firebase/firestore';
 import { firestore } from './firebase';
 import { Challenge, UserChallengeProgress, ChallengeReward } from '../types/social';
+import { awardXP } from './progression';
 
 // ==================== CHALLENGE MANAGEMENT ====================
 
@@ -202,27 +204,60 @@ export const claimChallengeReward = async (
 
   const challenge = challengeDoc.data() as Challenge;
   const reward = challenge.reward;
-
-  // Award rewards to user
   const userRef = doc(firestore, 'users', userId);
-  const updates: any = {};
 
-  if (reward.xp) {
-    updates.xp = increment(reward.xp);
-  }
-  if (reward.coins) {
-    updates['coins'] = increment(reward.coins);
-  }
-
-  if (Object.keys(updates).length > 0) {
-    await updateDoc(userRef, updates);
-  }
-
-  // Mark as claimed
-  await updateDoc(progressDoc.ref, {
-    claimed: true,
-    claimedAt: new Date().toISOString(),
+  // Claim-first: atomically flip claimed inside a transaction (re-checked
+  // against a fresh read) so a double-tap can never double-grant, then grant.
+  // If granting fails, roll the claim back so it can be retried — the old
+  // grant-first ordering let a mid-flow failure grant twice on retry.
+  await runTransaction(firestore, async (tx) => {
+    const fresh = await tx.get(progressDoc.ref);
+    if (!fresh.exists()) throw new Error('Challenge progress not found');
+    const data = fresh.data();
+    if (!data.completed) throw new Error('Challenge not completed');
+    if (data.claimed) throw new Error('Reward already claimed');
+    tx.update(progressDoc.ref, {
+      claimed: true,
+      claimedAt: new Date().toISOString(),
+    });
   });
+
+  try {
+    // XP routes through awardXP so the account level is recomputed with the grant
+    if (reward.xp) {
+      await awardXP(userId, reward.xp, `challenge_${challengeId}`);
+    }
+    if (reward.coins) {
+      await updateDoc(userRef, { coins: increment(reward.coins) });
+    }
+
+    // Persist item rewards (badge/title/emote) so the claim actually lands on
+    // the account instead of only being announced in the UI
+    if (reward.badge || reward.title || reward.emote) {
+      const userSnap = await getDoc(userRef);
+      const userData: any = userSnap.exists() ? userSnap.data() : {};
+      const itemUpdates: any = {};
+
+      if (reward.badge && !(userData.badges || []).includes(reward.badge)) {
+        itemUpdates.badges = [...(userData.badges || []), reward.badge];
+      }
+      if (reward.title && !(userData.unlockedTitles || []).includes(reward.title)) {
+        itemUpdates.unlockedTitles = [...(userData.unlockedTitles || []), reward.title];
+      }
+      if (reward.emote && !(userData.emotes || []).includes(reward.emote)) {
+        itemUpdates.emotes = [...(userData.emotes || []), reward.emote];
+      }
+
+      if (Object.keys(itemUpdates).length > 0) {
+        await updateDoc(userRef, itemUpdates);
+      }
+    }
+  } catch (grantError) {
+    await updateDoc(progressDoc.ref, { claimed: false, claimedAt: null }).catch((rollbackError) =>
+      console.error('Failed to roll back challenge claim:', rollbackError)
+    );
+    throw grantError;
+  }
 
   return reward;
 };
