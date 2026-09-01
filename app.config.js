@@ -2,7 +2,7 @@
 // (equivalent to the "appVersion" policy, written as a literal because the
 // committed android/ project makes the tooling treat this repo as bare
 // workflow, where policies are unsupported).
-const VERSION = "1.0.9";
+const VERSION = "1.1.0";
 
 export default {
   expo: {
