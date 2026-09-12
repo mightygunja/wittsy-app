@@ -29,7 +29,8 @@ export const BrowseRoomsScreen: React.FC<{ navigation: any }> = ({ navigation })
         const userElo = (userProfile as any)?.rankedRating || userProfile?.rating || 1200;
         activeRooms = await getBrowsableRankedRooms(userElo);
       } else {
-        const all = await getActiveRooms({ isPrivate: false, maxResults: 50 });
+        // The Casual Lobby is joined from its pinned card on Home, not listed here
+        const all = (await getActiveRooms({ isPrivate: false, maxResults: 50 })).filter(r => !r.isLobby);
         activeRooms = all.filter((r: any) => !r.groupId);
       }
       setRooms(activeRooms);

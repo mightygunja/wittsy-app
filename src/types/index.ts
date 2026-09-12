@@ -103,6 +103,11 @@ export interface Room {
   seasonName?: string | null;
   countdownStartedAt?: string;
   countdownDuration?: number;
+  isLobby?: boolean; // the always-on Casual Lobby
+  gameNumber?: number;
+  nextRoomId?: string; // set when a game rolls into a successor/rematch room
+  groupId?: string;
+  isSimulation?: boolean;
 }
 
 export interface RoomSettings {
@@ -127,6 +132,7 @@ export interface Player {
   username: string;
   avatar: Avatar;
   avatarConfig?: import('./avatar').AvatarConfig; // User's custom avatar configuration
+  isBot?: boolean; // Casual Lobby house bot (no user account)
   isReady: boolean;
   isConnected: boolean;
   joinedAt: string;

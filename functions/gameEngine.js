@@ -12,6 +12,7 @@
 const admin = require('firebase-admin');
 const { isCleanForPublic } = require('./contentFilter');
 const { settleRatings } = require('./elo');
+const casualLobby = require('./casualLobby');
 const db = admin.firestore();
 const rtdb = admin.database();
 
@@ -165,7 +166,13 @@ async function advancePhase(roomId) {
       }
 
       const roomDoc = await db.collection('rooms').doc(roomId).get();
-      const playerCount = roomDoc.data()?.players?.length || 0;
+      const roomData = roomDoc.data() || {};
+      // House bots (Casual Lobby) answer at the deadline, so the "everyone
+      // has submitted" early-advance check counts people only.
+      const playerCount = (roomData.players || []).filter(p => !p.isBot).length;
+      const lobbyBotIds = roomData.isLobby
+        ? (roomData.players || []).filter(p => p.isBot).map(p => p.userId)
+        : [];
 
       // Clock-skew guard: a client with a fast clock (or a buggy timer) must not be
       // able to end the submission phase early for the whole room. Only allow an
@@ -190,6 +197,11 @@ async function advancePhase(roomId) {
           validSubmissions[userId] = phrase;
         }
       });
+      // Bot answers are deterministic per room+round, so concurrent advance
+      // calls write identical voting cards.
+      if (lobbyBotIds.length > 0) {
+        Object.assign(validSubmissions, casualLobby.botPhrases(roomId, freshSubGame.round || 0, lobbyBotIds));
+      }
       const validSubmissionCount = Object.keys(validSubmissions).length;
 
       // Require at least 3 valid submissions to proceed to voting.
@@ -227,9 +239,16 @@ async function advancePhase(roomId) {
 
       console.log(`🗳️ ${Object.keys(freshVotingGame.votes || {}).length} votes received`);
 
+      // House bots vote at the deadline (deterministic per room+round, like
+      // their answers). Rooms without bots get no extra votes.
+      const allVotes = {
+        ...(freshVotingGame.votes || {}),
+        ...casualLobby.botVotes(roomId, freshVotingGame.round || 0, freshVotingGame.validSubmissions || {}),
+      };
+
       const winnerData = await processVotesSync(
         roomId,
-        freshVotingGame.votes,
+        allVotes,
         freshVotingGame.validSubmissions || null,
         freshVotingGame.round || 0,
         freshVotingGame.prompt || ''
@@ -371,6 +390,12 @@ async function startNewRound(roomId) {
     currentPrompt: prompt.text,
     usedPromptIds: admin.firestore.FieldValue.arrayUnion(prompt.id)
   });
+
+  // Casual Lobby: if people left mid-game, top the table back up with bots
+  if (room.isLobby) {
+    await casualLobby.topUpLobbyBots(roomId).catch(err =>
+      console.error(`⚠️ Failed to top up lobby bots for ${roomId}:`, err));
+  }
 
   console.log(`🔄 Round ${newRound} started: ${roomId} - "${prompt.text?.substring(0, 40)}..." (prompt locked via transaction)`);
 }
@@ -539,6 +564,8 @@ async function processVotesSync(roomId, votes, validSubmissions, currentRound, p
       winners.forEach(winnerId => {
         const phrase = validSubmissions?.[winnerId];
         if (!phrase) return;
+        // House-bot answers are canned lines — never publish them to the gallery
+        if (casualLobby.isBotId(winnerId)) return;
         // The gallery is public — filter explicit content before it lands there.
         if (!isCleanForPublic(phrase)) {
           console.log(`🚫 Starred phrase failed content filter — not saved to gallery`);
@@ -665,7 +692,8 @@ async function endGame(roomId) {
     // Save match history for each player (ALWAYS — not just players with bestPhrase).
     // Simulation rooms are excluded — bot matches must not pollute user history.
     const batch = db.batch();
-    const players = room?.isSimulation === true ? [] : (room?.players || []);
+    // House bots never get history, ratings, or group stats.
+    const players = room?.isSimulation === true ? [] : (room?.players || []).filter(p => !p.isBot);
     let matchesQueued = 0;
 
     for (const player of players) {
@@ -759,6 +787,17 @@ async function endGame(roomId) {
     // Clear used prompts for this room
     clearRoomPrompts(roomId);
     
+    // Casual Lobby: roll straight into the next game. Everyone still here is
+    // seated in a fresh successor room; clients move over after the results.
+    if (room?.isLobby) {
+      try {
+        const nextRoomId = await casualLobby.rollLobbyToNextGame(roomId, room);
+        console.log(`🎉 Lobby ${roomId} → next game ${nextRoomId || '(none — nobody left)'}`);
+      } catch (err) {
+        console.error(`⚠️ Failed to roll lobby ${roomId} to the next game:`, err);
+      }
+    }
+
     console.log(`🏁 Game ended: ${roomId} - Winner: ${winnerId} with ${maxVotes} votes`);
   } catch (error) {
     console.error(`❌ Error ending game ${roomId}:`, error);

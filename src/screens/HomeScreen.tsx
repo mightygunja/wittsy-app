@@ -19,7 +19,7 @@ import { useGuestUpgrade } from '../hooks/useGuestUpgrade';
 import { dailyRewardsService } from '../services/dailyRewardsService';
 import { deepLinking } from '../services/deepLinking';
 import { TYPOGRAPHY, SPACING, RADIUS, ANIMATION } from '../utils/constants';
-import { getActiveRooms, subscribeToActiveRooms, createRoom, joinRoom, leaveRoom, getUserActiveRoom, getUserActiveCasualRoom, getRoomByCode } from '../services/database';
+import { getActiveRooms, subscribeToActiveRooms, createRoom, joinRoom, leaveRoom, getUserActiveRoom, getUserActiveCasualRoom, getRoomByCode, joinCasualLobby, subscribeToCasualLobby } from '../services/database';
 import { getCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { RejoinRoomPrompt } from '../components/game/RejoinRoomPrompt';
 import { getUserGroups, subscribeToGroupActiveRooms, joinGroupViaInviteCode } from '../services/groups';
@@ -54,6 +54,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [joiningByCode, setJoiningByCode] = useState(false);
   const [rejoinTarget, setRejoinTarget] = useState<{ roomId: string; roomName: string } | null>(null);
   const rejoinCheckedRef = useRef(false);
+  const [casualLobby, setCasualLobby] = useState<any | null>(null);
+  const [joiningLobby, setJoiningLobby] = useState(false);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userActiveRoom, setUserActiveRoom] = useState<any | null>(null);
   const [userActiveCasualRoom, setUserActiveCasualRoom] = useState<any | null>(null);
@@ -218,6 +220,25 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       } catch (_) { /* already gone */ }
     }
     await clearCurrentRoom();
+  };
+
+  // Live Casual Lobby card (follows the lobby pointer as games roll over)
+  useEffect(() => {
+    if (!user?.uid) return;
+    return subscribeToCasualLobby(setCasualLobby);
+  }, [user?.uid]);
+
+  const handleJoinCasualLobby = async () => {
+    if (joiningLobby) return;
+    setJoiningLobby(true);
+    try {
+      const lobbyRoomId = await joinCasualLobby();
+      navigation.navigate('GameRoom', { roomId: lobbyRoomId });
+    } catch (error: any) {
+      Alert.alert('Couldn\'t Join', error?.message || 'The Casual Lobby is unavailable right now. Please try again.');
+    } finally {
+      setJoiningLobby(false);
+    }
   };
 
   // Handle deep links for game room invites
@@ -394,7 +415,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const loadActiveRooms = async () => {
     try {
       const rooms = await getActiveRooms({ isPrivate: false });
-      setActiveRooms(rooms.filter((r: any) => !r.groupId).slice(0, 5));
+      setActiveRooms(rooms.filter((r: any) => !r.groupId && !r.isLobby).slice(0, 5));
     } catch (error) {
       console.error('Error loading rooms:', error);
     }
@@ -439,7 +460,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setLoadingRooms(true);
     try {
       const rooms = await getActiveRooms({ isPrivate: false, maxResults: 50 });
-      setCasualRooms(rooms.filter((r: any) => !r.groupId));
+      // The Casual Lobby has its own pinned card above this list
+      setCasualRooms(rooms.filter((r: any) => !r.groupId && !r.isLobby));
     } catch (error) {
       console.error('Error loading casual rooms:', error);
     } finally {
@@ -522,7 +544,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       if (matchingRoom) {
         setJoinCodeOpen(false);
         setJoinCode('');
-        await handleJoinRoom(matchingRoom.roomId);
+        if (matchingRoom.isLobby) {
+          await handleJoinCasualLobby();
+        } else {
+          await handleJoinRoom(matchingRoom.roomId);
+        }
       } else {
         setJoinCodeError(`No active room found with code ${roomCode}.`);
       }
@@ -1162,6 +1188,42 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={[styles.sectionTitle, { marginBottom: SPACING.md }]}>
               {selectedRoomType === 'ranked' ? 'Current Ranked Games' : 'Current Casual Games'}
             </Text>
+            {selectedRoomType === 'casual' && (() => {
+              const lobbyPeople = (casualLobby?.players || []).filter((p: any) => !p.isBot).length;
+              const imInLobby = !!casualLobby?.players?.some((p: any) => p.userId === user?.uid);
+              const lobbyStatus = !casualLobby || casualLobby.status !== 'active'
+                ? 'Next game starting soon'
+                : `Game in progress${casualLobby.currentRound ? ` · Round ${casualLobby.currentRound}` : ''}`;
+              return (
+                <TouchableOpacity
+                  style={styles.lobbyPinnedCard}
+                  onPress={() => (imInLobby && casualLobby
+                    ? navigation.navigate('GameRoom', { roomId: casualLobby.roomId })
+                    : handleJoinCasualLobby())}
+                  activeOpacity={0.85}
+                  disabled={joiningLobby}
+                >
+                  <View style={styles.roomCardHeader}>
+                    <View style={styles.roomCardTitleRow}>
+                      <Text style={styles.roomCardName}>🎉 Casual Lobby</Text>
+                      <Badge text={imInLobby ? "YOU'RE IN" : 'ALWAYS OPEN'} variant="success" size="sm" />
+                    </View>
+                    <Text style={styles.roomCardPlayers}>👥 {lobbyPeople} playing</Text>
+                  </View>
+                  <Text style={styles.lobbyPinnedSubtitle}>
+                    Jump in anytime. First to {casualLobby?.settings?.winningVotes ?? 20} wins, then a new game starts right away. House bots keep the table full.
+                  </Text>
+                  <View style={styles.roomCardFooter}>
+                    <Text style={styles.roomCardStatus}>
+                      {casualLobby?.status === 'active' ? '🎮' : '⏳'} {lobbyStatus}
+                    </Text>
+                    <Text style={styles.lobbyPinnedCta}>
+                      {joiningLobby ? 'Joining…' : imInLobby ? 'Return ›' : 'Join ›'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })()}
             {loadingRooms ? (
               <Text style={styles.loadingText}>Loading rooms...</Text>
             ) : (
@@ -1169,7 +1231,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 {(selectedRoomType === 'ranked' ? rankedRooms : casualRooms).length === 0 ? (
                   <View style={styles.emptyRooms}>
                     <Text style={styles.emptyRoomsText}>
-                      No {selectedRoomType} games available
+                      {selectedRoomType === 'casual' ? 'No other casual games right now' : 'No ranked games available'}
                     </Text>
                     {selectedRoomType === 'ranked' && (
                       <Button
@@ -1745,5 +1807,25 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.error,
     fontSize: scaleFontSize(TYPOGRAPHY.fontSize.sm),
     marginTop: SPACING.sm,
+  },
+  lobbyPinnedCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.base,
+    marginBottom: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  lobbyPinnedSubtitle: {
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.sm),
+    color: COLORS.textSecondary,
+    lineHeight: getLineHeight(scaleFontSize(TYPOGRAPHY.fontSize.sm)),
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  lobbyPinnedCta: {
+    fontSize: scaleFontSize(TYPOGRAPHY.fontSize.base),
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.primary,
   },
 });

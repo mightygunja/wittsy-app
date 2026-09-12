@@ -28,6 +28,10 @@ exports.sendPushOnNotification = pushSender.sendPushOnNotification;
 const moderateSubmissions = require('./moderateSubmissions');
 exports.moderatePromptSubmission = moderateSubmissions.moderatePromptSubmission;
 
+const casualLobby = require('./casualLobby');
+exports.joinCasualLobby = casualLobby.joinCasualLobby;
+exports.startCasualLobby = casualLobby.startCasualLobby;
+
 // One-time initialization
 exports.initializeCollections = initCollections.initializeCollections;
 
@@ -171,6 +175,8 @@ exports.cleanupStaleCasualRooms = functions.pubsub
 
       staleRooms.docs.forEach(doc => {
         const roomData = doc.data();
+        // The always-on Casual Lobby is meant to be long-lived — exempt
+        if (roomData.isLobby) return;
         console.log(`🗑️ Deleting stale casual room: ${doc.id} (${roomData.name}) - ${roomData.status} - created ${roomData.createdAt.toDate()}`);
         batch.delete(doc.ref);
         

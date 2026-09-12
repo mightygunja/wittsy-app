@@ -104,7 +104,9 @@ exports.onGameStart = functions.firestore
     const beforeCount = (before.players || []).length;
     const afterCount  = players.length;
 
-    if (after.status === 'waiting' && beforeCount < 3 && afterCount >= 3) {
+    // (No push for the Casual Lobby: people are already in the app, and its
+    // games start back-to-back.)
+    if (!after.isLobby && after.status === 'waiting' && beforeCount < 3 && afterCount >= 3) {
       console.log(`Room ${roomId}: player count reached ${afterCount} — sending "about to start" notification`);
       await notifyRoomPlayers(
         players,
@@ -118,13 +120,15 @@ exports.onGameStart = functions.firestore
     if (before.status === 'waiting' && after.status === 'active') {
       await gameEngine.startGame(roomId);
 
-      console.log(`Room ${roomId}: game started — sending "game started" notification`);
-      await notifyRoomPlayers(
-        players,
-        'Game Started! 🚀',
-        'Your Wittz game has started. Submit your wittiest response!',
-        { type: 'game_started', roomId }
-      ).catch(err => console.error('Failed to send "game started" notifications:', err));
+      if (!after.isLobby) {
+        console.log(`Room ${roomId}: game started — sending "game started" notification`);
+        await notifyRoomPlayers(
+          players,
+          'Game Started! 🚀',
+          'Your Wittz game has started. Submit your wittiest response!',
+          { type: 'game_started', roomId }
+        ).catch(err => console.error('Failed to send "game started" notifications:', err));
+      }
     }
 
     return null;

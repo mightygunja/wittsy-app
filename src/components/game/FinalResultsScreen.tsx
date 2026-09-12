@@ -289,6 +289,11 @@ interface FinalResultsScreenProps {
     newRating: number;
     ratingChange: number;
   } | null;
+  /** Casual Lobby: seconds until the next game; counts down, then calls onNextGame. */
+  nextGameInSeconds?: number | null;
+  onNextGame?: () => void;
+  /** Optional line explaining why no rewards are shown (e.g. lobby games need 2+ people). */
+  rewardsNote?: string | null;
 }
 
 export const FinalResultsScreen: React.FC<FinalResultsScreenProps> = ({
@@ -301,7 +306,26 @@ export const FinalResultsScreen: React.FC<FinalResultsScreenProps> = ({
   playAgainLoading = false,
   rewards = null,
   myRatingChange = null,
+  nextGameInSeconds = null,
+  onNextGame,
+  rewardsNote = null,
 }) => {
+  // Casual Lobby: count down to the next game, then move automatically
+  const [nextGameCountdown, setNextGameCountdown] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (!visible || nextGameInSeconds == null) {
+      setNextGameCountdown(null);
+      return;
+    }
+    setNextGameCountdown(nextGameInSeconds);
+    const timer = setInterval(() => {
+      setNextGameCountdown((prev) => (prev == null ? prev : Math.max(0, prev - 1)));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [visible, nextGameInSeconds]);
+  React.useEffect(() => {
+    if (nextGameCountdown === 0) onNextGame?.();
+  }, [nextGameCountdown]);
   const { colors: COLORS } = useTheme();
   const styles = useMemo(() => createStyles(COLORS), [COLORS]);
 
@@ -451,9 +475,27 @@ export const FinalResultsScreen: React.FC<FinalResultsScreenProps> = ({
           </View>
         )}
 
+        {!rewards && !myRatingChange && rewardsNote ? (
+          <Text style={styles.rewardsNote}>{rewardsNote}</Text>
+        ) : null}
+
         {/* Buttons */}
         <View style={styles.buttons}>
-          {isHost ? (
+          {nextGameInSeconds != null ? (
+            <>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnPlayAgain]}
+                onPress={onNextGame}
+              >
+                <Text style={styles.btnPlayAgainText}>
+                  {nextGameCountdown ? `Next game in ${nextGameCountdown}s` : 'Starting next game…'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btn, styles.btnLeave]} onPress={onLeave}>
+                <Text style={styles.btnLeaveText}>Leave</Text>
+              </TouchableOpacity>
+            </>
+          ) : isHost ? (
             <>
               <TouchableOpacity
                 style={[styles.btn, styles.btnPlayAgain, playAgainLoading && styles.btnDisabled]}
@@ -619,6 +661,13 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   rewardsItem: {
     alignItems: 'center',
+  },
+  rewardsNote: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 4,
   },
   rewardsValue: {
     fontSize: 15,

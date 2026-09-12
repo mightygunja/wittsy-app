@@ -17,8 +17,9 @@ import {
   Timestamp,
   increment
 } from 'firebase/firestore';
-import { firestore, realtimeDb } from './firebase';
+import { firestore, realtimeDb, functions } from './firebase';
 import { ref, remove } from 'firebase/database';
+import { httpsCallable } from 'firebase/functions';
 import { Room, RoomSettings, Player, Prompt } from '../types';
 import { generateRoomCode } from '../utils/helpers';
 import { WINNING_VOTES, JOIN_LOCK_THRESHOLD } from '../utils/constants';
@@ -271,7 +272,8 @@ export const subscribeToActiveRooms = (
       roomId: docSnap.id,
       ...docSnap.data()
     } as Room));
-    callback(rooms);
+    // The Casual Lobby is shown as its own pinned card, not in this list
+    callback(rooms.filter(r => !r.isLobby));
   });
 };
 
@@ -501,8 +503,10 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
       console.log(`👑 New host assigned: ${updatedPlayers[0].username}`);
     }
 
-    // Active game with fewer than 3 players remaining - end the game
-    if (roomStatus === 'active' && updatedPlayers.length < 3) {
+    // Active game with fewer than 3 players remaining - end the game. The
+    // Casual Lobby never ends on departures: house bots refill the table at
+    // the next round, and a lobby nobody is in simply pauses.
+    if (roomStatus === 'active' && updatedPlayers.length < 3 && !roomData.isLobby) {
       updateData.status = 'finished';
       updateData.endedAt = new Date().toISOString();
       updateData.endReason = 'insufficient_players';
@@ -525,6 +529,53 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
     }
     console.log(`🏁 Room ${roomId} ended - fewer than 3 players remaining. Game cannot continue.`);
   }
+};
+
+// ==================== CASUAL LOBBY ====================
+
+/**
+ * Join the always-open Casual Lobby. Seating, house bots, and starting the
+ * game happen server-side; resolves to the room id to navigate to.
+ */
+export const joinCasualLobby = async (): Promise<string> => {
+  const call = httpsCallable<Record<string, never>, { roomId: string }>(functions, 'joinCasualLobby');
+  const result = await call({});
+  return result.data.roomId;
+};
+
+/** Start a waiting lobby game once its countdown ends (idempotent server-side). */
+export const startCasualLobby = async (roomId: string): Promise<void> => {
+  await httpsCallable(functions, 'startCasualLobby')({ roomId });
+};
+
+/**
+ * Live view of the current Casual Lobby room (null until one exists).
+ * Follows the config/casualLobby pointer as games roll over.
+ */
+export const subscribeToCasualLobby = (callback: (room: Room | null) => void): (() => void) => {
+  let roomUnsub: (() => void) | null = null;
+  const pointerUnsub = onSnapshot(
+    doc(firestore, 'config', 'casualLobby'),
+    (pointerSnap) => {
+      roomUnsub?.();
+      roomUnsub = null;
+      const lobbyRoomId = pointerSnap.exists() ? pointerSnap.data().roomId : null;
+      if (!lobbyRoomId) {
+        callback(null);
+        return;
+      }
+      roomUnsub = onSnapshot(
+        doc(firestore, 'rooms', lobbyRoomId),
+        (roomSnap) => callback(roomSnap.exists() ? ({ roomId: roomSnap.id, ...roomSnap.data() } as Room) : null),
+        () => callback(null)
+      );
+    },
+    () => callback(null)
+  );
+  return () => {
+    pointerUnsub();
+    roomUnsub?.();
+  };
 };
 
 /**

@@ -19,7 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../contexts/SettingsContext';
 import { AvatarDisplay } from '../components/avatar/AvatarDisplay';
-import { leaveRoom, startGame, deleteRoom, createRematchRoom } from '../services/database';
+import { leaveRoom, startGame, deleteRoom, createRematchRoom, startCasualLobby } from '../services/database';
 import { saveCurrentRoom, clearCurrentRoom } from '../services/roomPersistence';
 import { gameTimerService } from '../services/gameTimer';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -178,6 +178,12 @@ const GameRoomScreen: React.FC = () => {
   const [finalPlayers, setFinalPlayers] = useState<FinalPlayer[]>([]);
   const [playAgainLoading, setPlayAgainLoading] = useState(false);
   const gameEndProcessedRef = useRef(false);
+  // Casual Lobby: the successor room everyone moves to after the results
+  const [lobbyNextRoomId, setLobbyNextRoomId] = useState<string | null>(null);
+  // Latest room for callbacks inside long-lived subscriptions, whose
+  // closed-over `room` is frozen at subscribe time.
+  const latestRoomRef = useRef<Room | null>(null);
+  latestRoomRef.current = room;
   
   // Track previous phase to detect actual phase changes
   const previousPhaseRef = useRef<string | null>(null);
@@ -217,7 +223,11 @@ const GameRoomScreen: React.FC = () => {
       // Exactly-once guard for THIS user's rewards: remounting a finished room
       // (deep link, refresh) must not grant again. Shared settlement (match
       // history, ELO, group stats) happens server-side in endGame.
-      const firstSettlement = await claimPersonalSettlement(user.uid, roomId);
+      // Casual Lobby games need 2+ real people to earn rewards — otherwise a
+      // lone player could farm coins and XP against the house bots.
+      const peopleInRoom = room.players.filter(p => !p.isBot).length;
+      const rewardEligible = !room.isLobby || peopleInRoom >= 2;
+      const firstSettlement = rewardEligible && await claimPersonalSettlement(user.uid, roomId);
 
       let battlePassResult: { leveledUp: boolean; newLevel?: number } = { leveledUp: false };
       if (firstSettlement) {
@@ -359,9 +369,29 @@ const GameRoomScreen: React.FC = () => {
       } catch (error) {
         console.error('Error leaving room (navigating anyway):', error);
       }
+      // Casual Lobby: the next game was already set up with this player in it
+      if (lobbyNextRoomId) {
+        try {
+          await leaveRoom(lobbyNextRoomId, user.uid);
+        } catch (error) {
+          console.error('Error leaving the next lobby game:', error);
+        }
+      }
       clearCurrentRoom();
       navigation.goBack();
     }
+  };
+
+  // Casual Lobby: move to the next game (automatic after the results countdown)
+  const goToNextLobbyGame = () => {
+    if (!lobbyNextRoomId) return;
+    setShowFinalResults(false);
+    if (roomUnsubscribeRef.current) {
+      roomUnsubscribeRef.current();
+      roomUnsubscribeRef.current = null;
+    }
+    clearCurrentRoom();
+    navigation.replace('GameRoom' as never, { roomId: lobbyNextRoomId } as never);
   };
 
   // Subscribe to room data updates (Firestore)
@@ -377,8 +407,12 @@ const GameRoomScreen: React.FC = () => {
         setRoom(roomData);
         setLoading(false);
 
-        // If host created a rematch room, all clients navigate there automatically
-        if (roomData.nextRoomId && roomData.status === 'finished') {
+        if (roomData.nextRoomId && roomData.status === 'finished' && roomData.isLobby) {
+          // Casual Lobby: stay for the celebration and results — the results
+          // screen counts down, then moves everyone to the next game.
+          setLobbyNextRoomId(roomData.nextRoomId);
+        } else if (roomData.nextRoomId && roomData.status === 'finished') {
+          // Host created a rematch room: all clients navigate there automatically
           const nextId = roomData.nextRoomId as string;
           console.log('🔄 nextRoomId detected — navigating to rematch room:', nextId);
           if (roomUnsubscribeRef.current) {
@@ -442,8 +476,11 @@ const GameRoomScreen: React.FC = () => {
       if (remaining <= 0) {
         setCountdownRemaining(0);
         clearInterval(interval);
-        // Auto-start game when countdown reaches 0
-        if (room.isRanked && room.status === 'waiting') {
+        // Auto-start game when countdown reaches 0. Casual Lobby games start
+        // server-side (idempotent) — they have no human host to press Start.
+        if (room.isLobby && room.status === 'waiting') {
+          startCasualLobby(roomId).catch(err => console.error('Failed to start lobby game:', err));
+        } else if (room.isRanked && room.status === 'waiting') {
           handleStartGame();
         }
       } else {
@@ -452,7 +489,7 @@ const GameRoomScreen: React.FC = () => {
     }, 100);
     
     return () => clearInterval(interval);
-  }, [room?.countdownStartedAt, room?.countdownDuration, room?.status, room?.isRanked]);
+  }, [room?.countdownStartedAt, room?.countdownDuration, room?.status, room?.isRanked, room?.isLobby]);
 
   // Subscribe to game state updates
   useEffect(() => {
@@ -523,9 +560,11 @@ const GameRoomScreen: React.FC = () => {
             const primaryWinner = roundWinners[0];
             const winnerVotes = state.roundVoteCounts?.[primaryWinner] || 0;
 
-            // Star celebration at 4+ votes
-            if (winnerVotes >= STAR_THRESHOLD) {
-              const winnerPlayer = room?.players.find(p => p.userId === primaryWinner);
+            const liveRoom = latestRoomRef.current;
+
+            // Star celebration at 4+ votes (house bots don't get one)
+            if (winnerVotes >= STAR_THRESHOLD && !primaryWinner.startsWith('bot_')) {
+              const winnerPlayer = liveRoom?.players.find(p => p.userId === primaryWinner);
               const winnerPhrase = state.lastWinningPhrases?.[0] || state.lastWinningPhrase;
               if (winnerPlayer && winnerPhrase) {
                 setStarCelebrationData({
@@ -538,7 +577,10 @@ const GameRoomScreen: React.FC = () => {
               }
             }
 
-            if (user?.uid && roundWinners.includes(user.uid)) {
+            // Lobby rounds need 2+ real people to earn rewards (anti-farming)
+            const roundRewardEligible = !liveRoom?.isLobby ||
+              (liveRoom.players || []).filter(p => !p.isBot).length >= 2;
+            if (user?.uid && roundWinners.includes(user.uid) && roundRewardEligible) {
               const myVotes = state.roundVoteCounts?.[user.uid] || 0;
               analytics.winRound(roomId, state.currentRound || 0, myVotes);
 
@@ -1376,7 +1418,7 @@ const GameRoomScreen: React.FC = () => {
               </View>
 
               {/* Star earned badge — server awards a star at STAR_THRESHOLD+ votes */}
-              {winnerVotes >= STAR_THRESHOLD && (
+              {winnerVotes >= STAR_THRESHOLD && !winners.every(w => w.startsWith('bot_')) && (
                 <View style={styles.winnerHeroStarBadge}>
                   <Text style={styles.winnerHeroStarText}>⭐ STARRED — saved to the gallery</Text>
                 </View>
@@ -1631,8 +1673,10 @@ const GameRoomScreen: React.FC = () => {
                 <View style={styles.lobbyActionSection}>
                   <View style={styles.waitingCard}>
                     <Text style={styles.waitingIcon}>⏳</Text>
-                    <Text style={styles.waitingCardText}>Waiting for host to start the game...</Text>
-                    {needed > 0 && (
+                    <Text style={styles.waitingCardText}>
+                      {room.isLobby ? 'The next game starts automatically...' : 'Waiting for host to start the game...'}
+                    </Text>
+                    {needed > 0 && !room.isLobby && (
                       <Text style={styles.waitingCardSubtext}>
                         {needed} more player{needed !== 1 ? 's' : ''} needed to start
                       </Text>
@@ -1745,6 +1789,11 @@ const GameRoomScreen: React.FC = () => {
             ratingChange: mine.ratingChange,
           } : null;
         })()}
+        nextGameInSeconds={room?.isLobby && lobbyNextRoomId ? 10 : null}
+        onNextGame={goToNextLobbyGame}
+        rewardsNote={room?.isLobby && !gameEndRewards
+          ? 'Coins and XP are earned in lobby games with 2 or more people.'
+          : null}
       />
 
       {/* Star Celebration Animation */}
