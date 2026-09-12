@@ -68,6 +68,7 @@ class Telemetry {
   private screensViewed = 0;
   private lastScreen = '';
   private userId: string | null = null;
+  private profileSyncedFor: string | null = null;
   private started = false;
 
   // Local dev traffic must not pollute production analytics.
@@ -118,8 +119,12 @@ class Telemetry {
 
   setUser(userId: string | null) {
     this.userId = userId;
-    if (userId) {
-      // Merge device/user context onto the profile for per-user analysis
+    // Merge device/user context onto the profile for per-user analysis. For a
+    // brand-new account the profile doc doesn't exist yet at sign-in, and a
+    // merge onto a missing doc is a create the rules reject — so callers
+    // invoke this again once the profile exists. Re-writes only until one
+    // merge has succeeded for this user.
+    if (userId && this.profileSyncedFor !== userId) {
       setDoc(
         doc(firestore, 'users', userId),
         {
@@ -130,7 +135,11 @@ class Telemetry {
           },
         },
         { merge: true }
-      ).catch(() => {});
+      )
+        .then(() => {
+          this.profileSyncedFor = userId;
+        })
+        .catch(() => {});
     }
   }
 
@@ -142,7 +151,11 @@ class Telemetry {
   }
 
   track(name: string, params?: Record<string, unknown>) {
-    this.buffer.push({ name, params: sanitize(params), ts: Date.now() });
+    // Firestore rejects `undefined` anywhere in a document, so a param-less
+    // event must OMIT the key. `params: undefined` made every session_start
+    // invalid — and the whole batch carrying it.
+    const clean = sanitize(params);
+    this.buffer.push(clean ? { name, params: clean, ts: Date.now() } : { name, ts: Date.now() });
     if (this.buffer.length >= MAX_BUFFER) this.flush();
   }
 
@@ -169,22 +182,49 @@ class Telemetry {
         eventCount: events.length,
         flushedAt: Timestamp.now(),
       });
-    } catch {
-      // Most failures are pre-auth writes rejected by rules (visitor hasn't
-      // tapped Play yet). Re-queue so the batch lands after sign-in; cap the
-      // buffer so a persistent failure can't grow it unbounded.
-      this.buffer = [...events, ...this.buffer].slice(0, MAX_BUFFER * 3);
+    } catch (error: any) {
+      // Only a pre-auth rules rejection is worth retrying — the batch lands
+      // once the visitor signs in (buffer capped so it can't grow unbounded).
+      // Anything else, e.g. invalid data, fails identically on every retry:
+      // re-queueing it blocked every later flush in the session, so drop it.
+      const code = error?.code || '';
+      if (code === 'permission-denied' || code === 'unauthenticated') {
+        this.buffer = [...events, ...this.buffer].slice(0, MAX_BUFFER * 3);
+      }
     }
   }
 }
 
-/** Firestore rejects undefined values — strip them and clamp param size. */
+/**
+ * Make params Firestore-safe: Firestore rejects undefined, functions, class
+ * instances, and nested arrays anywhere in a document, and one bad value
+ * fails the whole batch. Strip/convert them recursively; clamp strings.
+ * Returns undefined when nothing is left, so callers can omit the key.
+ */
 function sanitize(params?: Record<string, unknown>): Record<string, unknown> | undefined {
-  if (!params) return undefined;
+  if (!params || typeof params !== 'object') return undefined;
+  const out = cleanValue(params, 0) as Record<string, unknown> | undefined;
+  return out && Object.keys(out).length > 0 ? out : undefined;
+}
+
+function cleanValue(v: unknown, depth: number): unknown {
+  if (v === undefined || typeof v === 'function' || typeof v === 'symbol') return undefined;
+  if (typeof v === 'string') return v.length > 200 ? v.slice(0, 200) : v;
+  if (v === null || typeof v !== 'object') return v;
+  if (depth >= 4) return undefined;
+  if (v instanceof Date) return v.toISOString();
+  if (v instanceof Error) return v.message.slice(0, 200);
+  if (Array.isArray(v)) {
+    return v
+      .map((item) => cleanValue(item, depth + 1))
+      .filter((item) => item !== undefined && !Array.isArray(item));
+  }
+  const proto = Object.getPrototypeOf(v);
+  if (proto !== Object.prototype && proto !== null) return String(v).slice(0, 200);
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(params)) {
-    if (v === undefined) continue;
-    out[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) : v;
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    const cleaned = cleanValue(val, depth + 1);
+    if (cleaned !== undefined) out[k] = cleaned;
   }
   return out;
 }

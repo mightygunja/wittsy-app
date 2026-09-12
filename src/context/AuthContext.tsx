@@ -66,7 +66,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Create or fetch user profile from Firestore
         const userDoc = await authService.getOrCreateUserProfile(firebaseUser);
-        
+
+        // Now that the profile exists, re-sync telemetry's device context: for
+        // a brand-new account the sign-in-time merge above was rejected (no
+        // profile doc yet). No-op when that earlier merge succeeded.
+        analytics.setUser(firebaseUser.uid);
+
         if (userDoc) {
           setUserProfile(userDoc as any); // Type conversion needed
         } else {
