@@ -135,6 +135,24 @@ export const updateGameState = (
   });
 };
 
+let serverTimeOffsetMs = 0;
+let serverTimeOffsetSubscribed = false;
+
+/**
+ * Current time on the server's clock. Phase timers count from server
+ * timestamps, so a device clock that drifts even a second or two would
+ * otherwise end phases early or late.
+ */
+export const serverNow = (): number => {
+  if (!serverTimeOffsetSubscribed) {
+    serverTimeOffsetSubscribed = true;
+    onValue(ref(realtimeDb, '.info/serverTimeOffset'), (snap) => {
+      serverTimeOffsetMs = Number(snap.val()) || 0;
+    });
+  }
+  return Date.now() + serverTimeOffsetMs;
+};
+
 /**
  * Subscribe to live game state updates
  */
@@ -152,8 +170,8 @@ export const subscribeToGameState = (
     if (state) {
       // Use phaseDuration from server (respects room settings)
       const duration = state.phaseDuration || 10;
-      const elapsed = (Date.now() - state.phaseStart) / 1000;
-      const remaining = Math.max(0, Math.floor(duration - elapsed));
+      const elapsed = (serverNow() - state.phaseStart) / 1000;
+      const remaining = Math.max(0, Math.ceil(duration - elapsed));
       
       // CRITICAL: Use state.prompt directly - this is the authoritative source
       // The prompt is set when the round starts and should NOT change during the round

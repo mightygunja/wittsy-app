@@ -32,6 +32,7 @@ import {
   subscribeToVotes,
   setTyping,
   subscribeToTyping,
+  serverNow,
 } from '../services/realtime';
 import { ref, remove } from 'firebase/database';
 import { realtimeDb } from '../services/firebase';
@@ -89,12 +90,19 @@ const advancePhase = async (roomId: string) => {
     console.error('Error advancing phase:', error);
   }
 };
+const ADVANCE_RETRY_MS = 3000;
+
+// Web: the answer box's autoFocus scrolls every clipping ancestor to reveal
+// it, so anything even slightly too wide shifts the whole room sideways and
+// cuts off both edges. Unlike `hidden`, `clip` can't be scrolled at all.
+const WEB_CLIP_STYLE = isWeb ? ({ overflow: 'clip' } as any) : null;
 import { Loading } from '../components/common/Loading';
 import Timer from '../components/game/Timer';
 import PhraseCard from '../components/game/PhraseCard';
 import ScoreBoard from '../components/game/ScoreBoard';
 import PlayerList from '../components/game/PlayerList';
 import { tabletHorizontalPadding } from '../utils/responsive';
+import { isWeb } from '../utils/webLayout';
 
 type RootStackParamList = {
   GameRoom: { roomId: string };
@@ -470,7 +478,7 @@ const GameRoomScreen: React.FC = () => {
       if (!room?.countdownStartedAt || !room?.countdownDuration) return;
       
       const startTime = new Date(room.countdownStartedAt).getTime();
-      const elapsed = (Date.now() - startTime) / 1000;
+      const elapsed = (serverNow() - startTime) / 1000;
       const remaining = room.countdownDuration - elapsed;
       
       if (remaining <= 0) {
@@ -501,8 +509,8 @@ const GameRoomScreen: React.FC = () => {
 
         // Calculate timeRemaining from phaseStartTime and phaseDuration
         if (state.phaseStartTime && state.phaseDuration) {
-          const elapsed = (Date.now() - state.phaseStartTime) / 1000;
-          state.timeRemaining = Math.max(0, Math.floor(state.phaseDuration - elapsed));
+          const elapsed = (serverNow() - state.phaseStartTime) / 1000;
+          state.timeRemaining = Math.max(0, Math.ceil(state.phaseDuration - elapsed));
         }
         
         // Reset phase-specific state when phase actually changes
@@ -630,17 +638,21 @@ const GameRoomScreen: React.FC = () => {
   useEffect(() => {
     if (!gameState?.phaseStartTime || !gameState?.phaseDuration) return;
 
-    let hasAdvanced = false;
+    // Retried until the phase changes (this effect restarts on every new
+    // phase): the server rejects calls that land too early and calls can
+    // fail, and in a lobby of one person plus bots there is no other client
+    // to advance the game instead.
+    let lastAdvanceAt = 0;
 
     const interval = setInterval(() => {
       setGameState(prev => {
         if (!prev?.phaseStartTime || !prev?.phaseDuration) return prev;
-        const elapsed = (Date.now() - prev.phaseStartTime) / 1000;
-        const remaining = Math.max(0, Math.floor(prev.phaseDuration - elapsed));
+        const elapsed = (serverNow() - prev.phaseStartTime) / 1000;
+        const remaining = Math.max(0, Math.ceil(prev.phaseDuration - elapsed));
 
         // Auto-submit if enabled and time runs out (prev.phase and the refs
         // are current — the outer gameState/phrase/hasSubmitted are stale here)
-        if (remaining === 0 && !hasAdvanced && prev.phase === 'submission') {
+        if (remaining === 0 && lastAdvanceAt === 0 && prev.phase === 'submission') {
           const currentPhrase = phraseRef.current;
           if (settings.gameplay.autoSubmit && currentPhrase.trim() && !hasSubmittedRef.current && user?.uid) {
             console.log('⚡ Auto-submitting phrase due to timeout');
@@ -652,8 +664,8 @@ const GameRoomScreen: React.FC = () => {
         // Advance phase when timer hits 0 — including 'insufficient' phase.
         // Do NOT rely on server-side setTimeout (Cloud Function containers can be killed).
         // The 'insufficient' case in gameEngine calls startNewRound directly.
-        if (remaining === 0 && !hasAdvanced) {
-          hasAdvanced = true;
+        if (remaining === 0 && Date.now() - lastAdvanceAt > ADVANCE_RETRY_MS) {
+          lastAdvanceAt = Date.now();
           advancePhase(roomId);
         }
 
@@ -1479,7 +1491,7 @@ const GameRoomScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, WEB_CLIP_STYLE]} edges={['bottom', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
