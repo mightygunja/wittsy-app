@@ -200,7 +200,7 @@ async function advancePhase(roomId) {
       // Bot answers are deterministic per room+round, so concurrent advance
       // calls write identical voting cards.
       if (lobbyBotIds.length > 0) {
-        Object.assign(validSubmissions, casualLobby.botPhrases(roomId, freshSubGame.round || 0, lobbyBotIds));
+        Object.assign(validSubmissions, casualLobby.botPhrases(roomId, freshSubGame.round || 0, lobbyBotIds, freshSubGame.promptCategory));
       }
       const validSubmissionCount = Object.keys(validSubmissions).length;
 
@@ -353,6 +353,7 @@ async function startNewRound(roomId) {
     phase: 'prompt',
     round: newRound,
     prompt: prompt.text,
+    promptCategory: prompt.category || null, // steers Casual Lobby bot answers
     phaseStart: now,
     phaseDuration: promptDuration,
     submissions: {},

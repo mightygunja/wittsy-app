@@ -32,8 +32,7 @@ const BOT_ROSTER = [
 ];
 
 // Prompt-agnostic punchlines (party-card style): they read as funny
-// non-sequiturs against any prompt. Keep the count coprime with 37 — the
-// per-bot stride in botPhrases — so bots never repeat within a round.
+// non-sequiturs against any prompt.
 const BOT_ANSWERS = [
   'A suspiciously confident raccoon',
   "My mom's Facebook comments",
@@ -151,28 +150,222 @@ function hash(str) {
   return h >>> 0;
 }
 
+// Themed lines, used for most of a bot's answers when the prompt's category
+// has a theme — so bot answers land on-topic and compete for people's votes.
+const THEMED_ANSWERS = {
+  food: [
+    'Gas station sushi, eaten confidently',
+    'Expired ranch with big dreams',
+    'The last slice nobody will claim',
+    'Pineapple on pizza, just to start a fight',
+    'A casserole my aunt refuses to explain',
+    'Cold pizza at 4 AM',
+    'Leftovers from an unknown year',
+    "The free sample lady's favorite customer",
+    'An avocado that was ripe for 11 minutes',
+    'Unseasoned tofu with no regrets',
+    'Kale chips pretending to be a snack',
+    "Hot sauce I can't handle but won't admit it",
+    'A charcuterie board for one',
+    'Ketchup on a steak, in public',
+    'A burrito that fell apart at the worst time',
+    'Cereal with orange juice, for chaos',
+    'Mayonnaise as a personality',
+    'The fancy cheese I pretend to understand',
+    'Crumbs in my keyboard from 2019',
+    'A gluten-free croissant with trust issues',
+    'Microwaving a whole rotisserie chicken at work',
+    'A buffet plate engineered like a skyscraper',
+    'A salad that is mostly croutons',
+    'Soup in a bread bowl, then eating the bowl',
+  ],
+  tech: [
+    'Autocorrect with a personal vendetta',
+    '47 open browser tabs',
+    "Replying 'lol' with a completely straight face",
+    'A group chat muted since 2021',
+    'Airplane mode as a lifestyle',
+    'My weekly screen time jump scare',
+    'Accidentally going live',
+    "A password that's just my dog's name",
+    'The spinning wheel of death',
+    'Talking for ten minutes while muted',
+    'Liking my own post by accident',
+    'A smart fridge with opinions',
+    'Turning it off and on again',
+    'A charger that only works at one angle',
+    'Seen at 2:14 AM',
+    'An influencer unboxing air',
+    '1% battery and a dream',
+    'The terms and conditions nobody read',
+    'Lag at the worst possible moment',
+    'Sending the screenshot to the person in the screenshot',
+    'Rage-quitting and immediately queuing again',
+    'A ring light in a dark bedroom',
+    'Posting a sunset nobody asked for',
+    'Buffering at the best part',
+  ],
+  entertainment: [
+    'A plot twist nobody asked for',
+    'The sequel that should have stayed a rumor',
+    'Skipping the intro like a legend',
+    'Crying at a cartoon about a toaster',
+    'A soundtrack playing in my head at the grocery store',
+    'One more episode at 3 AM',
+    'Karaoke with zero shame',
+    'A villain who honestly has a point',
+    'Spoiling the ending for everyone',
+    "The director's cut of my bad decisions",
+    'A laugh track for my entire life',
+    'A dramatic slow-motion walk to the fridge',
+    'A reunion tour nobody wanted',
+    'Rewatching the same show for the ninth time',
+    'The credits scene nobody waited for',
+    'An air guitar solo in traffic',
+    "An award speech I've practiced in the mirror",
+    'Lip-syncing into a hairbrush',
+    'A reality show about my group chat',
+    'Guessing the killer in the first five minutes',
+    'A musical number in the middle of an argument',
+    'The remix nobody asked for',
+    'My shower concert, completely sold out',
+    'Reading the last page first',
+  ],
+  love: [
+    "Texting 'wyd' at 2 AM",
+    'A red flag I painted green',
+    "Calling their mom 'dude' at the first dinner",
+    'Double-texting with full confidence',
+    "Deep-scrolling their cousin's dog's account",
+    'Splitting the bill down to the cent',
+    'A breakup announced in the group chat',
+    "Saying 'love you' to the pizza delivery guy",
+    'A second date at Costco',
+    'Matching pajamas, aggressively',
+    "Reading 'k' as a declaration of war",
+    'Pretending to love hiking',
+    'A love letter written entirely in memes',
+    "The 'we need to talk' text",
+    'A first date that turned into a job interview',
+    'Flirting exclusively by roasting them',
+    'Planning the wedding by date two',
+    'Relationship advice from a horoscope app',
+    'Accidentally liking their photo from 2016',
+    'Their ex still on the family group chat',
+    "A 'u up?' text sent to my boss",
+    'Falling for someone because of their dog',
+    'A candlelit dinner at a drive-thru',
+    'Rehearsing a casual hello for three days',
+  ],
+  work: [
+    'A meeting that could have been an email',
+    'Pretending my camera is broken',
+    "'Per my last email'",
+    'A LinkedIn post about my breakfast',
+    'Stalking the office birthday cake',
+    'Calling in sick with a very fake cough',
+    'A group project where I did everything',
+    "Mispronouncing the boss's name for a year",
+    'A standing desk I only sit at',
+    "Nodding confidently in a meeting I don't understand",
+    'Pajama pants on the video call',
+    'The coffee machine being broken again',
+    'Quiet quitting, but loudly',
+    'Writing the whole essay the night before',
+    'A pop quiz on a Monday',
+    "Stealing someone's clearly labeled yogurt",
+    "An out-of-office reply that's just a scream",
+    'Promoted to the person who fixes the printer',
+    'Asking the question the teacher just answered',
+    "A resume that says 'proficient in vibes'",
+    'Trust falls with people I do not trust',
+    'Taking the long way back from the bathroom',
+    'The fire drill that saved me from a presentation',
+    'Replying all with just a thumbs up',
+  ],
+  nature: [
+    'A pigeon who has seen everything',
+    'A cat that is clearly plotting something',
+    'A goose that chose violence',
+    'A houseplant surviving purely out of spite',
+    'A sloth on a deadline',
+    'A dog who thinks he is a lap dog at 90 pounds',
+    'A jellyfish just vibing',
+    'A volcano with anger management issues',
+    'Pluto, still bitter about the whole thing',
+    'An octopus who cannot commit to one hobby',
+    'A bee who is simply very tired',
+    'A frog who knows all your secrets',
+    'Mercury in retrograde, blamed for everything',
+    'An asteroid running fashionably late',
+    'A llama with a serious attitude',
+    'A crab who walks away from every argument',
+    'The most dramatic cactus in the world',
+    'A penguin in a tuxedo, overdressed again',
+    'A moth who found the porch light',
+    'A hummingbird on its fourth espresso',
+    'A tornado in a trench coat',
+    'A squirrel running a very small heist',
+    'A snail who refuses to be rushed',
+    'A black hole where my paycheck goes',
+  ],
+};
+
+// Prompt categories in the database are free-form and inconsistently cased;
+// anything unmapped just uses the general pool.
+const CATEGORY_THEMES = {
+  'food': 'food', 'food & drink': 'food',
+  'technology': 'tech', 'social media': 'tech', 'social-media': 'tech',
+  'internet': 'tech', 'gaming': 'tech', 'innovation': 'tech',
+  'entertainment': 'entertainment', 'music': 'entertainment', 'movies': 'entertainment',
+  'pop-culture': 'entertainment', 'books': 'entertainment', 'art': 'entertainment',
+  'sci-fi': 'entertainment', 'fantasy': 'entertainment',
+  'relationships': 'love', 'dating': 'love',
+  'work': 'work', 'career': 'work', 'school': 'work', 'skills': 'work',
+  'animals': 'nature', 'nature': 'nature', 'science': 'nature',
+};
+
+const themeFor = (category) => CATEGORY_THEMES[String(category || '').trim().toLowerCase()] || null;
+
 /** Answers for each bot this round: botId → phrase (distinct within the round). */
-function botPhrases(roomId, round, botIds) {
+function botPhrases(roomId, round, botIds, category) {
+  const themed = THEMED_ANSWERS[themeFor(category)] || [];
+  const used = new Set();
   const out = {};
-  const base = hash(`${roomId}:${round}`);
-  botIds.forEach((botId, i) => {
-    out[botId] = BOT_ANSWERS[(base + i * 37) % BOT_ANSWERS.length];
+  botIds.forEach((botId) => {
+    const h = hash(`${roomId}:${round}:${botId}:answer`);
+    const pool = themed.length > 0 && h % 10 < 6 ? themed : BOT_ANSWERS;
+    let idx = (h >>> 4) % pool.length;
+    while (used.has(pool[idx])) idx = (idx + 1) % pool.length;
+    used.add(pool[idx]);
+    out[botId] = pool[idx];
   });
   return out;
 }
 
-/** Votes for every bot that answered: botId → target (never itself). */
+const JUNK_ANSWERS = new Set(['lol', 'lmao', 'idk', 'ok', 'okay', 'k', 'no', 'yes', 'yea', 'yeah', 'nah', 'hi', 'hey', 'test', 'asdf', 'pass', 'skip', 'nothing', 'none', 'dunno']);
+
+function isLowEffort(phrase) {
+  const letters = String(phrase || '').toLowerCase().replace(/[^a-z]/g, '');
+  return letters.length < 3 || JUNK_ANSWERS.has(letters) || /^(.)\1+$/.test(letters);
+}
+
+/**
+ * Votes for every bot that answered: botId → target (never itself).
+ * Bots are fair judges — no favoritism toward people or other bots — so a
+ * lone player wins about their fair share (~1 in 4 games) instead of every
+ * game. Junk answers ("lol", "idk") only get a bot vote when nothing else
+ * is on the board.
+ */
 function botVotes(roomId, round, validSubmissions) {
   const votes = {};
   const ids = Object.keys(validSubmissions || {}).sort();
   ids.filter(isBotId).forEach((botId) => {
     const others = ids.filter((id) => id !== botId);
     if (others.length === 0) return;
+    const serious = others.filter((id) => !isLowEffort(validSubmissions[id]));
+    const pool = serious.length > 0 ? serious : others;
     const h = hash(`${roomId}:${round}:${botId}`);
-    // Lean toward people's answers (~70%): they actually answer the prompt,
-    // and it keeps the game about the humans at the table.
-    const people = others.filter((id) => !isBotId(id));
-    const pool = people.length > 0 && h % 10 < 7 ? people : others;
     votes[botId] = pool[(h >>> 4) % pool.length];
   });
   return votes;
@@ -441,6 +634,9 @@ module.exports = {
   isBotId,
   botPhrases,
   botVotes,
+  themeFor,
+  isLowEffort,
+  THEMED_ANSWERS,
   reconcileBots,
   newLobbyRoom,
   startLobbyIfWaiting,
