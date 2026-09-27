@@ -155,14 +155,14 @@ exports.cleanupStaleCasualRooms = functions.pubsub
   .onRun(async (context) => {
     console.log('🧹 Checking for stale casual rooms...');
     
-    const sixHoursAgo = admin.firestore.Timestamp.fromMillis(Date.now() - (6 * 60 * 60 * 1000));
+    const sixHoursAgoMs = Date.now() - (6 * 60 * 60 * 1000);
     
     try {
-      // Find casual rooms that are waiting or active and older than 6 hours
+      // Every live room, filtered in code below. Querying on isRanked and
+      // createdAt skipped any document missing those fields, so rooms written
+      // before the fields existed were never swept and sat 'active' forever.
       const staleRooms = await db.collection('rooms')
-        .where('isRanked', '==', false)
         .where('status', 'in', ['waiting', 'active'])
-        .where('createdAt', '<', sixHoursAgo)
         .get();
 
       if (staleRooms.empty) {
@@ -177,7 +177,16 @@ exports.cleanupStaleCasualRooms = functions.pubsub
         const roomData = doc.data();
         // The always-on Casual Lobby is meant to be long-lived — exempt
         if (roomData.isLobby) return;
-        console.log(`🗑️ Deleting stale casual room: ${doc.id} (${roomData.name}) - ${roomData.status} - created ${roomData.createdAt.toDate()}`);
+        // Ranked rooms have their own sweeper (cleanupStaleRankedRooms)
+        if (roomData.isRanked === true) return;
+        // Any live room has createdAt; a document without one predates the
+        // field entirely, so it is stale by definition.
+        const createdAt = roomData.createdAt;
+        const createdMs = createdAt && typeof createdAt.toMillis === 'function'
+          ? createdAt.toMillis()
+          : (createdAt ? new Date(createdAt).getTime() : 0);
+        if (createdMs >= sixHoursAgoMs) return;
+        console.log(`🗑️ Deleting stale casual room: ${doc.id} (${roomData.name}) - ${roomData.status} - created ${createdMs ? new Date(createdMs).toISOString() : 'unknown'}`);
         batch.delete(doc.ref);
         
         // Also clean up realtime database state

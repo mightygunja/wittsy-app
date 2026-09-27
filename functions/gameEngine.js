@@ -144,14 +144,39 @@ async function advancePhase(roomId) {
   switch (game.phase) {
     case 'prompt': {
       const nextDuration = Math.max(10, await getPhaseDurationForRoom(roomId, 'submission'));
-      await gameRef.update({
-        phase: 'submission',
-        phaseDuration: nextDuration,
-        phaseStart: Date.now(),
-        prompt: game.prompt,
-        submissions: {},
-        votes: {},
-      });
+
+      // Transaction: only the first caller flips prompt → submission. Every
+      // client calls advancePhase when its timer hits 0, and a plain update let
+      // each straggler rewrite phaseStart (restarting the answer clock for
+      // everyone) and wipe submissions typed in the meantime.
+      // The node must be synced first: with no listener attached the SDK runs
+      // the callback with null and aborts without ever reaching the server,
+      // which would stall every game at 'Get Ready'.
+      const keepSynced = () => {};
+      gameRef.on('value', keepSynced);
+      let promptResult;
+      try {
+        await gameRef.once('value');
+        promptResult = await gameRef.transaction((currentGame) => {
+          if (!currentGame || currentGame.phase !== 'prompt') return; // abort
+          return {
+            ...currentGame,
+            phase: 'submission',
+            phaseDuration: nextDuration,
+            phaseStart: Date.now(),
+            submissions: {},
+            votes: {},
+          };
+        });
+      } finally {
+        gameRef.off('value', keepSynced);
+      }
+
+      if (!promptResult.committed) {
+        console.log(`⏸️ ${roomId}: prompt already advanced by a concurrent call — skipping`);
+        return;
+      }
+
       console.log(`✅ ${roomId}: prompt → submission (${nextDuration}s)`);
       return;
     }
