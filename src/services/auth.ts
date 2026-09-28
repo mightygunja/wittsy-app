@@ -49,6 +49,22 @@ const generateRandomUsername = (): string => {
   return `${adj}${noun}${num}`;
 };
 
+// Security rules require a username of 3–20 characters: letters, digits and
+// underscores only. A provider's display name went straight into this field,
+// so a real name ("Abbas Hiptullah Kisat", "José") was rejected and the
+// account was left signed in with no profile at all.
+export const sanitizeUsername = (raw?: string | null): string => {
+  const cleaned = (raw || '')
+    .normalize('NFD')                 // separate accents from their letters
+    .replace(/[\u0300-\u036f]/g, '')  // drop the accent marks
+    .replace(/[^a-zA-Z0-9_]/g, '')    // spaces, apostrophes, emoji, punctuation
+    .slice(0, 20);
+  return cleaned.length >= 3 ? cleaned : generateRandomUsername();
+};
+
+export const PROFILE_SETUP_FAILED =
+  "We couldn't finish setting up your account. Please check your connection and try again.";
+
 // Helper to create default avatar
 const getDefaultAvatar = (): Avatar => ({
   faceShape: 'circle',
@@ -62,7 +78,7 @@ const getDefaultAvatar = (): Avatar => ({
 });
 
 // Get or create user profile in Firestore
-export const getOrCreateUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
+export const getOrCreateUserProfile = async (firebaseUser: FirebaseUser): Promise<User> => {
   try {
     const userRef = doc(firestore, 'users', firebaseUser.uid);
     const userSnap = await getDoc(userRef);
@@ -75,7 +91,7 @@ export const getOrCreateUserProfile = async (firebaseUser: FirebaseUser): Promis
       console.log('Creating new user document for:', firebaseUser.email);
       const newUser: User = {
         uid: firebaseUser.uid,
-        username: firebaseUser.displayName || generateRandomUsername(),
+        username: sanitizeUsername(firebaseUser.displayName),
         email: firebaseUser.email || '',
         avatar: getDefaultAvatar(),
         stats: {
@@ -123,9 +139,32 @@ export const getOrCreateUserProfile = async (firebaseUser: FirebaseUser): Promis
       return newUser as any;
     }
   } catch (error) {
+    // Rethrow: a caller that silently continues leaves the user in a phantom
+    // session whose games, coins and purchases are never saved.
     console.error('Error getting/creating user profile:', error);
-    return null;
+    throw error;
   }
+};
+
+/**
+ * Create the profile, retrying a few times, and never leave an account signed
+ * in without one — the Auth account exists the moment the credential lands,
+ * so giving up quietly strands it with no profile.
+ */
+const ensureUserProfile = async (firebaseUser: FirebaseUser): Promise<User> => {
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await getOrCreateUserProfile(firebaseUser);
+    } catch (profileError) {
+      lastError = profileError;
+      console.error(`⚠️ Profile setup attempt ${attempt}/3 failed:`, profileError);
+      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  await firebaseSignOut(auth).catch(() => {});
+  console.error('❌ Gave up on profile setup — signed the account out.', lastError);
+  throw new Error(PROFILE_SETUP_FAILED);
 };
 
 // Register new user
@@ -307,7 +346,7 @@ export const signInWithGoogle = async (): Promise<FirebaseUser> => {
       }
     }
 
-    await getOrCreateUserProfile(firebaseUser);
+    await ensureUserProfile(firebaseUser);
     try {
       await setDoc(
         doc(firestore, 'users', firebaseUser.uid),
@@ -363,7 +402,7 @@ export const signInWithGoogle = async (): Promise<FirebaseUser> => {
     console.log('✅ Signed in to Firebase with Google:', userCredential.user.email);
 
     // Create or update user profile
-    await getOrCreateUserProfile(userCredential.user);
+    await ensureUserProfile(userCredential.user);
     console.log('✅ User profile created/updated');
 
     // Update last active
@@ -469,26 +508,10 @@ export const signInWithApple = async (): Promise<FirebaseUser> => {
       throw signInError;
     }
 
-    // Get or create user profile with retry logic
-    let userProfile = null;
-    let retries = 3;
-    while (retries > 0 && !userProfile) {
-      try {
-        userProfile = await getOrCreateUserProfile(userCredential.user);
-        if (userProfile) {
-          console.log('✅ User profile created/retrieved successfully');
-          break;
-        }
-      } catch (profileError: any) {
-        console.error(`⚠️ Failed to create user profile (${retries} retries left):`, profileError);
-        retries--;
-        if (retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-        } else {
-          throw new Error('Failed to create user profile after multiple attempts');
-        }
-      }
-    }
+    // The old loop only decremented `retries` inside its catch, so a null
+    // return spun forever and froze the app mid sign-in.
+    const userProfile = await ensureUserProfile(userCredential.user);
+    console.log('✅ User profile created/retrieved successfully');
 
     // Initialize referral data for new Apple sign-ins
     if (userProfile) {

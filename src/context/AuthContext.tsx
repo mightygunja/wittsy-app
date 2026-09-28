@@ -64,69 +64,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // challenges come from the scheduled Cloud Functions. Seeding a fresh
         // project is done from an admin account via the seed utils.
 
-        // Create or fetch user profile from Firestore
-        const userDoc = await authService.getOrCreateUserProfile(firebaseUser);
+        // Create or fetch the user profile. A failure here used to fall back to
+        // a temporary in-memory profile, which let people play in a phantom
+        // account whose games, coins and purchases were never saved anywhere.
+        try {
+          const userDoc = await authService.getOrCreateUserProfile(firebaseUser);
 
-        // Now that the profile exists, re-sync telemetry's device context: for
-        // a brand-new account the sign-in-time merge above was rejected (no
-        // profile doc yet). No-op when that earlier merge succeeded.
-        analytics.setUser(firebaseUser.uid);
-
-        if (userDoc) {
-          setUserProfile(userDoc as any); // Type conversion needed
-        } else {
-          // Fallback to temporary profile
-          setUserProfile({
-            uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          username: firebaseUser.displayName || 'Anonymous',
-          avatar: {
-            faceShape: 'circle',
-            skinTone: '#FFD1A3',
-            hairstyle: 'short',
-            hairColor: '#000000',
-            eyes: 'normal',
-            mouth: 'smile',
-            accessories: [],
-            background: '#6C63FF'
-          },
-          stats: {
-            gamesPlayed: 0,
-            gamesWon: 0,
-            roundsWon: 0,
-            starsEarned: 0,
-            totalVotes: 0,
-            averageVotes: 0,
-            submissionRate: 100,
-            votingAccuracy: 0,
-            currentStreak: 0,
-            bestStreak: 0,
-            longestPhraseLength: 0,
-            shortestWinningPhraseLength: 0,
-            comebackWins: 0,
-            closeCallWins: 0,
-            unanimousVotes: 0,
-            perfectGames: 0
-          },
-          rating: 1200,
-          rank: 'Bronze I',
-          level: 1,
-          xp: 0,
-          achievements: [],
-          friends: [],
-          settings: {
-            theme: 'auto',
-            soundEnabled: true,
-            musicVolume: 0.7,
-            sfxVolume: 0.8,
-            notificationsEnabled: true,
-            showOnlineStatus: true,
-            allowFriendRequests: true,
-            profileVisibility: 'public'
-          },
-          createdAt: new Date(),
-          lastActive: new Date()
-        });
+          // Now that the profile exists, re-sync telemetry's device context: for
+          // a brand-new account the sign-in-time merge above was rejected (no
+          // profile doc yet). No-op when that earlier merge succeeded.
+          analytics.setUser(firebaseUser.uid);
+          setUserProfile(userDoc as any);
+        } catch (profileError) {
+          console.error('Failed to load or create the user profile:', profileError);
+          setUserProfile(null);
+          await authService.signOut().catch(() => {});
+          Alert.alert(
+            'Account Setup Failed',
+            "We couldn't finish setting up your account. Please check your connection and sign in again."
+          );
         }
       } else {
         setUserProfile(null);
@@ -190,11 +146,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshUserProfile = async () => {
-    if (user) {
+    if (!user) return;
+    try {
       const userDoc = await authService.getOrCreateUserProfile(user);
-      if (userDoc) {
-        setUserProfile(userDoc as any);
-      }
+      setUserProfile(userDoc as any);
+    } catch (error) {
+      // Keep the profile we already have rather than dropping the session
+      console.error('Failed to refresh the user profile:', error);
     }
   };
 
