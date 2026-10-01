@@ -24,11 +24,11 @@ const db = () => admin.firestore();
 const pointerRef = () => db().doc('config/casualLobby');
 
 const BOT_ROSTER = [
-  { userId: 'bot_pixel', username: 'PixelBot', avatarConfig: { skin: 'skin_medium', eyes: 'eyes_happy', mouth: 'mouth_grin', hair: 'hair_short', accessories: ['acc_glasses'], clothing: 'clothing_casual', background: 'bg_blue', effects: [] } },
-  { userId: 'bot_nova', username: 'NovaBot', avatarConfig: { skin: 'skin_light', eyes: 'eyes_normal', mouth: 'mouth_smile', hair: 'hair_long', accessories: [], clothing: 'clothing_casual', background: 'bg_purple', effects: [] } },
-  { userId: 'bot_byte', username: 'ByteBot', avatarConfig: { skin: 'skin_dark', eyes: 'eyes_happy', mouth: 'mouth_smile', hair: 'hair_bald', accessories: ['acc_glasses'], clothing: 'clothing_casual', background: 'bg_white', effects: [] } },
-  { userId: 'bot_echo', username: 'EchoBot', avatarConfig: { skin: 'skin_medium_dark', eyes: 'eyes_normal', mouth: 'mouth_grin', hair: 'hair_short', accessories: [], clothing: 'clothing_casual', background: 'bg_purple', effects: [] } },
-  { userId: 'bot_zippy', username: 'ZippyBot', avatarConfig: { skin: 'skin_medium_light', eyes: 'eyes_happy', mouth: 'mouth_grin', hair: 'hair_long', accessories: [], clothing: 'clothing_casual', background: 'bg_blue', effects: [] } },
+  { userId: 'bot_pixel', username: 'PixelBot', avatarConfig: { skin: 'skin_medium', eyes: 'eyes_happy', mouth: 'mouth_grin', hair: 'hair_short', accessories: ['acc_glasses'], clothing: 'clothing_casual', background: 'bg_blue', effects: [] }, persona: 'deadpan and literal, lands on one oddly specific mundane detail' },
+  { userId: 'bot_nova', username: 'NovaBot', avatarConfig: { skin: 'skin_light', eyes: 'eyes_normal', mouth: 'mouth_smile', hair: 'hair_long', accessories: [], clothing: 'clothing_casual', background: 'bg_purple', effects: [] }, persona: 'chaotic maximalist, escalates the premise as far as it will go' },
+  { userId: 'bot_byte', username: 'ByteBot', avatarConfig: { skin: 'skin_dark', eyes: 'eyes_happy', mouth: 'mouth_smile', hair: 'hair_bald', accessories: ['acc_glasses'], clothing: 'clothing_casual', background: 'bg_white', effects: [] }, persona: 'dry and observational, deeply unimpressed by everything' },
+  { userId: 'bot_echo', username: 'EchoBot', avatarConfig: { skin: 'skin_medium_dark', eyes: 'eyes_normal', mouth: 'mouth_grin', hair: 'hair_short', accessories: [], clothing: 'clothing_casual', background: 'bg_purple', effects: [] }, persona: 'wholesome and sincere, but just slightly unsettling' },
+  { userId: 'bot_zippy', username: 'ZippyBot', avatarConfig: { skin: 'skin_medium_light', eyes: 'eyes_happy', mouth: 'mouth_grin', hair: 'hair_long', accessories: [], clothing: 'clothing_casual', background: 'bg_blue', effects: [] }, persona: 'fast punchy one-liners, loves a pun or a hard turn' },
 ];
 
 // Prompt-agnostic punchlines (party-card style): they read as funny
@@ -137,6 +137,14 @@ const BOT_ANSWERS = [
   'An interpretive dance video about my feelings',
   'The vibe of a Monday',
 ];
+
+/** Roster entries, with personas, for the given bot ids (used by botBrain). */
+function botProfiles(botIds) {
+  return (botIds || [])
+    .map((id) => BOT_ROSTER.find((b) => b.userId === id))
+    .filter(Boolean)
+    .map((b) => ({ userId: b.userId, username: b.username, persona: b.persona }));
+}
 
 const isBotId = (id) => typeof id === 'string' && id.startsWith('bot_');
 
@@ -634,6 +642,7 @@ module.exports = {
   isBotId,
   botPhrases,
   botVotes,
+  botProfiles,
   themeFor,
   isLowEffort,
   THEMED_ANSWERS,

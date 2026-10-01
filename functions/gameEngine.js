@@ -13,6 +13,7 @@ const admin = require('firebase-admin');
 const { isCleanForPublic } = require('./contentFilter');
 const { settleRatings } = require('./elo');
 const casualLobby = require('./casualLobby');
+const botBrain = require('./botBrain');
 const db = admin.firestore();
 const rtdb = admin.database();
 
@@ -107,6 +108,41 @@ async function startGame(roomId) {
  * configured deadline, unless every player in the room has already submitted
  * (the legitimate everyone-is-done early advance).
  */
+/** Casual Lobby: write this round's bot answers into RTDB (best effort). */
+async function prepareBotAnswers(roomId, game) {
+  if (!game || !botBrain.isEnabled()) return;
+  try {
+    const roomDoc = await db.collection('rooms').doc(roomId).get();
+    const room = roomDoc.data();
+    if (!room || !room.isLobby) return;
+    const bots = casualLobby.botProfiles((room.players || []).filter(p => p.isBot).map(p => p.userId));
+    if (bots.length === 0) return;
+    const answers = await botBrain.generateAnswers({
+      roomId, round: game.round || 0, prompt: game.prompt, bots,
+    });
+    if (answers) {
+      await rtdb.ref(`rooms/${roomId}/game/botAnswers`).set({ round: game.round || 0, answers });
+    }
+  } catch (error) {
+    console.error(`⚠️ Bot answer prep failed for ${roomId}:`, error.message);
+  }
+}
+
+/** Casual Lobby: judge the board and park the bots' votes (best effort). */
+async function prepareBotVotes(roomId, { round, prompt, validSubmissions, botIds }) {
+  if (!botBrain.isEnabled()) return;
+  try {
+    const bots = casualLobby.botProfiles(botIds);
+    if (bots.length === 0) return;
+    const votes = await botBrain.chooseVotes({ roomId, round, prompt, validSubmissions, bots });
+    if (votes) {
+      await rtdb.ref(`rooms/${roomId}/game/botVotes`).set({ round, votes });
+    }
+  } catch (error) {
+    console.error(`⚠️ Bot vote prep failed for ${roomId}:`, error.message);
+  }
+}
+
 async function advancePhase(roomId) {
   const gameRef = rtdb.ref(`rooms/${roomId}/game`);
   const snapshot = await gameRef.once('value');
@@ -178,6 +214,11 @@ async function advancePhase(roomId) {
       }
 
       console.log(`✅ ${roomId}: prompt → submission (${nextDuration}s)`);
+
+      // Casual Lobby: the caller that won the transaction writes the bots'
+      // answers for this round while the submission timer runs, so the
+      // deadline itself never waits on a model call.
+      await prepareBotAnswers(roomId, promptResult.snapshot.val());
       return;
     }
 
@@ -222,10 +263,18 @@ async function advancePhase(roomId) {
           validSubmissions[userId] = phrase;
         }
       });
-      // Bot answers are deterministic per room+round, so concurrent advance
-      // calls write identical voting cards.
+      // Bot answers: the ones Claude wrote for this prompt when they arrived in
+      // time, else the canned pool (deterministic per room+round, so concurrent
+      // advance calls still write identical voting cards).
       if (lobbyBotIds.length > 0) {
-        Object.assign(validSubmissions, casualLobby.botPhrases(roomId, freshSubGame.round || 0, lobbyBotIds, freshSubGame.promptCategory));
+        const subRound = freshSubGame.round || 0;
+        const canned = casualLobby.botPhrases(roomId, subRound, lobbyBotIds, freshSubGame.promptCategory);
+        const written = freshSubGame.botAnswers && freshSubGame.botAnswers.round === subRound
+          ? (freshSubGame.botAnswers.answers || {})
+          : {};
+        lobbyBotIds.forEach((botId) => {
+          validSubmissions[botId] = written[botId] || canned[botId];
+        });
       }
       const validSubmissionCount = Object.keys(validSubmissions).length;
 
@@ -250,6 +299,16 @@ async function advancePhase(roomId) {
         validSubmissions,
       });
       console.log(`✅ ${roomId}: submission → voting (${votingDuration}s) | ${validSubmissionCount} valid submissions`);
+
+      // Casual Lobby: judge the board now, while the voting timer runs.
+      if (lobbyBotIds.length > 0) {
+        await prepareBotVotes(roomId, {
+          round: freshSubGame.round || 0,
+          prompt: freshSubGame.prompt,
+          validSubmissions,
+          botIds: lobbyBotIds,
+        });
+      }
       return;
     }
 
@@ -264,12 +323,21 @@ async function advancePhase(roomId) {
 
       console.log(`🗳️ ${Object.keys(freshVotingGame.votes || {}).length} votes received`);
 
-      // House bots vote at the deadline (deterministic per room+round, like
-      // their answers). Rooms without bots get no extra votes.
-      const allVotes = {
-        ...(freshVotingGame.votes || {}),
-        ...casualLobby.botVotes(roomId, freshVotingGame.round || 0, freshVotingGame.validSubmissions || {}),
-      };
+      // House bots vote at the deadline: Claude's judgement of the board when
+      // it arrived in time, else the deterministic fallback. A judged pick is
+      // only used when it names a real answer that isn't the bot's own.
+      const voteRound = freshVotingGame.round || 0;
+      const voteBoard = freshVotingGame.validSubmissions || {};
+      const fallbackVotes = casualLobby.botVotes(roomId, voteRound, voteBoard);
+      const judged = freshVotingGame.botVotes && freshVotingGame.botVotes.round === voteRound
+        ? (freshVotingGame.botVotes.votes || {})
+        : {};
+      const botBallots = {};
+      Object.keys(fallbackVotes).forEach((botId) => {
+        const pick = judged[botId];
+        botBallots[botId] = (pick && pick !== botId && voteBoard[pick]) ? pick : fallbackVotes[botId];
+      });
+      const allVotes = { ...(freshVotingGame.votes || {}), ...botBallots };
 
       const winnerData = await processVotesSync(
         roomId,

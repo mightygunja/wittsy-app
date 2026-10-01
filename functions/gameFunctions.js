@@ -140,7 +140,11 @@ exports.onGameStart = functions.firestore
  * Client calls this to advance phase when its timer hits 0.
  * This is the only mechanism — no server-side backup timers.
  */
-exports.advanceGamePhase = functions.https.onCall(async (data, context) => {
+// The Casual Lobby bots call Claude from inside advancePhase; the key is
+// bound here so it is available to that code path only.
+exports.advanceGamePhase = functions
+  .runWith({ secrets: ["ANTHROPIC_API_KEY"] })
+  .https.onCall(async (data, context) => {
   const { roomId } = data;
 
   if (!roomId) {
