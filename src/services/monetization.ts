@@ -183,6 +183,8 @@ export interface PurchaseResult {
 
 class MonetizationService {
   private initialized = false;
+  // Shared in-flight connection attempt (two callers initialize at launch)
+  private initPromise: Promise<boolean> | null = null;
   private currentUserId: string | null = null;
   private purchaseHistory: Purchase[] = [];
   private availableProducts: IAPProduct[] = [];
@@ -202,9 +204,9 @@ class MonetizationService {
   }
 
   /**
-   * Initialize IAP connection
+   * Open the store connection. Returns whether the store is actually usable.
    */
-  async initialize(userId?: string): Promise<void> {
+  async initialize(userId?: string): Promise<boolean> {
     // Always update the active user, even when the connection already exists
     // (account switch after sign-out re-runs initialize with a new uid).
     if (userId) {
@@ -212,82 +214,111 @@ class MonetizationService {
     }
 
     if (this.initialized) {
-      console.log('💰 Monetization already initialized');
-      return;
+      return true;
     }
 
-    // Skip IAP initialization on Expo Go
-    if (!isIAPAvailable()) {
-      console.log('⏭️ Skipping IAP initialization (Expo Go)');
+    // No store in this build (Expo Go / web): report ready so the app runs
+    // normally. The purchase paths check isIAPAvailable() and explain.
+    if (!isIAPAvailable() || !RNIap) {
+      console.log('⏭️ Skipping IAP initialization (no store in this build)');
       this.initialized = true;
-      return;
+      return true;
     }
 
+    // App.tsx and AuthContext both initialize at launch. Share one attempt
+    // instead of opening two connections and registering duplicate listeners,
+    // which would hand every purchase to the grant path twice.
+    if (!this.initPromise) {
+      this.initPromise = this.openConnection().finally(() => {
+        this.initPromise = null;
+      });
+    }
+    return this.initPromise;
+  }
+
+  private async openConnection(): Promise<boolean> {
     try {
       console.log('🔵 Initializing IAP connection...');
       await RNIap.initConnection();
       console.log('✅ IAP connection established');
+      this.initialized = true;
 
-      if (userId) {
-        this.currentUserId = userId;
-        console.log('✅ User ID set:', userId);
+      // Products are a nice-to-have for the shop UI. Failing to fetch them
+      // must not take the live connection down with it.
+      try {
+        const productIds = [
+          COIN_PRODUCTS.FIRST_TIME!,
+          COIN_PRODUCTS.SMALL!,
+          COIN_PRODUCTS.MEDIUM!,
+          COIN_PRODUCTS.LARGE!,
+          COIN_PRODUCTS.MEGA!,
+        ];
+        const products = await RNIap.fetchProducts({ skus: productIds });
+        this.availableProducts = (products || []) as IAPProduct[];
+        console.log('✅ Products loaded:', this.availableProducts.length);
+      } catch (productError: any) {
+        console.error('⚠️ Failed to load products (connection still live):', productError?.message);
       }
 
-      // Get available products
-      const productIds = [
-        COIN_PRODUCTS.FIRST_TIME!,
-        COIN_PRODUCTS.SMALL!,
-        COIN_PRODUCTS.MEDIUM!,
-        COIN_PRODUCTS.LARGE!,
-        COIN_PRODUCTS.MEGA!,
-      ];
-
-      console.log('🔵 Fetching products:', productIds);
-      const products = await RNIap.fetchProducts({ skus: productIds });
-      this.availableProducts = (products || []) as IAPProduct[];
-      console.log('✅ Products loaded:', this.availableProducts.length);
-
-      // Set up purchase listeners
-      this.purchaseUpdateSubscription = RNIap.purchaseUpdatedListener(
-        async (purchase: IAPPurchase) => {
-          console.log('🔵 Purchase update received:', purchase);
-          await this.handlePurchaseUpdate(purchase);
-        }
-      );
-
-      this.purchaseErrorSubscription = RNIap.purchaseErrorListener(
-        (error: PurchaseError) => {
-          console.error('❌ Purchase error:', error);
-          errorTracking.logError(new Error(error.message), { context: 'IAP purchase error' });
-          // Unblock any purchase waiting on its grant (cancel, card declined, ...)
-          const failedProductId = (error as any)?.productId;
-          const message = error?.code === 'E_USER_CANCELLED' ? 'Purchase cancelled' : (error?.message || 'Purchase failed');
-          if (failedProductId && this.pendingGrants.has(failedProductId)) {
-            this.pendingGrants.get(failedProductId)!({ granted: false, error: message });
-            this.pendingGrants.delete(failedProductId);
-          } else {
-            for (const [key, resolve] of this.pendingGrants) {
-              resolve({ granted: false, error: message });
-              this.pendingGrants.delete(key);
-            }
-          }
-        }
-      );
-
-      this.initialized = true;
-      console.log('✅ IAP initialized successfully');
-
+      this.registerPurchaseListeners();
       analytics.logEvent('iap_initialized', {});
+      return true;
     } catch (error: any) {
+      // Deliberately NOT marked initialized. The old code set the flag here
+      // regardless, so every later purchase passed the guard and reached the
+      // native layer with no connection, failing with "Connection not
+      // initialized. Call initConnection() first." for the rest of the
+      // session, with no way to recover.
+      this.initialized = false;
       console.error('❌ IAP initialization failed:', error);
       errorTracking.logError(error as Error, { context: 'IAP init' });
-      
-      // Mark as initialized anyway to allow app to continue
-      this.initialized = true;
-      console.log('⚠️ IAP initialization had errors but marked as initialized');
+      return false;
     }
   }
 
+  /** Registered once per live connection: duplicates double-handle purchases. */
+  private registerPurchaseListeners(): void {
+    if (this.purchaseUpdateSubscription || this.purchaseErrorSubscription) {
+      return;
+    }
+
+    this.purchaseUpdateSubscription = RNIap.purchaseUpdatedListener(
+      async (purchase: IAPPurchase) => {
+        console.log('🔵 Purchase update received:', purchase);
+        await this.handlePurchaseUpdate(purchase);
+      }
+    );
+
+    this.purchaseErrorSubscription = RNIap.purchaseErrorListener(
+      (error: PurchaseError) => {
+        console.error('❌ Purchase error:', error);
+        errorTracking.logError(new Error(error.message), { context: 'IAP purchase error' });
+        // Unblock any purchase waiting on its grant (cancel, card declined, ...)
+        const failedProductId = (error as any)?.productId;
+        const message = error?.code === 'E_USER_CANCELLED' ? 'Purchase cancelled' : (error?.message || 'Purchase failed');
+        if (failedProductId && this.pendingGrants.has(failedProductId)) {
+          this.pendingGrants.get(failedProductId)!({ granted: false, error: message });
+          this.pendingGrants.delete(failedProductId);
+        } else {
+          for (const [key, resolve] of this.pendingGrants) {
+            resolve({ granted: false, error: message });
+            this.pendingGrants.delete(key);
+          }
+        }
+      }
+    );
+  }
+
+  /**
+   * Make sure the store connection is live, retrying an earlier failure.
+   * initialize() runs at launch, when the store is often not reachable yet;
+   * this retry is what lets a purchase succeed on the next try instead of
+   * staying broken until the app is restarted.
+   */
+  private async ensureConnection(): Promise<boolean> {
+    if (this.initialized) return true;
+    return this.initialize();
+  }
   /**
    * Handle purchase updates
    */
@@ -440,9 +471,13 @@ class MonetizationService {
         };
       }
 
-      if (!this.initialized) {
-        console.error('❌ IAP not initialized');
-        throw new Error('IAP not initialized');
+      // Retry rather than fail outright: the launch-time init may have run
+      // before the store was reachable.
+      if (!(await this.ensureConnection())) {
+        return {
+          success: false,
+          error: 'Couldn’t reach the App Store. Check your connection and try again.',
+        };
       }
 
       const product = COIN_PACKAGES.find((p) => p.id === productId);
@@ -544,9 +579,11 @@ class MonetizationService {
         };
       }
 
-      if (!this.initialized) {
-        console.error('❌ Monetization not initialized');
-        throw new Error('Monetization not initialized');
+      if (!(await this.ensureConnection())) {
+        return {
+          success: false,
+          error: 'Couldn’t reach the App Store. Check your connection and try again.',
+        };
       }
 
       console.log('🔵 Requesting purchase for:', productId);
@@ -731,9 +768,8 @@ class MonetizationService {
         return { success: true, restored: 0 };
       }
 
-      if (!this.initialized) {
-        console.error('❌ IAP not initialized');
-        return { success: false, restored: 0, error: 'Store not initialized. Please try again.' };
+      if (!(await this.ensureConnection())) {
+        return { success: false, restored: 0, error: 'Couldn’t reach the App Store. Check your connection and try again.' };
       }
 
       const purchases = await RNIap.getAvailablePurchases();
@@ -811,7 +847,11 @@ class MonetizationService {
       if (this.purchaseErrorSubscription) {
         this.purchaseErrorSubscription.remove();
       }
-      await RNIap.endConnection();
+      if (RNIap && this.initialized) {
+        await RNIap.endConnection();
+      }
+      this.purchaseUpdateSubscription = null;
+      this.purchaseErrorSubscription = null;
       this.initialized = false;
       this.currentUserId = null;
       this.pendingGrants.clear();
