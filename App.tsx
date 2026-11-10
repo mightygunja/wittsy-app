@@ -38,55 +38,71 @@ export default function App() {
     // Make navigation ref available globally for push notifications
     (global as any).navigationRef = navigationRef;
     
-    // Initialize all services
+    // Initialize all services.
+    //
+    // Telemetry starts FIRST, before any await. It used to sit behind
+    // audioService.initialize() and playBackgroundMusic(), which load eight
+    // audio assets: if either threw or simply hung on a slow cold start, the
+    // shared catch swallowed it and analytics.startSession() never ran, so
+    // that session reported nothing at all — no sign-up, no screens, no
+    // games. That was roughly half of all users.
     const initializeServices = async () => {
       try {
-        // Initialize error tracking first
         errorTracking.initialize();
-        
-        // Initialize audio service
-        await audioService.initialize();
+        analytics.setEnabled(true);
+        analytics.startSession();
+      } catch (error) {
+        console.error('Failed to start analytics:', error);
+      }
 
-        // Start background music. Skipped on web: browsers block audio before
-        // the first user gesture, so autoplay here only produces console errors.
+      // Each service is independent: one failing or hanging must not skip
+      // the ones after it. The timeout does not cancel the work, it just
+      // stops a stuck service from holding up the rest of startup.
+      const step = async (name: string, run: () => Promise<unknown> | unknown, timeoutMs = 10000) => {
+        try {
+          await Promise.race([
+            Promise.resolve(run()),
+            new Promise((_resolve, reject) =>
+              setTimeout(() => reject(new Error(`${name} timed out after ${timeoutMs}ms`)), timeoutMs)
+            ),
+          ]);
+        } catch (error) {
+          console.error(`Failed to initialize ${name}:`, error);
+          errorTracking.logError(error as Error, { context: `App initialization: ${name}` });
+        }
+      };
+
+      await step('audio', async () => {
+        await audioService.initialize();
+        // Skipped on web: browsers block audio before the first user gesture,
+        // so autoplay here only produces console errors.
         if (Platform.OS !== 'web') {
           await audioService.playBackgroundMusic();
         }
+      });
 
-        // Initialize analytics + start the telemetry session
-        analytics.setEnabled(true);
-        analytics.startSession();
+      // Web has no IAP — purchases live in the native apps.
+      if (Platform.OS !== 'web') {
+        await step('monetization', () => monetization.initialize());
+      }
 
-        // Initialize monetization. Web has no IAP — purchases live in the
-        // native apps, so skip the store connection entirely.
-        if (Platform.OS !== 'web') {
-          await monetization.initialize();
-        }
-        
-        // Initialize A/B testing
-        await abTesting.initialize();
-        
-        // Configure Google Sign-In (skip on Expo Go - not supported)
+      await step('A/B testing', () => abTesting.initialize());
+
+      await step('Google Sign-In', () => {
+        // Not supported in Expo Go
         if (!isExpoGo()) {
           configureGoogleSignIn();
           console.log('✅ Google Sign-In configured (native build)');
         } else {
           console.log('⏭️ Skipping Google Sign-In configuration (Expo Go)');
         }
-        
-        // Note: Battle Pass, seeding, and other auth-dependent services 
-        // will initialize after user authentication in AuthContext
-        
-        // Initialize push notifications
-        await notifications.initialize();
-        
-        console.log('All services initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize services:', error);
-        errorTracking.logError(error as Error, { context: 'App initialization' });
-      }
-    };
+      });
 
+      // Battle Pass and other auth-dependent services initialize in AuthContext
+      await step('push notifications', () => notifications.initialize());
+
+      console.log('All services initialized');
+    };
     initializeServices();
 
     // Cleanup on unmount
